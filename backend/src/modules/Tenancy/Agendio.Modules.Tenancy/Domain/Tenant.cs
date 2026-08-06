@@ -1,0 +1,131 @@
+using Agendio.SharedKernel.Auditing;
+using Agendio.SharedKernel.Multitenancy;
+using Agendio.SharedKernel.Primitives;
+using Agendio.SharedKernel.Results;
+using Agendio.SharedKernel.ValueObjects;
+
+namespace Agendio.Modules.Tenancy.Domain;
+
+/// <summary>
+/// Raiz do modulo: um estabelecimento assinante da plataforma. NAO implementa
+/// ITenantOwned — Tenant E o tenant, nao pertence a um (nao tem RLS por
+/// TenantId; e protegido por autorizacao de aplicacao, nao por linha).
+/// </summary>
+public sealed class Tenant : AggregateRoot<TenantId>, IAuditable, ISoftDeletable
+{
+    public string Name { get; private set; } = string.Empty;
+
+    public Slug Slug { get; private set; } = null!;
+
+    /// <summary>Dirige o vocabulario da UI (ver <see cref="BusinessTypeCatalog"/>) e o catalogo de servicos sugerido.</summary>
+    public BusinessType BusinessType { get; private set; }
+
+    /// <summary>Fuso horario IANA (ex.: America/Sao_Paulo) — toda conversao de data/hora do tenant parte daqui.</summary>
+    public string TimeZoneId { get; private set; } = string.Empty;
+
+    public bool IsActive { get; private set; }
+
+    /// <summary>
+    /// Cor de marca em #RRGGBB, pareada com texto branco em toda a UI. Null usa
+    /// a cor padrao da plataforma. Contraste AA e verificado no momento de
+    /// salvar (<see cref="UpdateBranding"/>) — nunca depois.
+    /// </summary>
+    public string? PrimaryColorHex { get; private set; }
+
+    public DateTimeOffset CreatedAtUtc { get; set; }
+
+    public string? CreatedBy { get; set; }
+
+    public DateTimeOffset? UpdatedAtUtc { get; set; }
+
+    public string? UpdatedBy { get; set; }
+
+    public bool IsDeleted { get; set; }
+
+    public DateTimeOffset? DeletedAtUtc { get; set; }
+
+    // Exigido pelo EF Core para materializar a entidade vinda do banco.
+    private Tenant()
+    {
+    }
+
+    private Tenant(TenantId id, string name, Slug slug, BusinessType businessType, string timeZoneId) : base(id)
+    {
+        Name = name;
+        Slug = slug;
+        BusinessType = businessType;
+        TimeZoneId = timeZoneId;
+        IsActive = true;
+    }
+
+    public static Result<Tenant> Create(string? name, string? slugValue, BusinessType businessType, string? timeZoneId)
+    {
+        if (string.IsNullOrWhiteSpace(name))
+        {
+            return Result.Failure<Tenant>(Error.Validation("Tenant.NameEmpty", "O nome do estabelecimento nao pode ser vazio."));
+        }
+
+        var slugResult = Slug.Create(slugValue);
+        if (slugResult.IsFailure)
+        {
+            return Result.Failure<Tenant>(slugResult.Error);
+        }
+
+        if (!Enum.IsDefined(businessType))
+        {
+            return Result.Failure<Tenant>(Error.Validation("Tenant.InvalidBusinessType", "O segmento informado e invalido."));
+        }
+
+        if (string.IsNullOrWhiteSpace(timeZoneId) || !IsValidTimeZone(timeZoneId))
+        {
+            return Result.Failure<Tenant>(Error.Validation("Tenant.InvalidTimeZone", "O fuso horario informado e invalido."));
+        }
+
+        var tenant = new Tenant(TenantId.New(), name.Trim(), slugResult.Value, businessType, timeZoneId);
+        tenant.Raise(new TenantCreatedDomainEvent(tenant.Id, tenant.Name, tenant.Slug.Value));
+
+        return Result.Success(tenant);
+    }
+
+    public void Deactivate() => IsActive = false;
+
+    public void Activate() => IsActive = true;
+
+    /// <summary>Foreground fixo: todo componente da UI pareia --primary com texto branco (ver app/globals.css).</summary>
+    private const string BrandForegroundHex = "#FFFFFF";
+
+    public Result UpdateBranding(string? primaryColorHex)
+    {
+        if (!ContrastValidator.IsValidHexColor(primaryColorHex))
+        {
+            return Result.Failure(Error.Validation("Tenant.InvalidColorFormat", "Informe uma cor no formato #RRGGBB."));
+        }
+
+        if (!ContrastValidator.MeetsAaContrast(BrandForegroundHex, primaryColorHex!))
+        {
+            return Result.Failure(Error.Validation(
+                "Tenant.InsufficientContrast",
+                "Essa cor nao tem contraste suficiente com o texto branco (minimo AA: 4.5:1). Escolha um tom mais escuro."));
+        }
+
+        PrimaryColorHex = primaryColorHex;
+        return Result.Success();
+    }
+
+    private static bool IsValidTimeZone(string timeZoneId)
+    {
+        try
+        {
+            _ = TimeZoneInfo.FindSystemTimeZoneById(timeZoneId);
+            return true;
+        }
+        catch (TimeZoneNotFoundException)
+        {
+            return false;
+        }
+        catch (InvalidTimeZoneException)
+        {
+            return false;
+        }
+    }
+}

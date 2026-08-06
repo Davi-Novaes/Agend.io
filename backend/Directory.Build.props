@@ -1,0 +1,55 @@
+<Project>
+
+  <!--
+    Propriedades compartilhadas por TODOS os projetos do backend.
+    Evita repetir configuracao em cada .csproj e garante que um projeto novo
+    ja nasca com as mesmas regras de qualidade dos demais.
+  -->
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <LangVersion>latest</LangVersion>
+    <ImplicitUsings>enable</ImplicitUsings>
+
+    <!-- Nullable reference types: a defesa mais barata contra NullReferenceException. -->
+    <Nullable>enable</Nullable>
+
+    <!-- Determinismo e rastreabilidade de build. -->
+    <Deterministic>true</Deterministic>
+    <EnforceCodeStyleInBuild>true</EnforceCodeStyleInBuild>
+    <EnableNETAnalyzers>true</EnableNETAnalyzers>
+    <AnalysisLevel>latest-recommended</AnalysisLevel>
+
+    <!-- Central Package Management: versoes vivem em Directory.Packages.props. -->
+    <ManagePackageVersionsCentrally>true</ManagePackageVersionsCentrally>
+
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <!-- CS1591: nao exigimos XML doc em cada membro publico; apenas onde agrega. -->
+    <NoWarn>$(NoWarn);CS1591</NoWarn>
+
+    <!--
+      Avisos que SEMPRE sao erros, mesmo em build local.
+      Sao os que representam bug real, nao estilo:
+        CS8600-CS8655 -> violacoes de nullability
+        CS4014        -> chamada async sem await (fire-and-forget acidental)
+        CS0168/CS0219 -> variavel declarada e nao usada (quase sempre codigo morto)
+    -->
+    <WarningsAsErrors>
+      $(WarningsAsErrors);CS8600;CS8602;CS8603;CS8604;CS8618;CS8619;CS8625;CS4014;CS0168;CS0219
+    </WarningsAsErrors>
+  </PropertyGroup>
+
+  <!--
+    Em CI todo aviso vira erro. Localmente nao, para nao travar o fluxo de
+    desenvolvimento em avisos de estilo enquanto o codigo ainda esta tomando forma.
+    A barreira de qualidade continua existindo: nada entra na main com aviso.
+  -->
+  <PropertyGroup Condition="'$(ContinuousIntegrationBuild)' == 'true'">
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Using Include="System.Diagnostics.CodeAnalysis" />
+  </ItemGroup>
+
+</Project>
