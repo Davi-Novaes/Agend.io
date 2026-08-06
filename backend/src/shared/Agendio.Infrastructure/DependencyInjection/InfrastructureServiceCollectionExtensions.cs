@@ -1,0 +1,77 @@
+using Agendio.Infrastructure.Behaviors;
+using Agendio.Infrastructure.Messaging;
+using Agendio.Infrastructure.Multitenancy;
+using Agendio.Infrastructure.Persistence.Interceptors;
+using Agendio.Infrastructure.Security;
+using Agendio.SharedKernel.Messaging;
+using Agendio.SharedKernel.Multitenancy;
+using Agendio.SharedKernel.Time;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
+using StackExchange.Redis;
+
+namespace Agendio.Infrastructure.DependencyInjection;
+
+public static class InfrastructureServiceCollectionExtensions
+{
+    /// <summary>
+    /// Registra tudo que e transversal a todos os modulos: relogio, contexto de
+    /// tenant, seguranca (hash de senha, JWT), mensageria e os interceptors de
+    /// EF Core. Cada modulo, alem disso, registra o PROPRIO DbContext e os
+    /// PROPRIOS handlers via AddHandlersFromAssembly.
+    /// </summary>
+    public static IServiceCollection AddAgendioInfrastructure(this IServiceCollection services, IConfiguration configuration)
+    {
+        services.AddHttpContextAccessor();
+        services.AddSingleton<IClock, SystemClock>();
+        services.AddScoped<ITenantContext, HttpTenantContext>();
+
+        services.AddSingleton<IPasswordHasher, Argon2PasswordHasher>();
+        services.AddSingleton<IRefreshTokenGenerator, RefreshTokenGenerator>();
+
+        services.Configure<JwtOptions>(configuration.GetSection(JwtOptions.SectionName));
+        services.AddSingleton<IJwtTokenService, JwtTokenService>();
+
+        services.Configure<RabbitMqOptions>(configuration.GetSection(RabbitMqOptions.SectionName));
+        services.AddSingleton<IIntegrationEventPublisher, RabbitMqIntegrationEventPublisher>();
+
+        AddRedis(services, configuration);
+
+        // Interceptors do EF Core: escopados porque dependem de ITenantContext
+        // (escopado por requisicao). Cada DbContext de modulo os injeta via
+        // options.AddInterceptors(...) na propria configuracao (AddDbContext).
+        services.AddScoped<TenantConnectionInterceptor>();
+        services.AddScoped<AuditingSaveChangesInterceptor>();
+        services.AddScoped<DomainEventsToOutboxInterceptor>();
+
+        services.AddDispatcher();
+
+        // Pipeline behaviors GLOBAIS: registro como generico aberto aplica a
+        // TODO comando/consulta de TODO modulo, sem cada modulo precisar repetir.
+        // A ORDEM de registro e a ordem de execucao (o primeiro registrado e o
+        // mais externo): Logging precisa envolver tudo (inclusive falha de
+        // validacao) para registrar o desfecho; ExplicitTenant roda por ultimo,
+        // logo antes do handler, para o tenant estar ancorado quando o handler
+        // tocar o banco.
+        services.AddTransient(typeof(IPipelineBehavior<,>), typeof(LoggingBehavior<,>));
+        services.AddTransient(typeof(IPipelineBehavior<,>), typeof(ValidationBehavior<,>));
+        services.AddTransient(typeof(IPipelineBehavior<,>), typeof(ExplicitTenantBehavior<,>));
+
+        return services;
+    }
+
+    private static void AddRedis(IServiceCollection services, IConfiguration configuration)
+    {
+        var connectionString = configuration.GetConnectionString("Redis")
+            ?? throw new InvalidOperationException("Connection string 'Redis' nao configurada.");
+
+        services.AddSingleton<IConnectionMultiplexer>(_ =>
+            ConnectionMultiplexer.Connect(connectionString));
+
+        services.AddStackExchangeRedisCache(redisOptions =>
+        {
+            redisOptions.Configuration = connectionString;
+            redisOptions.InstanceName = "agendio:";
+        });
+    }
+}

@@ -1,0 +1,24 @@
+<Solution>
+  <Folder Name="/src/" />
+  <Folder Name="/src/host/">
+    <Project Path="src/host/Agendio.Api/Agendio.Api.csproj" />
+  </Folder>
+  <Folder Name="/src/modules/" />
+  <Folder Name="/src/modules/Identity/">
+    <Project Path="src/modules/Identity/Agendio.Modules.Identity.Contracts/Agendio.Modules.Identity.Contracts.csproj" />
+    <Project Path="src/modules/Identity/Agendio.Modules.Identity/Agendio.Modules.Identity.csproj" />
+  </Folder>
+  <Folder Name="/src/modules/Tenancy/">
+    <Project Path="src/modules/Tenancy/Agendio.Modules.Tenancy.Contracts/Agendio.Modules.Tenancy.Contracts.csproj" />
+    <Project Path="src/modules/Tenancy/Agendio.Modules.Tenancy/Agendio.Modules.Tenancy.csproj" />
+  </Folder>
+  <Folder Name="/src/shared/">
+    <Project Path="src/shared/Agendio.Infrastructure/Agendio.Infrastructure.csproj" />
+    <Project Path="src/shared/Agendio.SharedKernel/Agendio.SharedKernel.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/Agendio.ArchitectureTests/Agendio.ArchitectureTests.csproj" />
+    <Project Path="tests/Agendio.IntegrationTests/Agendio.IntegrationTests.csproj" />
+    <Project Path="tests/Agendio.UnitTests/Agendio.UnitTests.csproj" />
+  </Folder>
+</Solution>

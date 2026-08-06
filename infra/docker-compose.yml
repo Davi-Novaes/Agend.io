@@ -1,0 +1,84 @@
+name: agendio
+
+services:
+  postgres:
+    # Imagem com a extensao pgvector ja compilada (Postgres 17 por baixo) —
+    # preparacao barata para IA (ver docs/adr) sem esperar uma migration extra depois.
+    image: pgvector/pgvector:pg17
+    container_name: agendio-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres_dev_only
+      POSTGRES_DB: postgres
+    ports:
+      - "5432:5432"
+    volumes:
+      - agendio_postgres_data:/var/lib/postgresql/data
+      - ./postgres/init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    container_name: agendio-redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - agendio_redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  rabbitmq:
+    image: rabbitmq:4-management-alpine
+    container_name: agendio-rabbitmq
+    restart: unless-stopped
+    environment:
+      RABBITMQ_DEFAULT_USER: agendio
+      RABBITMQ_DEFAULT_PASS: agendio_dev_only
+    ports:
+      - "5672:5672"   # AMQP
+      - "15672:15672" # Management UI (http://localhost:15672)
+    volumes:
+      - agendio_rabbitmq_data:/var/lib/rabbitmq
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 10s
+      timeout: 10s
+      retries: 10
+
+  seq:
+    # Visualizador de logs estruturados do Serilog — http://localhost:8081
+    image: datalust/seq:latest
+    container_name: agendio-seq
+    restart: unless-stopped
+    environment:
+      ACCEPT_EULA: "Y"
+    ports:
+      - "8081:80"
+      - "5341:5341" # ingestao via API
+    volumes:
+      - agendio_seq_data:/data
+
+  mailhog:
+    # Captura e-mail enviado pela aplicacao em dev, sem mandar de verdade —
+    # UI em http://localhost:8025
+    image: mailhog/mailhog:latest
+    container_name: agendio-mailhog
+    restart: unless-stopped
+    ports:
+      - "1025:1025" # SMTP
+      - "8025:8025" # Web UI
+
+volumes:
+  agendio_postgres_data:
+  agendio_redis_data:
+  agendio_rabbitmq_data:
+  agendio_seq_data:

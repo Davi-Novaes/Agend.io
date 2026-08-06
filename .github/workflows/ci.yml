@@ -1,0 +1,50 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+# Cancela execucoes anteriores do mesmo PR quando um novo commit chega —
+# evita gastar minutos de CI rodando uma versao ja obsoleta do codigo.
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  backend:
+    name: Backend (.NET)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "10.0.x"
+
+      - name: Restaurar dependencias
+        run: dotnet restore backend/Agendio.slnx
+
+      # ContinuousIntegrationBuild=true liga TreatWarningsAsErrors (ver
+      # Directory.Build.props) — nada com aviso passa no CI, mesmo que builds
+      # locais sejam mais tolerantes durante o desenvolvimento.
+      - name: Build (0 avisos obrigatorio)
+        run: dotnet build backend/Agendio.slnx --no-restore -c Release -p:ContinuousIntegrationBuild=true
+
+      - name: Testes unitarios (Agendio.UnitTests)
+        run: dotnet test backend/tests/Agendio.UnitTests/Agendio.UnitTests.csproj --no-build -c Release
+
+      - name: Testes de arquitetura (Agendio.ArchitectureTests)
+        run: dotnet test backend/tests/Agendio.ArchitectureTests/Agendio.ArchitectureTests.csproj --no-build -c Release
+
+      # Sobe Postgres/Redis/RabbitMQ via Testcontainers (o runner Ubuntu do
+      # GitHub ja tem Docker disponivel, sem configuracao extra) e exercita o
+      # host da API de ponta a ponta. INCLUI o teste de isolamento entre
+      # tenants — gate obrigatorio, PR quebra o build se isolamento falhar.
+      - name: Testes de integracao (Agendio.IntegrationTests)
+        run: dotnet test backend/tests/Agendio.IntegrationTests/Agendio.IntegrationTests.csproj --no-build -c Release
+
+  # Job do frontend entra quando frontend/ existir (Sprint 0, proximo commit):
+  # checkout -> setup-node -> npm ci -> npm run lint -> npm run build -> testes
+  # de acessibilidade (axe-core via Playwright, ver CLAUDE.md).

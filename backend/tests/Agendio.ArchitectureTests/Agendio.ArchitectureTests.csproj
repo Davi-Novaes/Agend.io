@@ -1,0 +1,42 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <IsPackable>false</IsPackable>
+    <OutputType>Exe</OutputType>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NET.Test.Sdk" />
+    <PackageReference Include="NetArchTest.Rules" />
+    <PackageReference Include="Shouldly" />
+    <PackageReference Include="xunit.runner.visualstudio">
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+      <PrivateAssets>all</PrivateAssets>
+    </PackageReference>
+    <PackageReference Include="xunit.v3" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Using Include="Xunit" />
+    <Using Include="Shouldly" />
+  </ItemGroup>
+
+  <!--
+    Referencia TODOS os projetos de producao de proposito: as regras de arquitetura
+    (dependencia entre modulos, isolamento de tenant) sao verificadas sobre os
+    assemblies compilados dessa lista inteira.
+  -->
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\host\Agendio.Api\Agendio.Api.csproj" />
+    <ProjectReference Include="..\..\src\shared\Agendio.SharedKernel\Agendio.SharedKernel.csproj" />
+    <ProjectReference Include="..\..\src\shared\Agendio.Infrastructure\Agendio.Infrastructure.csproj" />
+    <ProjectReference Include="..\..\src\modules\Identity\Agendio.Modules.Identity\Agendio.Modules.Identity.csproj" />
+    <ProjectReference Include="..\..\src\modules\Identity\Agendio.Modules.Identity.Contracts\Agendio.Modules.Identity.Contracts.csproj" />
+    <ProjectReference Include="..\..\src\modules\Tenancy\Agendio.Modules.Tenancy\Agendio.Modules.Tenancy.csproj" />
+    <ProjectReference Include="..\..\src\modules\Tenancy\Agendio.Modules.Tenancy.Contracts\Agendio.Modules.Tenancy.Contracts.csproj" />
+  </ItemGroup>
+
+</Project>

@@ -1,0 +1,63 @@
+# ---------- .NET ----------
+bin/
+obj/
+[Dd]ebug/
+[Rr]elease/
+artifacts/
+*.user
+*.suo
+*.userprefs
+.vs/
+.vscode/*
+!.vscode/extensions.json
+!.vscode/launch.json
+*.received.*
+TestResults/
+coverage/
+*.coverage
+*.trx
+BenchmarkDotNet.Artifacts/
+
+# ---------- Node / Next.js ----------
+node_modules/
+.next/
+out/
+build/
+.turbo/
+*.tsbuildinfo
+.pnp.*
+.yarn/*
+!.yarn/patches
+
+# ---------- Ambiente e segredos ----------
+# NUNCA versionar segredos. Apenas os arquivos .example entram no repositorio.
+.env
+.env.*
+!.env.example
+appsettings.Local.json
+appsettings.*.Local.json
+secrets.json
+*.pfx
+*.key
+*.pem
+
+# ---------- Infra local ----------
+infra/data/
+infra/.volumes/
+
+# ---------- Sistema operacional ----------
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+.DS_Store
+
+# ---------- Logs ----------
+*.log
+logs/
+
+# ---------- Estado efemero de sessao do Claude Code ----------
+.claude/*.lock
+
+# ---------- Legado (projeto Python sem relacao, mantido para referencia) ----------
+_legacy/**/__pycache__/
