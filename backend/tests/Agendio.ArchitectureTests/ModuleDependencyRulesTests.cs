@@ -14,13 +14,35 @@ public class ModuleDependencyRulesTests
 {
     private static readonly Assembly IdentityAssembly = typeof(Agendio.Modules.Identity.Domain.User).Assembly;
     private static readonly Assembly TenancyAssembly = typeof(Agendio.Modules.Tenancy.Domain.Tenant).Assembly;
+    private static readonly Assembly CustomersAssembly = typeof(Agendio.Modules.Customers.Domain.Customer).Assembly;
+    private static readonly Assembly CatalogAssembly = typeof(Agendio.Modules.Catalog.Domain.Service).Assembly;
+    private static readonly Assembly ResourcesAssembly = typeof(Agendio.Modules.Resources.Domain.Resource).Assembly;
+    private static readonly Assembly SchedulingAssembly = typeof(Agendio.Modules.Scheduling.Domain.Appointment).Assembly;
+    private static readonly Assembly PlatformAssembly = typeof(Agendio.Modules.Platform.Domain.PlatformAdmin).Assembly;
+    private static readonly Assembly BillingAssembly = typeof(Agendio.Modules.Billing.Domain.Subscription).Assembly;
 
     [Theory]
     [InlineData("Agendio.Modules.Identity.Domain")]
     [InlineData("Agendio.Modules.Tenancy.Domain")]
+    [InlineData("Agendio.Modules.Customers.Domain")]
+    [InlineData("Agendio.Modules.Catalog.Domain")]
+    [InlineData("Agendio.Modules.Resources.Domain")]
+    [InlineData("Agendio.Modules.Scheduling.Domain")]
+    [InlineData("Agendio.Modules.Platform.Domain")]
+    [InlineData("Agendio.Modules.Billing.Domain")]
     public void Domain_Should_Not_Depend_On_Application_Or_Infrastructure(string domainNamespace)
     {
-        var assembly = domainNamespace.Contains("Identity") ? IdentityAssembly : TenancyAssembly;
+        var assembly = domainNamespace switch
+        {
+            _ when domainNamespace.Contains("Identity") => IdentityAssembly,
+            _ when domainNamespace.Contains("Customers") => CustomersAssembly,
+            _ when domainNamespace.Contains("Catalog") => CatalogAssembly,
+            _ when domainNamespace.Contains("Resources") => ResourcesAssembly,
+            _ when domainNamespace.Contains("Scheduling") => SchedulingAssembly,
+            _ when domainNamespace.Contains("Platform") => PlatformAssembly,
+            _ when domainNamespace.Contains("Billing") => BillingAssembly,
+            _ => TenancyAssembly,
+        };
         var moduleRoot = domainNamespace[..domainNamespace.LastIndexOf(".Domain", StringComparison.Ordinal)];
 
         var result = Types.InAssembly(assembly)
@@ -56,6 +78,157 @@ public class ModuleDependencyRulesTests
 
         result.IsSuccessful.ShouldBeTrue(
             "Identity so pode depender de Agendio.Modules.Tenancy.Contracts, nunca do modulo Tenancy inteiro. " +
+            "Tipos violando a regra: " + string.Join(", ", result.FailingTypeNames ?? []));
+    }
+
+    [Fact]
+    public void Scheduling_Module_Should_Not_Depend_On_Customers_Catalog_Resources_Or_Tenancy_Internals()
+    {
+        // Scheduling e o modulo que mais depende de leitura de outros modulos
+        // (cliente, servico, recurso, fuso horario do tenant) — exatamente por
+        // isso e o teste mais importante para pegar alguem "atalhando" e
+        // referenciando o Domain de outro modulo em vez do .Contracts dele.
+        var forbiddenNamespaces = new[]
+        {
+            "Agendio.Modules.Customers.Domain",
+            "Agendio.Modules.Customers.Application",
+            "Agendio.Modules.Customers.Infrastructure",
+            "Agendio.Modules.Customers.Endpoints",
+            "Agendio.Modules.Customers.DependencyInjection",
+            "Agendio.Modules.Catalog.Domain",
+            "Agendio.Modules.Catalog.Application",
+            "Agendio.Modules.Catalog.Infrastructure",
+            "Agendio.Modules.Catalog.Endpoints",
+            "Agendio.Modules.Catalog.DependencyInjection",
+            "Agendio.Modules.Resources.Domain",
+            "Agendio.Modules.Resources.Application",
+            "Agendio.Modules.Resources.Infrastructure",
+            "Agendio.Modules.Resources.Endpoints",
+            "Agendio.Modules.Resources.DependencyInjection",
+            "Agendio.Modules.Tenancy.Domain",
+            "Agendio.Modules.Tenancy.Application",
+            "Agendio.Modules.Tenancy.Infrastructure",
+            "Agendio.Modules.Tenancy.Endpoints",
+            "Agendio.Modules.Tenancy.DependencyInjection",
+        };
+
+        var result = Types.InAssembly(SchedulingAssembly)
+            .That().ResideInNamespace("Agendio.Modules.Scheduling")
+            .ShouldNot().HaveDependencyOnAny(forbiddenNamespaces)
+            .GetResult();
+
+        result.IsSuccessful.ShouldBeTrue(
+            "Scheduling so pode depender dos .Contracts de Customers/Catalog/Resources/Tenancy, nunca dos modulos inteiros. " +
+            "Tipos violando a regra: " + string.Join(", ", result.FailingTypeNames ?? []));
+    }
+
+    [Fact]
+    public void Platform_Module_Should_Not_Depend_On_Any_Tenant_Facing_Module_Internals()
+    {
+        // Platform e a autoridade do Super Admin — nao deveria nem PRECISAR
+        // conhecer Identity/Customers/Catalog/Resources/Scheduling. So Tenancy
+        // e permitido, e so via .Contracts (ITenantAdministrationService).
+        var forbiddenNamespaces = new[]
+        {
+            "Agendio.Modules.Identity.Domain",
+            "Agendio.Modules.Identity.Application",
+            "Agendio.Modules.Identity.Infrastructure",
+            "Agendio.Modules.Identity.Endpoints",
+            "Agendio.Modules.Identity.DependencyInjection",
+            "Agendio.Modules.Customers.Domain",
+            "Agendio.Modules.Customers.Application",
+            "Agendio.Modules.Customers.Infrastructure",
+            "Agendio.Modules.Customers.Endpoints",
+            "Agendio.Modules.Customers.DependencyInjection",
+            "Agendio.Modules.Catalog.Domain",
+            "Agendio.Modules.Catalog.Application",
+            "Agendio.Modules.Catalog.Infrastructure",
+            "Agendio.Modules.Catalog.Endpoints",
+            "Agendio.Modules.Catalog.DependencyInjection",
+            "Agendio.Modules.Resources.Domain",
+            "Agendio.Modules.Resources.Application",
+            "Agendio.Modules.Resources.Infrastructure",
+            "Agendio.Modules.Resources.Endpoints",
+            "Agendio.Modules.Resources.DependencyInjection",
+            "Agendio.Modules.Scheduling.Domain",
+            "Agendio.Modules.Scheduling.Application",
+            "Agendio.Modules.Scheduling.Infrastructure",
+            "Agendio.Modules.Scheduling.Endpoints",
+            "Agendio.Modules.Scheduling.DependencyInjection",
+            "Agendio.Modules.Tenancy.Domain",
+            "Agendio.Modules.Tenancy.Application",
+            "Agendio.Modules.Tenancy.Infrastructure",
+            "Agendio.Modules.Tenancy.Endpoints",
+            "Agendio.Modules.Tenancy.DependencyInjection",
+            "Agendio.Modules.Billing.Domain",
+            "Agendio.Modules.Billing.Application",
+            "Agendio.Modules.Billing.Infrastructure",
+            "Agendio.Modules.Billing.Endpoints",
+            "Agendio.Modules.Billing.DependencyInjection",
+        };
+
+        var result = Types.InAssembly(PlatformAssembly)
+            .That().ResideInNamespace("Agendio.Modules.Platform")
+            .ShouldNot().HaveDependencyOnAny(forbiddenNamespaces)
+            .GetResult();
+
+        result.IsSuccessful.ShouldBeTrue(
+            "Platform so pode depender dos .Contracts de Tenancy/Billing, nunca de nenhum modulo inteiro. " +
+            "Tipos violando a regra: " + string.Join(", ", result.FailingTypeNames ?? []));
+    }
+
+    [Fact]
+    public void Billing_Module_Should_Not_Depend_On_Any_Tenant_Facing_Module_Internals()
+    {
+        // Billing so precisa de leitura/escrita cross-modulo em Tenancy
+        // (ITenantAdministrationService, no job de conciliacao) — nenhum outro
+        // modulo deveria aparecer aqui, nem o proprio Tenancy fora do .Contracts.
+        var forbiddenNamespaces = new[]
+        {
+            "Agendio.Modules.Identity.Domain",
+            "Agendio.Modules.Identity.Application",
+            "Agendio.Modules.Identity.Infrastructure",
+            "Agendio.Modules.Identity.Endpoints",
+            "Agendio.Modules.Identity.DependencyInjection",
+            "Agendio.Modules.Customers.Domain",
+            "Agendio.Modules.Customers.Application",
+            "Agendio.Modules.Customers.Infrastructure",
+            "Agendio.Modules.Customers.Endpoints",
+            "Agendio.Modules.Customers.DependencyInjection",
+            "Agendio.Modules.Catalog.Domain",
+            "Agendio.Modules.Catalog.Application",
+            "Agendio.Modules.Catalog.Infrastructure",
+            "Agendio.Modules.Catalog.Endpoints",
+            "Agendio.Modules.Catalog.DependencyInjection",
+            "Agendio.Modules.Resources.Domain",
+            "Agendio.Modules.Resources.Application",
+            "Agendio.Modules.Resources.Infrastructure",
+            "Agendio.Modules.Resources.Endpoints",
+            "Agendio.Modules.Resources.DependencyInjection",
+            "Agendio.Modules.Scheduling.Domain",
+            "Agendio.Modules.Scheduling.Application",
+            "Agendio.Modules.Scheduling.Infrastructure",
+            "Agendio.Modules.Scheduling.Endpoints",
+            "Agendio.Modules.Scheduling.DependencyInjection",
+            "Agendio.Modules.Platform.Domain",
+            "Agendio.Modules.Platform.Application",
+            "Agendio.Modules.Platform.Infrastructure",
+            "Agendio.Modules.Platform.Endpoints",
+            "Agendio.Modules.Platform.DependencyInjection",
+            "Agendio.Modules.Tenancy.Domain",
+            "Agendio.Modules.Tenancy.Application",
+            "Agendio.Modules.Tenancy.Infrastructure",
+            "Agendio.Modules.Tenancy.Endpoints",
+            "Agendio.Modules.Tenancy.DependencyInjection",
+        };
+
+        var result = Types.InAssembly(BillingAssembly)
+            .That().ResideInNamespace("Agendio.Modules.Billing")
+            .ShouldNot().HaveDependencyOnAny(forbiddenNamespaces)
+            .GetResult();
+
+        result.IsSuccessful.ShouldBeTrue(
+            "Billing so pode depender do .Contracts de Tenancy, nunca de nenhum modulo inteiro. " +
             "Tipos violando a regra: " + string.Join(", ", result.FailingTypeNames ?? []));
     }
 }

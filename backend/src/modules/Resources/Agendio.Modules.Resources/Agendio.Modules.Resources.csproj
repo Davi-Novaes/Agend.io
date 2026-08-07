@@ -1,0 +1,25 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- Tipos de Minimal API (IEndpointRouteBuilder, Results) usados em Endpoints/. -->
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="FluentValidation" />
+    <PackageReference Include="FluentValidation.DependencyInjectionExtensions" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\..\shared\Agendio.SharedKernel\Agendio.SharedKernel.csproj" />
+    <ProjectReference Include="..\..\..\shared\Agendio.Infrastructure\Agendio.Infrastructure.csproj" />
+    <ProjectReference Include="..\Agendio.Modules.Resources.Contracts\Agendio.Modules.Resources.Contracts.csproj" />
+  </ItemGroup>
+
+</Project>

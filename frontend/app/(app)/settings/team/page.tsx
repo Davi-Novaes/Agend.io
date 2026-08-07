@@ -91,7 +91,7 @@ export default function TeamSettingsPage() {
 
   return (
     <main className="mx-auto flex min-h-full w-full max-w-lg flex-1 flex-col p-6 sm:p-10">
-      <Link href="/" className="text-muted-foreground mb-6 inline-flex items-center gap-1.5 text-sm hover:text-foreground">
+      <Link href="/painel" className="text-muted-foreground mb-6 inline-flex items-center gap-1.5 text-sm hover:text-foreground">
         <ArrowLeft className="size-4" />
         Voltar
       </Link>

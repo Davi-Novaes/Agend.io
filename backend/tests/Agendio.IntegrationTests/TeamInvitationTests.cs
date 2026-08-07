@@ -98,6 +98,37 @@ public class TeamInvitationTests(IntegrationTestFixture fixture)
     }
 
     [Fact]
+    public async Task Inviting_A_Team_Member_Should_Send_A_Real_Email_Via_Smtp()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var client = fixture.CreateClient();
+
+        var (tenantId, ownerEmail) = await CreateTenantWithOwnerAsync(client, cancellationToken);
+        var ownerAccessToken = await LoginAsync(client, tenantId, ownerEmail, cancellationToken);
+
+        var inviteEmail = $"staff-{Guid.NewGuid():N}@example.com";
+        var inviteResponse = await AuthorizedRequestHelpers.PostAuthorizedAsync(
+            client, ownerAccessToken, "/api/team/invitations", new { email = inviteEmail, role = "Staff" }, cancellationToken);
+        inviteResponse.StatusCode.ShouldBe(HttpStatusCode.Created);
+
+        // Consulta a API de verdade do MailHog em vez de so confiar que o
+        // handler chamou IEmailSender — prova que o e-mail saiu via SMTP.
+        using var mailHogClient = new HttpClient { BaseAddress = new Uri(fixture.MailHogApiBaseUrl) };
+        var found = false;
+        for (var attempt = 0; attempt < 10 && !found; attempt++)
+        {
+            var messagesJson = await mailHogClient.GetStringAsync("/api/v2/messages", cancellationToken);
+            found = messagesJson.Contains(inviteEmail, StringComparison.OrdinalIgnoreCase);
+            if (!found)
+            {
+                await Task.Delay(200, cancellationToken);
+            }
+        }
+
+        found.ShouldBeTrue("o e-mail de convite deveria ter chegado no MailHog.");
+    }
+
+    [Fact]
     public async Task Anonymous_Request_To_Invite_Should_Be_Unauthorized()
     {
         var cancellationToken = TestContext.Current.CancellationToken;

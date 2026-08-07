@@ -1,6 +1,7 @@
 using Agendio.Infrastructure.Endpoints;
 using Agendio.Modules.Tenancy.Application.CreateTenant;
 using Agendio.Modules.Tenancy.Application.UpdateTenantBranding;
+using Agendio.Modules.Tenancy.Application.UpdateTenantLogo;
 using Agendio.Modules.Tenancy.Contracts;
 using Agendio.Modules.Tenancy.Domain;
 using Agendio.SharedKernel.Messaging;
@@ -51,6 +52,7 @@ public sealed class TenancyEndpoints : IEndpointModule
                     tenant.Slug,
                     tenant.IsActive,
                     tenant.PrimaryColorHex,
+                    tenant.LogoUrl,
                 });
         })
         // Publica de proposito: o portal do cliente (Sprint 4) precisa resolver
@@ -72,6 +74,21 @@ public sealed class TenancyEndpoints : IEndpointModule
         .RequireAuthorization(policy => policy.RequireRole("Owner"))
         .WithName("UpdateTenantBranding")
         .WithSummary("Atualiza a cor de marca do estabelecimento (rejeitada se o contraste AA nao for atingido).");
+
+        group.MapPost("/logo", async (IFormFile file, IDispatcher dispatcher, CancellationToken cancellationToken) =>
+        {
+            await using var contentStream = new MemoryStream();
+            await file.CopyToAsync(contentStream, cancellationToken);
+
+            var command = new UpdateTenantLogoCommand(contentStream.ToArray(), file.ContentType);
+            var result = await dispatcher.Send(command, cancellationToken);
+
+            return result.IsSuccess ? Results.Ok(new { logoUrl = result.Value }) : result.Error.ToProblemResult();
+        })
+        .DisableAntiforgery()
+        .RequireAuthorization(policy => policy.RequireRole("Owner"))
+        .WithName("UpdateTenantLogo")
+        .WithSummary("Faz upload do logo do estabelecimento (PNG/JPEG/WEBP, ate 2MB).");
     }
 
     private static object ToResponse(BusinessTypeDefinition definition) => new

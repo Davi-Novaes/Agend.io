@@ -4,6 +4,28 @@
     <Project Path="src/host/Agendio.Api/Agendio.Api.csproj" />
   </Folder>
   <Folder Name="/src/modules/" />
+  <Folder Name="/src/modules/Billing/">
+    <Project Path="src/modules/Billing/Agendio.Modules.Billing/Agendio.Modules.Billing.csproj" />
+    <Project Path="src/modules/Billing/Agendio.Modules.Billing.Contracts/Agendio.Modules.Billing.Contracts.csproj" />
+  </Folder>
+  <Folder Name="/src/modules/Catalog/">
+    <Project Path="src/modules/Catalog/Agendio.Modules.Catalog/Agendio.Modules.Catalog.csproj" />
+    <Project Path="src/modules/Catalog/Agendio.Modules.Catalog.Contracts/Agendio.Modules.Catalog.Contracts.csproj" />
+  </Folder>
+  <Folder Name="/src/modules/Customers/">
+    <Project Path="src/modules/Customers/Agendio.Modules.Customers/Agendio.Modules.Customers.csproj" />
+    <Project Path="src/modules/Customers/Agendio.Modules.Customers.Contracts/Agendio.Modules.Customers.Contracts.csproj" />
+  </Folder>
+  <Folder Name="/src/modules/Platform/">
+    <Project Path="src/modules/Platform/Agendio.Modules.Platform/Agendio.Modules.Platform.csproj" />
+  </Folder>
+  <Folder Name="/src/modules/Resources/">
+    <Project Path="src/modules/Resources/Agendio.Modules.Resources/Agendio.Modules.Resources.csproj" />
+    <Project Path="src/modules/Resources/Agendio.Modules.Resources.Contracts/Agendio.Modules.Resources.Contracts.csproj" />
+  </Folder>
+  <Folder Name="/src/modules/Scheduling/">
+    <Project Path="src/modules/Scheduling/Agendio.Modules.Scheduling/Agendio.Modules.Scheduling.csproj" />
+  </Folder>
   <Folder Name="/src/modules/Identity/">
     <Project Path="src/modules/Identity/Agendio.Modules.Identity.Contracts/Agendio.Modules.Identity.Contracts.csproj" />
     <Project Path="src/modules/Identity/Agendio.Modules.Identity/Agendio.Modules.Identity.csproj" />

@@ -22,6 +22,7 @@ public static class TenancyModuleServiceCollectionExtensions
         services.AddOutboxProcessing<TenancyDbContext>();
 
         services.AddScoped<ITenantLookupService, TenantLookupService>();
+        services.AddScoped<ITenantAdministrationService, TenantAdministrationService>();
 
         services.AddValidatorsFromAssembly(moduleAssembly);
         services.AddHandlersFromAssembly(moduleAssembly);

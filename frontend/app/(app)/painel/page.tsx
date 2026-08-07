@@ -27,12 +27,27 @@ export default function DashboardPage() {
       <p className="text-muted-foreground text-sm">
         Sessao valida ate {new Date(session.expiresAtUtc).toLocaleTimeString("pt-BR")}.
       </p>
-      <div className="flex gap-2">
+      <div className="flex flex-wrap justify-center gap-2">
+        <Button variant="outline" asChild>
+          <Link href="/agenda">Agenda</Link>
+        </Button>
+        <Button variant="outline" asChild>
+          <Link href="/clientes">Clientes</Link>
+        </Button>
+        <Button variant="outline" asChild>
+          <Link href="/servicos">Servicos</Link>
+        </Button>
+        <Button variant="outline" asChild>
+          <Link href="/recursos">Recursos</Link>
+        </Button>
         <Button variant="outline" asChild>
           <Link href="/settings/branding">Marca</Link>
         </Button>
         <Button variant="outline" asChild>
           <Link href="/settings/team">Equipe</Link>
+        </Button>
+        <Button variant="outline" asChild>
+          <Link href="/settings/billing">Plano</Link>
         </Button>
       </div>
       <Button
