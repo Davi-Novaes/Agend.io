@@ -45,6 +45,9 @@ secrets.json
 infra/data/
 infra/.volumes/
 
+# ---------- Upload local (LocalFileStorage, dev — sem modulo de Storage ainda) ----------
+backend/src/host/Agendio.Api/uploads/
+
 # ---------- Sistema operacional ----------
 Thumbs.db
 ehthumbs.db

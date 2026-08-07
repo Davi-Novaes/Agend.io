@@ -57,7 +57,7 @@ export default function LoginPage() {
       }
 
       await login({ tenantId: tenant.id, email: values.email, password: values.password });
-      router.push("/");
+      router.push("/painel");
     } catch (error) {
       if (error instanceof ApiError && error.status === 404) {
         form.setError("tenantSlug", {

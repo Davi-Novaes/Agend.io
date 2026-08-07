@@ -144,7 +144,7 @@ export default function OnboardingPage() {
       });
 
       await login({ tenantId: tenant.id, email: values.ownerEmail, password: values.ownerPassword });
-      router.push("/");
+      router.push("/painel");
     } catch (error) {
       if (error instanceof ApiError && error.status === 409) {
         form.setError("slug", { message: "Este identificador ja esta em uso." });

@@ -1,0 +1,30 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- Tipos de Minimal API (IEndpointRouteBuilder, Results) usados em Endpoints/. -->
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Microsoft.Extensions.Http (AddHttpClient) ja vem transitivamente via
+         FrameworkReference Microsoft.AspNetCore.App — referencia-lo aqui de novo
+         gera aviso NU1510 (pacote nao podado, redundante). -->
+    <PackageReference Include="FluentValidation" />
+    <PackageReference Include="FluentValidation.DependencyInjectionExtensions" />
+    <PackageReference Include="RabbitMQ.Client" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\..\shared\Agendio.SharedKernel\Agendio.SharedKernel.csproj" />
+    <ProjectReference Include="..\..\..\shared\Agendio.Infrastructure\Agendio.Infrastructure.csproj" />
+    <ProjectReference Include="..\Agendio.Modules.Billing.Contracts\Agendio.Modules.Billing.Contracts.csproj" />
+    <ProjectReference Include="..\..\Tenancy\Agendio.Modules.Tenancy.Contracts\Agendio.Modules.Tenancy.Contracts.csproj" />
+  </ItemGroup>
+
+</Project>

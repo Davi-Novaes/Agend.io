@@ -45,6 +45,37 @@ jobs:
       - name: Testes de integracao (Agendio.IntegrationTests)
         run: dotnet test backend/tests/Agendio.IntegrationTests/Agendio.IntegrationTests.csproj --no-build -c Release
 
-  # Job do frontend entra quando frontend/ existir (Sprint 0, proximo commit):
-  # checkout -> setup-node -> npm ci -> npm run lint -> npm run build -> testes
-  # de acessibilidade (axe-core via Playwright, ver CLAUDE.md).
+  frontend:
+    name: Frontend (Next.js)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: "npm"
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Instalar dependencias
+        run: npm ci
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Build
+        run: npm run build
+
+      # So o Chromium (nao os 3 engines) — suficiente para o gate de
+      # acessibilidade, evita minutos de CI baixando Firefox/WebKit a toa.
+      - name: Instalar browser do Playwright
+        run: npx playwright install --with-deps chromium
+
+      # Gate de acessibilidade (CLAUDE.md: "axe-core roda no Playwright como
+      # gate de CI"). npm run start (producao) roda por baixo via
+      # playwright.config.ts -> webServer, contra a pagina publica principal.
+      - name: Testes de acessibilidade (axe-core via Playwright)
+        run: npm run test:e2e

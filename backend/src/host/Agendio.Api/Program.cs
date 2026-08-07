@@ -7,12 +7,20 @@ using Agendio.Infrastructure.DependencyInjection;
 using Agendio.Infrastructure.Endpoints;
 using Agendio.Infrastructure.Messaging;
 using Agendio.Infrastructure.Security;
+using Agendio.Modules.Billing.DependencyInjection;
+using Agendio.Modules.Billing.Infrastructure.Jobs;
+using Agendio.Modules.Catalog.DependencyInjection;
+using Agendio.Modules.Customers.DependencyInjection;
 using Agendio.Modules.Identity.DependencyInjection;
+using Agendio.Modules.Platform.DependencyInjection;
+using Agendio.Modules.Resources.DependencyInjection;
+using Agendio.Modules.Scheduling.DependencyInjection;
 using Agendio.Modules.Tenancy.DependencyInjection;
 using Hangfire;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.AspNetCore.RateLimiting;
+using Microsoft.Extensions.FileProviders;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.Extensions.Options;
 using OpenTelemetry.Metrics;
@@ -59,11 +67,25 @@ try
     builder.Services.AddAgendioInfrastructure(builder.Configuration);
     builder.Services.AddTenancyModule(builder.Configuration);
     builder.Services.AddIdentityModule(builder.Configuration);
+    builder.Services.AddCustomersModule(builder.Configuration);
+    builder.Services.AddCatalogModule(builder.Configuration);
+    builder.Services.AddResourcesModule(builder.Configuration);
+    builder.Services.AddSchedulingModule(builder.Configuration);
+    builder.Services.AddPlatformModule(builder.Configuration);
+    builder.Services.AddBillingModule(builder.Configuration);
     builder.Services.AddAgendioHangfire(builder.Configuration);
 
     // ---------- Autenticacao / Autorizacao ----------
+    // Duas autoridades JWT completamente separadas — issuer/audience/chave
+    // proprios cada uma (ver PlatformJwtOptions): um token de tenant nunca
+    // valida no scheme "Platform" e vice-versa, mesmo que alguem tente usar um
+    // no lugar do outro. E assim que "Super Admin e autoridade separada, nunca
+    // um papel dentro de tenant" (CLAUDE.md) vira garantia tecnica, nao so
+    // promessa de codigo de aplicacao.
     var jwtOptions = builder.Configuration.GetSection(JwtOptions.SectionName).Get<JwtOptions>()
         ?? throw new InvalidOperationException("Secao 'Jwt' nao configurada em appsettings.");
+    var platformJwtOptions = builder.Configuration.GetSection(PlatformJwtOptions.SectionName).Get<PlatformJwtOptions>()
+        ?? throw new InvalidOperationException("Secao 'PlatformJwt' nao configurada em appsettings.");
 
     builder.Services
         .AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
@@ -76,14 +98,38 @@ try
                 IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtOptions.SigningKey)),
                 ClockSkew = TimeSpan.FromSeconds(30),
             };
+        })
+        .AddJwtBearer(PlatformAuthConstants.AuthenticationScheme, options =>
+        {
+            options.TokenValidationParameters = new TokenValidationParameters
+            {
+                ValidIssuer = platformJwtOptions.Issuer,
+                ValidAudience = platformJwtOptions.Audience,
+                IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(platformJwtOptions.SigningKey)),
+                ClockSkew = TimeSpan.FromSeconds(30),
+            };
         });
 
-    builder.Services.AddAuthorization();
+    builder.Services.AddAuthorization(options =>
+    {
+        options.AddPolicy(PlatformAuthConstants.AuthorizationPolicy, policy => policy
+            .AddAuthenticationSchemes(PlatformAuthConstants.AuthenticationScheme)
+            .RequireAuthenticatedUser()
+            .RequireClaim(PlatformAuthConstants.ScopeClaimType, PlatformAuthConstants.PlatformScopeValue));
+    });
 
     // ---------- Rate limiting ----------
     // Duas camadas: um limite generoso global, e um limite bem mais apertado
     // especificamente para login/registro (alvo classico de forca bruta e
-    // enumeracao de contas).
+    // enumeracao de contas). O limite global e configuravel porque o
+    // WebApplicationFactory dos testes de integracao roda a suite inteira num
+    // unico processo com uma unica particao "unknown" (TestServer nao tem IP
+    // de cliente real) — sem isso, o volume agregado de requisicoes de VARIOS
+    // testes no mesmo minuto derruba testes depois do teste de concorrencia
+    // do Scheduling com 429, nao por bug, so por contencao do proprio teste.
+    var globalRateLimitPermits = builder.Configuration.GetValue("RateLimiting:GlobalPermitLimit", 200);
+    var globalRateLimitWindowSeconds = builder.Configuration.GetValue("RateLimiting:GlobalWindowSeconds", 60);
+
     builder.Services.AddRateLimiter(options =>
     {
         options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
@@ -93,8 +139,8 @@ try
                 partitionKey: httpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown",
                 factory: _ => new FixedWindowRateLimiterOptions
                 {
-                    PermitLimit = 200,
-                    Window = TimeSpan.FromMinutes(1),
+                    PermitLimit = globalRateLimitPermits,
+                    Window = TimeSpan.FromSeconds(globalRateLimitWindowSeconds),
                 }));
 
         options.AddPolicy("auth", httpContext =>
@@ -150,6 +196,33 @@ try
 
     var app = builder.Build();
 
+    // ---------- Outbox -> RabbitMQ (drena a cada minuto, por modulo) ----------
+    app.Services.ScheduleOutboxProcessing<Agendio.Modules.Tenancy.Infrastructure.Persistence.TenancyDbContext>("tenancy");
+    app.Services.ScheduleOutboxProcessing<Agendio.Modules.Identity.Infrastructure.Persistence.IdentityDbContext>("identity");
+    app.Services.ScheduleOutboxProcessing<Agendio.Modules.Customers.Infrastructure.Persistence.CustomersDbContext>("customers");
+    app.Services.ScheduleOutboxProcessing<Agendio.Modules.Catalog.Infrastructure.Persistence.CatalogDbContext>("catalog");
+    app.Services.ScheduleOutboxProcessing<Agendio.Modules.Resources.Infrastructure.Persistence.ResourcesDbContext>("resources");
+    app.Services.ScheduleOutboxProcessing<Agendio.Modules.Scheduling.Infrastructure.Persistence.SchedulingDbContext>("scheduling");
+    app.Services.ScheduleOutboxProcessing<Agendio.Modules.Platform.Infrastructure.Persistence.PlatformDbContext>("platform");
+    app.Services.ScheduleOutboxProcessing<Agendio.Modules.Billing.Infrastructure.Persistence.BillingDbContext>("billing");
+
+    // ---------- Conciliacao de assinaturas (diaria, ver Sprint 7) ----------
+    // IRecurringJobManager resolvido do DI (nunca o facade estatico RecurringJob
+    // — JobStorage.Current ainda nao esta inicializado logo apos app.Build(),
+    // mesmo motivo documentado em HangfireServiceCollectionExtensions).
+    app.Services.GetRequiredService<IRecurringJobManager>().AddOrUpdate<BillingReconciliationJob>(
+        "billing-reconciliation", job => job.RunAsync(CancellationToken.None), Cron.Daily(3));
+
+    // ---------- Seed do primeiro Super Admin (Development apenas) ----------
+    // Provisionamento de producao (rotacao de senha obrigatoria no primeiro
+    // login, MFA, convite em vez de credencial fixa) fica fora do MVP de
+    // proposito — ver ADR do Sprint 6. Em producao a secao "PlatformAdmin" nao
+    // deveria nem existir na configuracao.
+    if (app.Environment.IsDevelopment())
+    {
+        await Agendio.Modules.Platform.Seeding.PlatformAdminDevSeeder.SeedAsync(app.Services, app.Configuration);
+    }
+
     app.UseSerilogRequestLogging();
 
     if (app.Environment.IsDevelopment())
@@ -172,6 +245,19 @@ try
     });
 
     app.UseHttpsRedirection();
+
+    // Serve o que LocalFileStorage grava em {ContentRoot}/uploads — logo do
+    // tenant por enquanto. Nenhuma autorizacao aqui de proposito: e conteudo
+    // publico (o mesmo logo que aparece no portal do cliente sem login).
+    // PhysicalFileProvider exige que a pasta ja exista — cria antes de checkout
+    // limpo, sem upload nenhum ainda ter acontecido.
+    var uploadsPath = Path.Combine(app.Environment.ContentRootPath, "uploads");
+    Directory.CreateDirectory(uploadsPath);
+    app.UseStaticFiles(new StaticFileOptions
+    {
+        FileProvider = new PhysicalFileProvider(uploadsPath),
+        RequestPath = "/uploads",
+    });
 
     app.UseCors("Default");
     app.UseRateLimiter();

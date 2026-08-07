@@ -32,6 +32,9 @@ public sealed class Tenant : AggregateRoot<TenantId>, IAuditable, ISoftDeletable
     /// </summary>
     public string? PrimaryColorHex { get; private set; }
 
+    /// <summary>Caminho publico do arquivo salvo por IFileStorage. Null usa um placeholder generico na UI.</summary>
+    public string? LogoUrl { get; private set; }
+
     public DateTimeOffset CreatedAtUtc { get; set; }
 
     public string? CreatedBy { get; set; }
@@ -109,6 +112,17 @@ public sealed class Tenant : AggregateRoot<TenantId>, IAuditable, ISoftDeletable
         }
 
         PrimaryColorHex = primaryColorHex;
+        return Result.Success();
+    }
+
+    public Result SetLogo(string logoUrl)
+    {
+        if (string.IsNullOrWhiteSpace(logoUrl))
+        {
+            return Result.Failure(Error.Validation("Tenant.InvalidLogoUrl", "URL do logo invalida."));
+        }
+
+        LogoUrl = logoUrl;
         return Result.Success();
     }
 

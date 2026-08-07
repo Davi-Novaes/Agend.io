@@ -1,8 +1,10 @@
 using Agendio.Infrastructure.Behaviors;
 using Agendio.Infrastructure.Messaging;
 using Agendio.Infrastructure.Multitenancy;
+using Agendio.Infrastructure.Notifications;
 using Agendio.Infrastructure.Persistence.Interceptors;
 using Agendio.Infrastructure.Security;
+using Agendio.Infrastructure.Storage;
 using Agendio.SharedKernel.Messaging;
 using Agendio.SharedKernel.Multitenancy;
 using Agendio.SharedKernel.Time;
@@ -32,8 +34,17 @@ public static class InfrastructureServiceCollectionExtensions
         services.Configure<JwtOptions>(configuration.GetSection(JwtOptions.SectionName));
         services.AddSingleton<IJwtTokenService, JwtTokenService>();
 
+        services.Configure<PlatformJwtOptions>(configuration.GetSection(PlatformJwtOptions.SectionName));
+        services.AddSingleton<IPlatformJwtTokenService, PlatformJwtTokenService>();
+
         services.Configure<RabbitMqOptions>(configuration.GetSection(RabbitMqOptions.SectionName));
         services.AddSingleton<IIntegrationEventPublisher, RabbitMqIntegrationEventPublisher>();
+
+        services.Configure<SmtpOptions>(configuration.GetSection(SmtpOptions.SectionName));
+        services.AddTransient<IEmailSender, SmtpEmailSender>();
+        services.Configure<FrontendOptions>(configuration.GetSection(FrontendOptions.SectionName));
+
+        services.AddSingleton<IFileStorage, LocalFileStorage>();
 
         AddRedis(services, configuration);
 
@@ -42,6 +53,7 @@ public static class InfrastructureServiceCollectionExtensions
         // options.AddInterceptors(...) na propria configuracao (AddDbContext).
         services.AddScoped<TenantConnectionInterceptor>();
         services.AddScoped<AuditingSaveChangesInterceptor>();
+        services.AddScoped<AuditLogInterceptor>();
         services.AddScoped<DomainEventsToOutboxInterceptor>();
 
         services.AddDispatcher();
