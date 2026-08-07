@@ -6,12 +6,15 @@ import Link from "next/link";
 import { toast } from "sonner";
 import { ArrowLeft } from "lucide-react";
 
-import { updateTenantBranding, ApiError } from "@/lib/api/client";
+import { updateTenantBranding, uploadTenantLogo, resolveAssetUrl, ApiError } from "@/lib/api/client";
 import { meetsAaContrast, contrastRatio } from "@/lib/tenant/contrast";
 import { useSession } from "@/lib/auth/session-context";
 import { DEFAULT_TENANT_THEME } from "@/lib/tenant/tenant-theme";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
+
+const ALLOWED_LOGO_TYPES = ["image/png", "image/jpeg", "image/webp"];
+const MAX_LOGO_SIZE_BYTES = 2 * 1024 * 1024;
 
 // A UI sempre pareia --primary com texto branco (ver app/globals.css) — o
 // contraste e verificado contra ESTA cor fixa, tanto aqui quanto no backend.
@@ -26,6 +29,10 @@ export default function BrandingSettingsPage() {
   const { session } = useSession();
   const [color, setColor] = React.useState(() => toHex(DEFAULT_TENANT_THEME.primary));
   const [isSaving, setIsSaving] = React.useState(false);
+  const [logoPreviewUrl, setLogoPreviewUrl] = React.useState<string | null>(null);
+  const [selectedLogoFile, setSelectedLogoFile] = React.useState<File | null>(null);
+  const [isUploadingLogo, setIsUploadingLogo] = React.useState(false);
+  const logoInputRef = React.useRef<HTMLInputElement>(null);
 
   React.useEffect(() => {
     if (!session) {
@@ -33,8 +40,55 @@ export default function BrandingSettingsPage() {
     }
   }, [session, router]);
 
+  React.useEffect(() => {
+    return () => {
+      if (logoPreviewUrl) {
+        URL.revokeObjectURL(logoPreviewUrl);
+      }
+    };
+  }, [logoPreviewUrl]);
+
   if (!session) {
     return null;
+  }
+
+  function handleLogoFileChange(event: React.ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+    if (!file) {
+      return;
+    }
+
+    if (!ALLOWED_LOGO_TYPES.includes(file.type)) {
+      toast.error("Formato invalido. Envie um arquivo PNG, JPEG ou WEBP.");
+      return;
+    }
+
+    if (file.size > MAX_LOGO_SIZE_BYTES) {
+      toast.error("O arquivo nao pode ter mais que 2MB.");
+      return;
+    }
+
+    setSelectedLogoFile(file);
+    setLogoPreviewUrl(URL.createObjectURL(file));
+  }
+
+  async function handleLogoUpload() {
+    if (!selectedLogoFile) {
+      return;
+    }
+
+    setIsUploadingLogo(true);
+    try {
+      const result = await uploadTenantLogo(selectedLogoFile, session!.accessToken);
+      setLogoPreviewUrl(resolveAssetUrl(result.logoUrl));
+      setSelectedLogoFile(null);
+      toast.success("Logo atualizado.");
+    } catch (error) {
+      const message = error instanceof ApiError ? error.message : "Nao foi possivel enviar o logo.";
+      toast.error(message);
+    } finally {
+      setIsUploadingLogo(false);
+    }
   }
 
   const ratio = contrastRatio(FOREGROUND_HEX, color);
@@ -56,7 +110,7 @@ export default function BrandingSettingsPage() {
 
   return (
     <main className="mx-auto flex min-h-full w-full max-w-lg flex-1 flex-col p-6 sm:p-10">
-      <Link href="/" className="text-muted-foreground mb-6 inline-flex items-center gap-1.5 text-sm hover:text-foreground">
+      <Link href="/painel" className="text-muted-foreground mb-6 inline-flex items-center gap-1.5 text-sm hover:text-foreground">
         <ArrowLeft className="size-4" />
         Voltar
       </Link>
@@ -65,6 +119,40 @@ export default function BrandingSettingsPage() {
       <p className="text-muted-foreground mt-1 mb-6 text-sm">
         Escolha a cor principal do seu painel e do portal de agendamento.
       </p>
+
+      <section className="mb-8">
+        <h2 className="mb-2 text-sm font-medium">Logo</h2>
+        <div className="flex items-center gap-4">
+          <div className="bg-muted flex size-16 shrink-0 items-center justify-center overflow-hidden rounded-lg border">
+            {logoPreviewUrl ? (
+              // eslint-disable-next-line @next/next/no-img-element -- preview de upload local/URL dinamica da API, nao um asset estatico do build.
+              <img src={logoPreviewUrl} alt="Logo do estabelecimento" className="size-full object-contain" />
+            ) : (
+              <span className="text-muted-foreground text-xs">Sem logo</span>
+            )}
+          </div>
+          <div className="flex flex-col gap-2">
+            <input
+              ref={logoInputRef}
+              type="file"
+              accept="image/png,image/jpeg,image/webp"
+              onChange={handleLogoFileChange}
+              className="hidden"
+            />
+            <div className="flex gap-2">
+              <Button type="button" variant="outline" onClick={() => logoInputRef.current?.click()}>
+                Escolher arquivo
+              </Button>
+              {selectedLogoFile && (
+                <Button type="button" onClick={handleLogoUpload} disabled={isUploadingLogo}>
+                  {isUploadingLogo ? "Enviando..." : "Enviar"}
+                </Button>
+              )}
+            </div>
+            <p className="text-muted-foreground text-xs">PNG, JPEG ou WEBP, ate 2MB.</p>
+          </div>
+        </div>
+      </section>
 
       <div className="grid gap-4">
         <div className="flex items-center gap-3">

@@ -34,5 +34,5 @@ internal sealed class TenantLookupService(TenancyDbContext dbContext) : ITenantL
     }
 
     private static TenantLookupResult Map(Tenant tenant) =>
-        new(tenant.Id, tenant.Name, tenant.Slug.Value, tenant.TimeZoneId, tenant.IsActive, tenant.PrimaryColorHex);
+        new(tenant.Id, tenant.Name, tenant.Slug.Value, tenant.TimeZoneId, tenant.IsActive, tenant.PrimaryColorHex, tenant.LogoUrl);
 }

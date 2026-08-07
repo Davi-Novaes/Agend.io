@@ -13,6 +13,10 @@ internal static class AuthorizedRequestHelpers
         HttpClient client, string accessToken, string path, object payload, CancellationToken cancellationToken) =>
         SendAuthorizedAsync(client, HttpMethod.Put, accessToken, path, payload, cancellationToken);
 
+    public static Task<HttpResponseMessage> PatchAuthorizedAsync(
+        HttpClient client, string accessToken, string path, object payload, CancellationToken cancellationToken) =>
+        SendAuthorizedAsync(client, HttpMethod.Patch, accessToken, path, payload, cancellationToken);
+
     public static Task<HttpResponseMessage> GetAuthorizedAsync(
         HttpClient client, string accessToken, string path, CancellationToken cancellationToken) =>
         SendAuthorizedAsync(client, HttpMethod.Get, accessToken, path, payload: null, cancellationToken);

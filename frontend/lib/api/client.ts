@@ -57,7 +57,13 @@ export type TenantSummary = {
   slug: string;
   isActive: boolean;
   primaryColorHex: string | null;
+  logoUrl: string | null;
 };
+
+/** Resolve um logoUrl relativo (ex.: "/uploads/tenant-logos/x.png") para a origem da API. */
+export function resolveAssetUrl(path: string): string {
+  return `${API_BASE_URL}${path}`;
+}
 
 export function getTenantBySlug(slug: string): Promise<TenantSummary> {
   return request<TenantSummary>(`/api/tenants/by-slug/${encodeURIComponent(slug)}`);
@@ -135,6 +141,31 @@ export function updateTenantBranding(primaryColorHex: string, accessToken: strin
   );
 }
 
+export async function uploadTenantLogo(file: File, accessToken: string): Promise<{ logoUrl: string }> {
+  const formData = new FormData();
+  formData.append("file", file);
+
+  // Nao usa request(): FormData precisa que o browser defina o Content-Type
+  // (com o boundary do multipart) sozinho — setar "application/json" quebraria o upload.
+  const response = await fetch(`${API_BASE_URL}/api/tenants/logo`, {
+    method: "POST",
+    credentials: "include",
+    headers: { Authorization: `Bearer ${accessToken}` },
+    body: formData,
+  });
+
+  if (!response.ok) {
+    const problem = (await response.json().catch(() => null)) as ProblemDetails | null;
+    throw new ApiError(
+      problem?.detail ?? problem?.title ?? "Nao foi possivel enviar o logo.",
+      response.status,
+      problem?.code
+    );
+  }
+
+  return response.json();
+}
+
 export type TeamMember = {
   id: string;
   email: string;
@@ -184,4 +215,449 @@ export function acceptInvitation(input: {
     method: "POST",
     body: JSON.stringify({ fullName: input.fullName, password: input.password }),
   });
+}
+
+export type PagedResult<T> = {
+  items: T[];
+  totalCount: number;
+  page: number;
+  pageSize: number;
+};
+
+function buildListQuery(params: { search?: string; page?: number; pageSize?: number }): string {
+  const query = new URLSearchParams();
+  if (params.search) {
+    query.set("search", params.search);
+  }
+  query.set("page", String(params.page ?? 1));
+  query.set("pageSize", String(params.pageSize ?? 20));
+  return query.toString();
+}
+
+// ---------- Customers ----------
+
+export type CustomerSummary = {
+  id: string;
+  fullName: string;
+  email: string | null;
+  phone: string | null;
+  isActive: boolean;
+};
+
+export type CustomerDetails = CustomerSummary & {
+  notes: string | null;
+  dateOfBirth: string | null;
+  customData: Record<string, string>;
+};
+
+export type CustomerInput = {
+  fullName: string;
+  email?: string | null;
+  phone?: string | null;
+  notes?: string | null;
+  dateOfBirth?: string | null;
+};
+
+export function listCustomers(
+  params: { search?: string; page?: number; pageSize?: number },
+  accessToken: string
+): Promise<PagedResult<CustomerSummary>> {
+  return request(`/api/customers?${buildListQuery(params)}`, {}, accessToken);
+}
+
+export function getCustomerById(id: string, accessToken: string): Promise<CustomerDetails> {
+  return request(`/api/customers/${id}`, {}, accessToken);
+}
+
+export function createCustomer(input: CustomerInput, accessToken: string): Promise<{ id: string }> {
+  return request("/api/customers", { method: "POST", body: JSON.stringify(input) }, accessToken);
+}
+
+export function updateCustomer(id: string, input: CustomerInput, accessToken: string): Promise<void> {
+  return request(`/api/customers/${id}`, { method: "PUT", body: JSON.stringify(input) }, accessToken);
+}
+
+export function setCustomerActiveStatus(id: string, isActive: boolean, accessToken: string): Promise<void> {
+  return request(`/api/customers/${id}/status`, { method: "PATCH", body: JSON.stringify({ isActive }) }, accessToken);
+}
+
+export type ImportCustomersResult = {
+  imported: number;
+  skipped: number;
+  errors: string[];
+};
+
+export async function importCustomersFromCsv(file: File, accessToken: string): Promise<ImportCustomersResult> {
+  const formData = new FormData();
+  formData.append("file", file);
+
+  const response = await fetch(`${API_BASE_URL}/api/customers/import`, {
+    method: "POST",
+    credentials: "include",
+    headers: { Authorization: `Bearer ${accessToken}` },
+    body: formData,
+  });
+
+  if (!response.ok) {
+    const problem = (await response.json().catch(() => null)) as ProblemDetails | null;
+    throw new ApiError(
+      problem?.detail ?? problem?.title ?? "Nao foi possivel importar o arquivo.",
+      response.status,
+      problem?.code
+    );
+  }
+
+  return response.json();
+}
+
+// ---------- Catalog (Servicos) ----------
+
+export type ServiceSummary = {
+  id: string;
+  name: string;
+  durationMinutes: number;
+  price: number;
+  currency: string;
+  category: string | null;
+  isActive: boolean;
+};
+
+export type ServiceDetails = ServiceSummary & {
+  description: string | null;
+};
+
+export type ServiceInput = {
+  name: string;
+  description?: string | null;
+  durationMinutes: number;
+  price: number;
+  currency?: string;
+  category?: string | null;
+};
+
+export function listServices(
+  params: { search?: string; page?: number; pageSize?: number },
+  accessToken: string
+): Promise<PagedResult<ServiceSummary>> {
+  return request(`/api/services?${buildListQuery(params)}`, {}, accessToken);
+}
+
+export function getServiceById(id: string, accessToken: string): Promise<ServiceDetails> {
+  return request(`/api/services/${id}`, {}, accessToken);
+}
+
+export function createService(input: ServiceInput, accessToken: string): Promise<{ id: string }> {
+  return request("/api/services", { method: "POST", body: JSON.stringify(input) }, accessToken);
+}
+
+export function updateService(id: string, input: ServiceInput, accessToken: string): Promise<void> {
+  return request(`/api/services/${id}`, { method: "PUT", body: JSON.stringify(input) }, accessToken);
+}
+
+export function setServiceActiveStatus(id: string, isActive: boolean, accessToken: string): Promise<void> {
+  return request(`/api/services/${id}/status`, { method: "PATCH", body: JSON.stringify({ isActive }) }, accessToken);
+}
+
+// ---------- Resources ----------
+
+export type ResourceType = "Person" | "Room" | "Equipment";
+
+export type DayOfWeekName =
+  | "Sunday"
+  | "Monday"
+  | "Tuesday"
+  | "Wednesday"
+  | "Thursday"
+  | "Friday"
+  | "Saturday";
+
+export type WorkingHourEntry = {
+  dayOfWeek: DayOfWeekName;
+  startTime: string;
+  endTime: string;
+};
+
+export type ResourceSummary = {
+  id: string;
+  name: string;
+  type: ResourceType;
+  capacity: number;
+  description: string | null;
+  isActive: boolean;
+};
+
+export type ResourceDetails = ResourceSummary & {
+  workingHours: WorkingHourEntry[];
+};
+
+export type ResourceInput = {
+  name: string;
+  type: ResourceType;
+  capacity: number;
+  description?: string | null;
+};
+
+export function listResources(
+  params: { search?: string; page?: number; pageSize?: number },
+  accessToken: string
+): Promise<PagedResult<ResourceSummary>> {
+  return request(`/api/resources?${buildListQuery(params)}`, {}, accessToken);
+}
+
+export function getResourceById(id: string, accessToken: string): Promise<ResourceDetails> {
+  return request(`/api/resources/${id}`, {}, accessToken);
+}
+
+export function createResource(input: ResourceInput, accessToken: string): Promise<{ id: string }> {
+  return request("/api/resources", { method: "POST", body: JSON.stringify(input) }, accessToken);
+}
+
+export function updateResource(id: string, input: ResourceInput, accessToken: string): Promise<void> {
+  return request(`/api/resources/${id}`, { method: "PUT", body: JSON.stringify(input) }, accessToken);
+}
+
+export function setResourceActiveStatus(id: string, isActive: boolean, accessToken: string): Promise<void> {
+  return request(`/api/resources/${id}/status`, { method: "PATCH", body: JSON.stringify({ isActive }) }, accessToken);
+}
+
+export function setResourceWorkingHours(
+  id: string,
+  entries: WorkingHourEntry[],
+  accessToken: string
+): Promise<void> {
+  return request(`/api/resources/${id}/working-hours`, { method: "PUT", body: JSON.stringify({ entries }) }, accessToken);
+}
+
+// ---------- Scheduling (Agenda) ----------
+
+export type AppointmentStatus =
+  | "Scheduled"
+  | "Confirmed"
+  | "InProgress"
+  | "Completed"
+  | "NoShow"
+  | "CancelledByCustomer"
+  | "CancelledByStaff";
+
+export type AppointmentSummary = {
+  id: string;
+  customerId: string;
+  resourceId: string;
+  serviceId: string;
+  serviceName: string;
+  startUtc: string;
+  endUtc: string;
+  status: AppointmentStatus;
+  price: number;
+  currency: string;
+  notes: string | null;
+};
+
+export type AppointmentDetails = AppointmentSummary;
+
+export type ScheduleAppointmentInput = {
+  customerId: string;
+  resourceId: string;
+  serviceId: string;
+  startAtUtc: string;
+  notes?: string | null;
+};
+
+export function listAppointments(
+  params: { fromUtc: string; toUtc: string; resourceId?: string },
+  accessToken: string
+): Promise<AppointmentSummary[]> {
+  const query = new URLSearchParams({ from: params.fromUtc, to: params.toUtc });
+  if (params.resourceId) {
+    query.set("resourceId", params.resourceId);
+  }
+  return request(`/api/appointments?${query.toString()}`, {}, accessToken);
+}
+
+export function getAppointmentById(id: string, accessToken: string): Promise<AppointmentDetails> {
+  return request(`/api/appointments/${id}`, {}, accessToken);
+}
+
+export function scheduleAppointment(input: ScheduleAppointmentInput, accessToken: string): Promise<{ id: string }> {
+  return request("/api/appointments", { method: "POST", body: JSON.stringify(input) }, accessToken);
+}
+
+export function confirmAppointment(id: string, accessToken: string): Promise<void> {
+  return request(`/api/appointments/${id}/confirm`, { method: "POST" }, accessToken);
+}
+
+export function startAppointment(id: string, accessToken: string): Promise<void> {
+  return request(`/api/appointments/${id}/start`, { method: "POST" }, accessToken);
+}
+
+export function completeAppointment(id: string, accessToken: string): Promise<void> {
+  return request(`/api/appointments/${id}/complete`, { method: "POST" }, accessToken);
+}
+
+export function markAppointmentNoShow(id: string, accessToken: string): Promise<void> {
+  return request(`/api/appointments/${id}/no-show`, { method: "POST" }, accessToken);
+}
+
+export function cancelAppointment(id: string, byStaff: boolean, accessToken: string): Promise<void> {
+  return request(`/api/appointments/${id}/cancel`, { method: "POST", body: JSON.stringify({ byStaff }) }, accessToken);
+}
+
+export function rescheduleAppointment(id: string, newStartAtUtc: string, accessToken: string): Promise<void> {
+  return request(
+    `/api/appointments/${id}/reschedule`,
+    { method: "PUT", body: JSON.stringify({ newStartAtUtc }) },
+    accessToken
+  );
+}
+
+// ---------- Portal publico (sem login) ----------
+
+export type PublicServiceSummary = {
+  id: string;
+  name: string;
+  description: string | null;
+  durationMinutes: number;
+  price: number;
+  currency: string;
+  category: string | null;
+};
+
+export type PublicResourceSummary = {
+  id: string;
+  name: string;
+  type: ResourceType;
+  description: string | null;
+};
+
+export type AvailableSlot = {
+  startUtc: string;
+  endUtc: string;
+};
+
+export type PublicScheduleAppointmentInput = {
+  resourceId: string;
+  serviceId: string;
+  startAtUtc: string;
+  customerFullName: string;
+  customerEmail: string;
+  customerPhone?: string | null;
+  notes?: string | null;
+};
+
+export function publicListServices(tenantId: string): Promise<PublicServiceSummary[]> {
+  return request(`/api/public/tenants/${tenantId}/services`);
+}
+
+export function publicListResources(tenantId: string): Promise<PublicResourceSummary[]> {
+  return request(`/api/public/tenants/${tenantId}/resources`);
+}
+
+export function getAvailableSlots(
+  tenantId: string,
+  params: { resourceId: string; serviceId: string; date: string }
+): Promise<AvailableSlot[]> {
+  const query = new URLSearchParams(params);
+  return request(`/api/public/tenants/${tenantId}/availability?${query.toString()}`);
+}
+
+export function publicScheduleAppointment(tenantId: string, input: PublicScheduleAppointmentInput): Promise<{ id: string }> {
+  return request(`/api/public/tenants/${tenantId}/appointments`, { method: "POST", body: JSON.stringify(input) });
+}
+
+// ---------- Platform (Super Admin) ----------
+// Autoridade separada de qualquer tenant: token proprio, nunca reaproveita
+// AuthTokens/login/useSession do painel do estabelecimento.
+
+export type PlatformAuthTokens = {
+  accessToken: string;
+  expiresAtUtc: string;
+  fullName: string;
+};
+
+export function platformLogin(input: { email: string; password: string }): Promise<PlatformAuthTokens> {
+  return request<PlatformAuthTokens>("/api/platform/auth/login", {
+    method: "POST",
+    body: JSON.stringify(input),
+  });
+}
+
+export type TenantAdminSummary = {
+  id: string;
+  name: string;
+  slug: string;
+  timeZoneId: string;
+  isActive: boolean;
+};
+
+export function listTenantsForPlatform(accessToken: string): Promise<TenantAdminSummary[]> {
+  return request<TenantAdminSummary[]>("/api/platform/tenants", {}, accessToken);
+}
+
+export function setTenantActiveStatusForPlatform(
+  tenantId: string,
+  isActive: boolean,
+  accessToken: string
+): Promise<void> {
+  return request(
+    `/api/platform/tenants/${tenantId}/status`,
+    { method: "PATCH", body: JSON.stringify({ isActive }) },
+    accessToken
+  );
+}
+
+// ---------- Billing (assinatura do estabelecimento) ----------
+
+export type PlanSummary = {
+  id: string;
+  name: string;
+  priceAmount: number;
+  currency: string;
+  billingCycle: string;
+};
+
+export function listPlans(accessToken: string): Promise<PlanSummary[]> {
+  return request<PlanSummary[]>("/api/billing/plans", {}, accessToken);
+}
+
+export type LatestPaymentSummary = {
+  status: string;
+  amount: number;
+  dueDate: string;
+  invoiceUrl: string | null;
+};
+
+export type MySubscription = {
+  planName: string;
+  status: string;
+  trialEndsAtUtc: string;
+  currentPeriodEndsAtUtc: string | null;
+  latestPayment: LatestPaymentSummary | null;
+};
+
+export function getMySubscription(accessToken: string): Promise<MySubscription> {
+  return request<MySubscription>("/api/billing/subscription", {}, accessToken);
+}
+
+export function subscribeToPlan(
+  input: { planId: string; fullName: string; cpfCnpj: string; email?: string },
+  accessToken: string
+): Promise<{ invoiceUrl: string }> {
+  return request("/api/billing/subscription/subscribe", { method: "POST", body: JSON.stringify(input) }, accessToken);
+}
+
+export function cancelSubscription(accessToken: string): Promise<void> {
+  return request("/api/billing/subscription/cancel", { method: "POST" }, accessToken);
+}
+
+export type SubscriptionAdminSummary = {
+  tenantId: string;
+  tenantName: string;
+  planName: string;
+  status: string;
+  trialEndsAtUtc: string;
+  currentPeriodEndsAtUtc: string | null;
+};
+
+export function listSubscriptionsForPlatform(accessToken: string): Promise<SubscriptionAdminSummary[]> {
+  return request<SubscriptionAdminSummary[]>("/api/platform/subscriptions", {}, accessToken);
 }
