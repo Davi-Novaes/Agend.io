@@ -1,6 +1,16 @@
 using Agendio.Infrastructure.Multitenancy;
+using Agendio.Modules.Billing.Domain;
+using Agendio.Modules.Billing.Infrastructure.Persistence;
+using Agendio.Modules.Catalog.Domain;
+using Agendio.Modules.Catalog.Infrastructure.Persistence;
+using Agendio.Modules.Customers.Domain;
+using Agendio.Modules.Customers.Infrastructure.Persistence;
 using Agendio.Modules.Identity.Domain;
 using Agendio.Modules.Identity.Infrastructure.Persistence;
+using Agendio.Modules.Resources.Domain;
+using Agendio.Modules.Resources.Infrastructure.Persistence;
+using Agendio.Modules.Scheduling.Domain;
+using Agendio.Modules.Scheduling.Infrastructure.Persistence;
 using Agendio.Modules.Tenancy.Domain;
 using Agendio.Modules.Tenancy.Infrastructure.Persistence;
 using Agendio.SharedKernel.Multitenancy;
@@ -39,6 +49,78 @@ public class TenantIsolationRulesTests
     }
 
     [Fact]
+    public void Customers_Module_Should_Have_Exactly_One_TenantOwned_Entity_With_A_Query_Filter()
+    {
+        using var dbContext = CreateCustomersDbContext();
+
+        var tenantOwnedEntityTypes = dbContext.Model.GetEntityTypes()
+            .Where(entityType => typeof(ITenantOwned).IsAssignableFrom(entityType.ClrType))
+            .ToList();
+
+        tenantOwnedEntityTypes.Select(e => e.ClrType).ShouldBe([typeof(Customer)]);
+
+        foreach (var entityType in tenantOwnedEntityTypes)
+        {
+            entityType.GetDeclaredQueryFilters().ShouldNotBeEmpty(
+                $"{entityType.ClrType.Name} implementa ITenantOwned mas nao tem Global Query Filter configurado no DbContext.");
+        }
+    }
+
+    [Fact]
+    public void Catalog_Module_Should_Have_Exactly_One_TenantOwned_Entity_With_A_Query_Filter()
+    {
+        using var dbContext = CreateCatalogDbContext();
+
+        var tenantOwnedEntityTypes = dbContext.Model.GetEntityTypes()
+            .Where(entityType => typeof(ITenantOwned).IsAssignableFrom(entityType.ClrType))
+            .ToList();
+
+        tenantOwnedEntityTypes.Select(e => e.ClrType).ShouldBe([typeof(Service)]);
+
+        foreach (var entityType in tenantOwnedEntityTypes)
+        {
+            entityType.GetDeclaredQueryFilters().ShouldNotBeEmpty(
+                $"{entityType.ClrType.Name} implementa ITenantOwned mas nao tem Global Query Filter configurado no DbContext.");
+        }
+    }
+
+    [Fact]
+    public void Resources_Module_Should_Have_Exactly_One_TenantOwned_Entity_With_A_Query_Filter()
+    {
+        using var dbContext = CreateResourcesDbContext();
+
+        var tenantOwnedEntityTypes = dbContext.Model.GetEntityTypes()
+            .Where(entityType => typeof(ITenantOwned).IsAssignableFrom(entityType.ClrType))
+            .ToList();
+
+        tenantOwnedEntityTypes.Select(e => e.ClrType).ShouldBe([typeof(Resource)]);
+
+        foreach (var entityType in tenantOwnedEntityTypes)
+        {
+            entityType.GetDeclaredQueryFilters().ShouldNotBeEmpty(
+                $"{entityType.ClrType.Name} implementa ITenantOwned mas nao tem Global Query Filter configurado no DbContext.");
+        }
+    }
+
+    [Fact]
+    public void Scheduling_Module_Should_Have_Exactly_One_TenantOwned_Entity_With_A_Query_Filter()
+    {
+        using var dbContext = CreateSchedulingDbContext();
+
+        var tenantOwnedEntityTypes = dbContext.Model.GetEntityTypes()
+            .Where(entityType => typeof(ITenantOwned).IsAssignableFrom(entityType.ClrType))
+            .ToList();
+
+        tenantOwnedEntityTypes.Select(e => e.ClrType).ShouldBe([typeof(Appointment)]);
+
+        foreach (var entityType in tenantOwnedEntityTypes)
+        {
+            entityType.GetDeclaredQueryFilters().ShouldNotBeEmpty(
+                $"{entityType.ClrType.Name} implementa ITenantOwned mas nao tem Global Query Filter configurado no DbContext.");
+        }
+    }
+
+    [Fact]
     public void Tenant_Should_Deliberately_Not_Be_TenantOwned()
     {
         // Tenant E o tenant — nao pertence a um. Se algum dia Tenant passar a
@@ -47,6 +129,25 @@ public class TenantIsolationRulesTests
         typeof(ITenantOwned).IsAssignableFrom(typeof(Tenant)).ShouldBeFalse();
 
         using var dbContext = CreateTenancyDbContext();
+        var tenantOwnedEntityTypes = dbContext.Model.GetEntityTypes()
+            .Where(entityType => typeof(ITenantOwned).IsAssignableFrom(entityType.ClrType));
+
+        tenantOwnedEntityTypes.ShouldBeEmpty();
+    }
+
+    [Fact]
+    public void Billing_Module_Should_Deliberately_Have_Zero_TenantOwned_Entities()
+    {
+        // Subscription/Payment tem coluna tenant_id normal, mas nao sao
+        // ITenantOwned e nao tem RLS de proposito — agendio_owner e agendio_app
+        // sao ambos NOBYPASSRLS, entao RLS aqui deixaria o painel Super Admin e
+        // o job de conciliacao cegos para todo tenant. Ver comentario em
+        // Subscription.cs. Se algum dia isso mudar, merece revisao explicita.
+        typeof(ITenantOwned).IsAssignableFrom(typeof(Subscription)).ShouldBeFalse();
+        typeof(ITenantOwned).IsAssignableFrom(typeof(Payment)).ShouldBeFalse();
+        typeof(ITenantOwned).IsAssignableFrom(typeof(Plan)).ShouldBeFalse();
+
+        using var dbContext = CreateBillingDbContext();
         var tenantOwnedEntityTypes = dbContext.Model.GetEntityTypes()
             .Where(entityType => typeof(ITenantOwned).IsAssignableFrom(entityType.ClrType));
 
@@ -69,5 +170,50 @@ public class TenantIsolationRulesTests
             .UseSnakeCaseNamingConvention();
 
         return new TenancyDbContext(optionsBuilder.Options);
+    }
+
+    private static CustomersDbContext CreateCustomersDbContext()
+    {
+        var optionsBuilder = new DbContextOptionsBuilder<CustomersDbContext>()
+            .UseNpgsql("Host=localhost;Database=architecture_tests_only")
+            .UseSnakeCaseNamingConvention();
+
+        return new CustomersDbContext(optionsBuilder.Options, new NullTenantContext());
+    }
+
+    private static CatalogDbContext CreateCatalogDbContext()
+    {
+        var optionsBuilder = new DbContextOptionsBuilder<CatalogDbContext>()
+            .UseNpgsql("Host=localhost;Database=architecture_tests_only")
+            .UseSnakeCaseNamingConvention();
+
+        return new CatalogDbContext(optionsBuilder.Options, new NullTenantContext());
+    }
+
+    private static ResourcesDbContext CreateResourcesDbContext()
+    {
+        var optionsBuilder = new DbContextOptionsBuilder<ResourcesDbContext>()
+            .UseNpgsql("Host=localhost;Database=architecture_tests_only")
+            .UseSnakeCaseNamingConvention();
+
+        return new ResourcesDbContext(optionsBuilder.Options, new NullTenantContext());
+    }
+
+    private static SchedulingDbContext CreateSchedulingDbContext()
+    {
+        var optionsBuilder = new DbContextOptionsBuilder<SchedulingDbContext>()
+            .UseNpgsql("Host=localhost;Database=architecture_tests_only")
+            .UseSnakeCaseNamingConvention();
+
+        return new SchedulingDbContext(optionsBuilder.Options, new NullTenantContext());
+    }
+
+    private static BillingDbContext CreateBillingDbContext()
+    {
+        var optionsBuilder = new DbContextOptionsBuilder<BillingDbContext>()
+            .UseNpgsql("Host=localhost;Database=architecture_tests_only")
+            .UseSnakeCaseNamingConvention();
+
+        return new BillingDbContext(optionsBuilder.Options);
     }
 }

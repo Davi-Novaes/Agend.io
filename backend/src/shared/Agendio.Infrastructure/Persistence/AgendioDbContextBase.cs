@@ -28,6 +28,8 @@ public abstract class AgendioDbContextBase(DbContextOptions options) : DbContext
 {
     public DbSet<OutboxMessage> OutboxMessages => Set<OutboxMessage>();
 
+    public DbSet<AuditLogEntry> AuditLogEntries => Set<AuditLogEntry>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.Entity<OutboxMessage>(builder =>
@@ -38,6 +40,19 @@ public abstract class AgendioDbContextBase(DbContextOptions options) : DbContext
             builder.Property(message => message.Content).IsRequired().HasColumnType("jsonb");
             builder.Property(message => message.Error).HasMaxLength(2048);
             builder.HasIndex(message => message.ProcessedOnUtc);
+        });
+
+        modelBuilder.Entity<AuditLogEntry>(builder =>
+        {
+            builder.ToTable("audit_log");
+            builder.HasKey(entry => entry.Id);
+            builder.Property(entry => entry.EntityType).IsRequired().HasMaxLength(256);
+            builder.Property(entry => entry.Action).IsRequired().HasMaxLength(32);
+            builder.Property(entry => entry.Before).HasColumnType("jsonb");
+            builder.Property(entry => entry.After).HasColumnType("jsonb");
+            builder.Property(entry => entry.PerformedBy).IsRequired().HasMaxLength(256);
+            builder.HasIndex(entry => new { entry.TenantId, entry.EntityType, entry.EntityId });
+            builder.HasIndex(entry => entry.OccurredAtUtc);
         });
 
         base.OnModelCreating(modelBuilder);

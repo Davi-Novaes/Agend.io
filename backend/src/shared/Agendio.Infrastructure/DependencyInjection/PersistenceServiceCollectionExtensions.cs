@@ -31,6 +31,7 @@ public static class PersistenceServiceCollectionExtensions
             options.AddInterceptors(
                 serviceProvider.GetRequiredService<TenantConnectionInterceptor>(),
                 serviceProvider.GetRequiredService<AuditingSaveChangesInterceptor>(),
+                serviceProvider.GetRequiredService<AuditLogInterceptor>(),
                 serviceProvider.GetRequiredService<DomainEventsToOutboxInterceptor>());
         });
 

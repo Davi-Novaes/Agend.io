@@ -1,3 +1,5 @@
+using Agendio.Infrastructure.Messaging;
+using Agendio.Infrastructure.Persistence;
 using Hangfire;
 using Hangfire.PostgreSql;
 using Microsoft.Extensions.Configuration;
@@ -7,6 +9,29 @@ namespace Agendio.Infrastructure.DependencyInjection;
 
 public static class HangfireServiceCollectionExtensions
 {
+    /// <summary>
+    /// Ativa o job recorrente que drena a tabela outbox do modulo para o
+    /// RabbitMQ (ver OutboxProcessor e o comentario em OutboxMessage). A
+    /// tabela/o interceptor que grava nela ja existiam desde o Sprint 0 — so
+    /// faltava alguem de fato ler e publicar, o que so passou a importar com
+    /// o primeiro consumidor real (notificacoes, Sprint 5).
+    ///
+    /// Usa IRecurringJobManager (resolvido do DI), nao a fachada estatica
+    /// RecurringJob — esta ultima depende de JobStorage.Current, que so fica
+    /// disponivel depois que o pipeline do Hangfire termina de subir, e falha
+    /// logo apos app.Build() com "JobStorage instance has not been initialized".
+    /// </summary>
+    public static void ScheduleOutboxProcessing<TDbContext>(this IServiceProvider services, string moduleName)
+        where TDbContext : AgendioDbContextBase
+    {
+        var recurringJobManager = services.GetRequiredService<IRecurringJobManager>();
+
+        recurringJobManager.AddOrUpdate<OutboxProcessor<TDbContext>>(
+            $"outbox-{moduleName}",
+            processor => processor.ProcessPendingMessagesAsync(CancellationToken.None),
+            Cron.Minutely());
+    }
+
     /// <summary>
     /// Storage no mesmo PostgreSQL da aplicacao — sem infra extra so para jobs.
     /// O dashboard (habilitado no Agendio.Api, restrito a Super Admin) da

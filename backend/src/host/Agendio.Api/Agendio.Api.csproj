@@ -36,6 +36,12 @@
     <ProjectReference Include="..\..\modules\Identity\Agendio.Modules.Identity.Contracts\Agendio.Modules.Identity.Contracts.csproj" />
     <ProjectReference Include="..\..\modules\Tenancy\Agendio.Modules.Tenancy\Agendio.Modules.Tenancy.csproj" />
     <ProjectReference Include="..\..\modules\Tenancy\Agendio.Modules.Tenancy.Contracts\Agendio.Modules.Tenancy.Contracts.csproj" />
+    <ProjectReference Include="..\..\modules\Customers\Agendio.Modules.Customers\Agendio.Modules.Customers.csproj" />
+    <ProjectReference Include="..\..\modules\Catalog\Agendio.Modules.Catalog\Agendio.Modules.Catalog.csproj" />
+    <ProjectReference Include="..\..\modules\Resources\Agendio.Modules.Resources\Agendio.Modules.Resources.csproj" />
+    <ProjectReference Include="..\..\modules\Scheduling\Agendio.Modules.Scheduling\Agendio.Modules.Scheduling.csproj" />
+    <ProjectReference Include="..\..\modules\Platform\Agendio.Modules.Platform\Agendio.Modules.Platform.csproj" />
+    <ProjectReference Include="..\..\modules\Billing\Agendio.Modules.Billing\Agendio.Modules.Billing.csproj" />
   </ItemGroup>
 
 </Project>

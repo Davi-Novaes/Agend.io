@@ -37,6 +37,7 @@ public sealed class TenantConfiguration : IEntityTypeConfiguration<Tenant>
         builder.Property(t => t.TimeZoneId).IsRequired().HasMaxLength(64);
         builder.Property(t => t.IsActive).IsRequired();
         builder.Property(t => t.PrimaryColorHex).HasMaxLength(7);
+        builder.Property(t => t.LogoUrl).HasMaxLength(500);
 
         builder.Property(t => t.CreatedBy).HasMaxLength(256);
         builder.Property(t => t.UpdatedBy).HasMaxLength(256);
