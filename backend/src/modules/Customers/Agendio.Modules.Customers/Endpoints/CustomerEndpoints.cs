@@ -42,7 +42,8 @@ public sealed class CustomerEndpoints : IEndpointModule
         group.MapPost("/", async (CreateCustomerRequest request, IDispatcher dispatcher, CancellationToken cancellationToken) =>
         {
             var command = new CreateCustomerCommand(
-                request.FullName, request.Email, request.Phone, request.Notes, request.DateOfBirth, request.CustomData);
+                request.FullName, request.Email, request.Phone, request.Notes, request.DateOfBirth, request.CustomData,
+                request.Cpf, request.HealthNotes);
             var result = await dispatcher.Send(command, cancellationToken);
 
             return result.IsSuccess
@@ -55,7 +56,8 @@ public sealed class CustomerEndpoints : IEndpointModule
         group.MapPut("/{id:guid}", async (Guid id, UpdateCustomerRequest request, IDispatcher dispatcher, CancellationToken cancellationToken) =>
         {
             var command = new UpdateCustomerCommand(
-                id, request.FullName, request.Email, request.Phone, request.Notes, request.DateOfBirth, request.CustomData);
+                id, request.FullName, request.Email, request.Phone, request.Notes, request.DateOfBirth, request.CustomData,
+                request.Cpf, request.HealthNotes);
             var result = await dispatcher.Send(command, cancellationToken);
 
             return result.IsSuccess ? Results.NoContent() : result.Error.ToProblemResult();
@@ -93,10 +95,12 @@ public sealed class CustomerEndpoints : IEndpointModule
     }
 
     private sealed record CreateCustomerRequest(
-        string FullName, string? Email, string? Phone, string? Notes, DateOnly? DateOfBirth, Dictionary<string, string>? CustomData);
+        string FullName, string? Email, string? Phone, string? Notes, DateOnly? DateOfBirth, Dictionary<string, string>? CustomData,
+        string? Cpf = null, string? HealthNotes = null);
 
     private sealed record UpdateCustomerRequest(
-        string FullName, string? Email, string? Phone, string? Notes, DateOnly? DateOfBirth, Dictionary<string, string>? CustomData);
+        string FullName, string? Email, string? Phone, string? Notes, DateOnly? DateOfBirth, Dictionary<string, string>? CustomData,
+        string? Cpf = null, string? HealthNotes = null);
 
     private sealed record SetActiveStatusRequest(bool IsActive);
 }

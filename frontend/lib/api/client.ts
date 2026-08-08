@@ -102,19 +102,59 @@ export function createTenant(input: {
 }
 
 export type AuthTokens = {
+  mfaRequired: false;
   accessToken: string;
   expiresAtUtc: string;
 };
+
+export type MfaChallenge = {
+  mfaRequired: true;
+  mfaChallengeToken: string;
+  expiresAtUtc: string;
+};
+
+// /login e /mfa/verify devolvem o mesmo formato de uniao: ou tokens de
+// verdade (mfaRequired: false), ou um desafio pendente que precisa de um
+// segundo passo antes de autenticar de fato.
+export type LoginResult = AuthTokens | MfaChallenge;
 
 export function login(input: {
   tenantId: string;
   email: string;
   password: string;
-}): Promise<AuthTokens> {
-  return request<AuthTokens>("/api/auth/login", {
+}): Promise<LoginResult> {
+  return request<LoginResult>("/api/auth/login", {
     method: "POST",
     body: JSON.stringify(input),
   });
+}
+
+export function verifyMfa(input: { mfaChallengeToken: string; code: string }): Promise<AuthTokens> {
+  return request<AuthTokens>("/api/auth/mfa/verify", {
+    method: "POST",
+    body: JSON.stringify(input),
+  });
+}
+
+export type SetupMfaResult = { secret: string; otpAuthUri: string };
+
+export function setupMfa(accessToken: string): Promise<SetupMfaResult> {
+  return request<SetupMfaResult>("/api/auth/mfa/setup", { method: "POST" }, accessToken);
+}
+
+export function enableMfa(
+  input: { secret: string; code: string },
+  accessToken: string
+): Promise<{ recoveryCodes: string[] }> {
+  return request("/api/auth/mfa/enable", { method: "POST", body: JSON.stringify(input) }, accessToken);
+}
+
+export function disableMfa(input: { password: string; code: string }, accessToken: string): Promise<void> {
+  return request<void>("/api/auth/mfa/disable", { method: "POST", body: JSON.stringify(input) }, accessToken);
+}
+
+export function getMfaStatus(accessToken: string): Promise<{ mfaEnabled: boolean }> {
+  return request("/api/auth/mfa/status", {}, accessToken);
 }
 
 export function registerUser(input: {
@@ -248,6 +288,8 @@ export type CustomerDetails = CustomerSummary & {
   notes: string | null;
   dateOfBirth: string | null;
   customData: Record<string, string>;
+  cpf: string | null;
+  healthNotes: string | null;
 };
 
 export type CustomerInput = {
@@ -256,6 +298,8 @@ export type CustomerInput = {
   phone?: string | null;
   notes?: string | null;
   dateOfBirth?: string | null;
+  cpf?: string | null;
+  healthNotes?: string | null;
 };
 
 export function listCustomers(

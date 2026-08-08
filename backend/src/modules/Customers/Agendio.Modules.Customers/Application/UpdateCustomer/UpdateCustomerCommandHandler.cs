@@ -20,7 +20,8 @@ public sealed class UpdateCustomerCommandHandler(CustomersDbContext dbContext) :
         }
 
         var updateResult = customer.Update(
-            request.FullName, request.Email, request.Phone, request.Notes, request.DateOfBirth, request.CustomData);
+            request.FullName, request.Email, request.Phone, request.Notes, request.DateOfBirth, request.CustomData,
+            request.Cpf, request.HealthNotes);
 
         if (updateResult.IsFailure)
         {

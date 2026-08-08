@@ -8,5 +8,6 @@ public sealed class CreateCustomerCommandValidator : AbstractValidator<CreateCus
     {
         RuleFor(c => c.FullName).NotEmpty().MaximumLength(200);
         RuleFor(c => c.Notes).MaximumLength(2000);
+        RuleFor(c => c.HealthNotes).MaximumLength(4000);
     }
 }

@@ -36,6 +36,12 @@ public sealed class UserConfiguration : IEntityTypeConfiguration<User>
         builder.Property(u => u.Role).HasConversion<string>().HasMaxLength(32).IsRequired();
         builder.Property(u => u.IsActive).IsRequired();
 
+        builder.Property(u => u.MfaEnabled).IsRequired().HasDefaultValue(false);
+
+        // Sem HasConversion aqui: MfaSecretEncrypted (como Customer.Cpf/HealthNotes,
+        // ver docs/adr/0007) usa EncryptedStringConverter, aplicado no
+        // IdentityDbContext.OnModelCreating porque depende de IEncryptionService.
+
         builder.Property(u => u.CreatedBy).HasMaxLength(256);
         builder.Property(u => u.UpdatedBy).HasMaxLength(256);
 

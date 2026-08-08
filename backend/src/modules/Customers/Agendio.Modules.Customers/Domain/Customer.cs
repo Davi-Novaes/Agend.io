@@ -28,6 +28,12 @@ public sealed class Customer : AggregateRoot<CustomerId>, ITenantOwned, IAuditab
 
     public DateOnly? DateOfBirth { get; private set; }
 
+    /// <summary>Criptografado em coluna (ver docs/adr/0007) — nunca aparece em log/auditoria (AuditLogInterceptor.SensitiveNameFragments).</summary>
+    public string? Cpf { get; private set; }
+
+    /// <summary>Dado de saude opcional (convenio, alergia, restricao) para segmentos como clinica/psicologo — criptografado em coluna, mesma justificativa de Cpf.</summary>
+    public string? HealthNotes { get; private set; }
+
     public IReadOnlyDictionary<string, string> CustomData { get; private set; } = new Dictionary<string, string>();
 
     public bool IsActive { get; private set; }
@@ -50,7 +56,8 @@ public sealed class Customer : AggregateRoot<CustomerId>, ITenantOwned, IAuditab
 
     private Customer(
         TenantId tenantId, string fullName, Email? email, PhoneNumber? phone,
-        string? notes, DateOnly? dateOfBirth, IReadOnlyDictionary<string, string> customData)
+        string? notes, DateOnly? dateOfBirth, string? cpf, string? healthNotes,
+        IReadOnlyDictionary<string, string> customData)
         : base(CustomerId.New())
     {
         TenantId = tenantId;
@@ -59,6 +66,8 @@ public sealed class Customer : AggregateRoot<CustomerId>, ITenantOwned, IAuditab
         Phone = phone;
         Notes = notes;
         DateOfBirth = dateOfBirth;
+        Cpf = cpf;
+        HealthNotes = healthNotes;
         CustomData = customData;
         IsActive = true;
     }
@@ -70,7 +79,9 @@ public sealed class Customer : AggregateRoot<CustomerId>, ITenantOwned, IAuditab
         string? phone,
         string? notes,
         DateOnly? dateOfBirth,
-        IReadOnlyDictionary<string, string>? customData = null)
+        IReadOnlyDictionary<string, string>? customData = null,
+        string? cpf = null,
+        string? healthNotes = null)
     {
         if (string.IsNullOrWhiteSpace(fullName))
         {
@@ -89,9 +100,15 @@ public sealed class Customer : AggregateRoot<CustomerId>, ITenantOwned, IAuditab
             return Result.Failure<Customer>(phoneResult.Error);
         }
 
+        var cpfResult = ParseOptionalCpf(cpf);
+        if (cpfResult.IsFailure)
+        {
+            return Result.Failure<Customer>(cpfResult.Error);
+        }
+
         var customer = new Customer(
             tenantId, fullName.Trim(), emailResult.Value, phoneResult.Value, notes?.Trim(), dateOfBirth,
-            customData ?? new Dictionary<string, string>());
+            cpfResult.Value, healthNotes?.Trim(), customData ?? new Dictionary<string, string>());
 
         customer.Raise(new CustomerCreatedDomainEvent(customer.Id, tenantId, customer.FullName));
 
@@ -104,7 +121,9 @@ public sealed class Customer : AggregateRoot<CustomerId>, ITenantOwned, IAuditab
         string? phone,
         string? notes,
         DateOnly? dateOfBirth,
-        IReadOnlyDictionary<string, string>? customData)
+        IReadOnlyDictionary<string, string>? customData,
+        string? cpf = null,
+        string? healthNotes = null)
     {
         if (string.IsNullOrWhiteSpace(fullName))
         {
@@ -123,11 +142,19 @@ public sealed class Customer : AggregateRoot<CustomerId>, ITenantOwned, IAuditab
             return Result.Failure(phoneResult.Error);
         }
 
+        var cpfResult = ParseOptionalCpf(cpf);
+        if (cpfResult.IsFailure)
+        {
+            return Result.Failure(cpfResult.Error);
+        }
+
         FullName = fullName.Trim();
         Email = emailResult.Value;
         Phone = phoneResult.Value;
         Notes = notes?.Trim();
         DateOfBirth = dateOfBirth;
+        Cpf = cpfResult.Value;
+        HealthNotes = healthNotes?.Trim();
         CustomData = customData ?? CustomData;
 
         return Result.Success();
@@ -157,5 +184,19 @@ public sealed class Customer : AggregateRoot<CustomerId>, ITenantOwned, IAuditab
 
         var result = PhoneNumber.Create(phone);
         return result.IsSuccess ? Result.Success<PhoneNumber?>(result.Value) : Result.Failure<PhoneNumber?>(result.Error);
+    }
+
+    // Cpf fica como string (digitos normalizados), nao CpfCnpj: quem persiste
+    // e le e o valor criptografado em coluna (EncryptedStringConverter atua em
+    // string?), a validacao de formato e so no momento de aceitar o valor.
+    private static Result<string?> ParseOptionalCpf(string? cpf)
+    {
+        if (string.IsNullOrWhiteSpace(cpf))
+        {
+            return Result.Success<string?>(null);
+        }
+
+        var result = CpfCnpj.Create(cpf);
+        return result.IsSuccess ? Result.Success<string?>(result.Value.Value) : Result.Failure<string?>(result.Error);
     }
 }

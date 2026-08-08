@@ -66,6 +66,54 @@ public class PhoneNumberTests
     }
 }
 
+public class CpfCnpjTests
+{
+    [Theory]
+    [InlineData("529.982.247-25")]
+    [InlineData("52998224725")]
+    public void Create_Should_Accept_Valid_Cpf(string input)
+    {
+        var result = CpfCnpj.Create(input);
+
+        result.IsSuccess.ShouldBeTrue();
+        result.Value.Value.ShouldBe("52998224725");
+    }
+
+    [Theory]
+    [InlineData("11.222.333/0001-81")]
+    [InlineData("11222333000181")]
+    public void Create_Should_Accept_Valid_Cnpj(string input)
+    {
+        var result = CpfCnpj.Create(input);
+
+        result.IsSuccess.ShouldBeTrue();
+        result.Value.Value.ShouldBe("11222333000181");
+    }
+
+    [Theory]
+    [InlineData("529.982.247-26")] // digito verificador errado
+    [InlineData("11111111111")] // todos os digitos iguais
+    [InlineData("123")] // tamanho invalido
+    [InlineData("11222333000182")] // CNPJ com digito verificador errado
+    public void Create_Should_Reject_Invalid_Check_Digit_Or_Length(string input)
+    {
+        var result = CpfCnpj.Create(input);
+
+        result.IsFailure.ShouldBeTrue();
+    }
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData("")]
+    [InlineData("   ")]
+    public void Create_Should_Fail_For_Empty_Input(string? input)
+    {
+        var result = CpfCnpj.Create(input);
+
+        result.IsFailure.ShouldBeTrue();
+    }
+}
+
 public class SlugTests
 {
     [Theory]

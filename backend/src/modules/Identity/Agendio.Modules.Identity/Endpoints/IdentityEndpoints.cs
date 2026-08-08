@@ -1,10 +1,16 @@
+using System.Security.Claims;
 using Agendio.Infrastructure.Endpoints;
 using Agendio.Modules.Identity.Application;
 using Agendio.Modules.Identity.Application.AcceptInvitation;
+using Agendio.Modules.Identity.Application.DisableMfa;
+using Agendio.Modules.Identity.Application.EnableMfa;
+using Agendio.Modules.Identity.Application.GetMfaStatus;
 using Agendio.Modules.Identity.Application.InviteTeamMember;
 using Agendio.Modules.Identity.Application.Login;
 using Agendio.Modules.Identity.Application.RefreshAccessToken;
 using Agendio.Modules.Identity.Application.RegisterUser;
+using Agendio.Modules.Identity.Application.SetupMfa;
+using Agendio.Modules.Identity.Application.VerifyMfa;
 using Agendio.Modules.Identity.Domain;
 using Agendio.Modules.Identity.Infrastructure.Persistence;
 using Agendio.SharedKernel.Messaging;
@@ -35,6 +41,7 @@ public sealed class IdentityEndpoints : IEndpointModule
                 : result.Error.ToProblemResult();
         })
         .AllowAnonymous()
+        .RequireRateLimiting("auth")
         .WithName("RegisterUser")
         .WithSummary("Registra o primeiro usuario (dono) de um estabelecimento.");
 
@@ -48,11 +55,73 @@ public sealed class IdentityEndpoints : IEndpointModule
                 return result.Error.ToProblemResult();
             }
 
-            SetRefreshTokenCookie(httpContext, result.Value);
-            return Results.Ok(ToResponse(result.Value));
+            return result.Value switch
+            {
+                LoginSuccess success => CompleteLogin(httpContext, success.Tokens),
+                LoginMfaChallenge challenge => Results.Ok(new
+                {
+                    mfaRequired = true,
+                    mfaChallengeToken = challenge.ChallengeToken,
+                    expiresAtUtc = challenge.ExpiresAtUtc,
+                }),
+                _ => throw new InvalidOperationException($"LoginResult inesperado: {result.Value.GetType().Name}."),
+            };
         })
         .AllowAnonymous()
+        .RequireRateLimiting("auth")
         .WithName("Login");
+
+        group.MapPost("/mfa/verify", async (VerifyMfaRequest request, IDispatcher dispatcher, HttpContext httpContext, CancellationToken cancellationToken) =>
+        {
+            var command = new VerifyMfaCommand(request.MfaChallengeToken, request.Code);
+            var result = await dispatcher.Send(command, cancellationToken);
+
+            return result.IsSuccess ? CompleteLogin(httpContext, result.Value) : result.Error.ToProblemResult();
+        })
+        .AllowAnonymous()
+        .RequireRateLimiting("auth")
+        .WithName("VerifyMfa")
+        .WithSummary("Segunda etapa do login quando MFA esta habilitado: confirma o codigo TOTP (ou de recuperacao) e emite os tokens.");
+
+        group.MapGet("/mfa/status", async (HttpContext httpContext, IDispatcher dispatcher, CancellationToken cancellationToken) =>
+        {
+            var result = await dispatcher.Query(new GetMfaStatusQuery(GetUserId(httpContext)), cancellationToken);
+            return result.IsSuccess ? Results.Ok(result.Value) : result.Error.ToProblemResult();
+        })
+        .RequireAuthorization()
+        .WithName("GetMfaStatus")
+        .WithSummary("Diz se o usuario autenticado tem MFA habilitado — usado pela tela de Configuracoes/Seguranca.");
+
+        group.MapPost("/mfa/setup", async (HttpContext httpContext, IDispatcher dispatcher, CancellationToken cancellationToken) =>
+        {
+            var result = await dispatcher.Send(new SetupMfaCommand(GetUserId(httpContext)), cancellationToken);
+            return result.IsSuccess ? Results.Ok(result.Value) : result.Error.ToProblemResult();
+        })
+        .RequireAuthorization()
+        .WithName("SetupMfa")
+        .WithSummary("Gera um novo segredo TOTP e a URI de provisionamento (QR code) — nada e persistido ate EnableMfa confirmar.");
+
+        group.MapPost("/mfa/enable", async (EnableMfaRequest request, HttpContext httpContext, IDispatcher dispatcher, CancellationToken cancellationToken) =>
+        {
+            var command = new EnableMfaCommand(GetUserId(httpContext), request.Secret, request.Code);
+            var result = await dispatcher.Send(command, cancellationToken);
+
+            return result.IsSuccess ? Results.Ok(new { recoveryCodes = result.Value }) : result.Error.ToProblemResult();
+        })
+        .RequireAuthorization()
+        .WithName("EnableMfa")
+        .WithSummary("Confirma o codigo TOTP e ativa MFA — devolve os codigos de recuperacao em texto puro, unica vez que aparecem.");
+
+        group.MapPost("/mfa/disable", async (DisableMfaRequest request, HttpContext httpContext, IDispatcher dispatcher, CancellationToken cancellationToken) =>
+        {
+            var command = new DisableMfaCommand(GetUserId(httpContext), request.Password, request.Code);
+            var result = await dispatcher.Send(command, cancellationToken);
+
+            return result.IsSuccess ? Results.NoContent() : result.Error.ToProblemResult();
+        })
+        .RequireAuthorization()
+        .WithName("DisableMfa")
+        .WithSummary("Desliga MFA — exige senha e um codigo (TOTP ou recuperacao) validos.");
 
         group.MapPost("/refresh", async (HttpContext httpContext, IDispatcher dispatcher, CancellationToken cancellationToken) =>
         {
@@ -140,6 +209,12 @@ public sealed class IdentityEndpoints : IEndpointModule
         .WithSummary("Lista os convites pendentes do estabelecimento.");
     }
 
+    private static IResult CompleteLogin(HttpContext httpContext, AuthTokensResult tokens)
+    {
+        SetRefreshTokenCookie(httpContext, tokens);
+        return Results.Ok(ToResponse(tokens));
+    }
+
     private static void SetRefreshTokenCookie(HttpContext httpContext, AuthTokensResult tokens)
     {
         httpContext.Response.Cookies.Append(RefreshTokenCookieName, tokens.RefreshToken, new CookieOptions
@@ -154,15 +229,29 @@ public sealed class IdentityEndpoints : IEndpointModule
 
     // O refresh token NUNCA aparece no corpo da resposta — so no cookie
     // HttpOnly. O access token vive em memoria no frontend (nunca localStorage).
+    // mfaRequired:false aqui deixa o frontend tratar a resposta de /login e de
+    // /mfa/verify com o MESMO tipo (ver LoginMfaChallenge no endpoint /login).
     private static object ToResponse(AuthTokensResult tokens) => new
     {
+        mfaRequired = false,
         accessToken = tokens.AccessToken,
         expiresAtUtc = tokens.AccessTokenExpiresAtUtc,
     };
 
+    // UserId sempre presente nas rotas com .RequireAuthorization(): a claim vem
+    // do JWT emitido em AuthTokenIssuer (ClaimTypes.NameIdentifier = user.Id).
+    private static Guid GetUserId(HttpContext httpContext) =>
+        Guid.Parse(httpContext.User.FindFirst(ClaimTypes.NameIdentifier)!.Value);
+
     private sealed record RegisterRequest(Guid TenantId, string Email, string Password, string FullName);
 
     private sealed record LoginRequest(Guid TenantId, string Email, string Password);
+
+    private sealed record VerifyMfaRequest(string MfaChallengeToken, string Code);
+
+    private sealed record EnableMfaRequest(string Secret, string Code);
+
+    private sealed record DisableMfaRequest(string Password, string Code);
 
     private sealed record InviteTeamMemberRequest(string Email, UserRole Role);
 
