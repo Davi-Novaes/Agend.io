@@ -41,6 +41,9 @@ export default function DashboardPage() {
           <Link href="/recursos">Recursos</Link>
         </Button>
         <Button variant="outline" asChild>
+          <Link href="/financeiro">Financeiro</Link>
+        </Button>
+        <Button variant="outline" asChild>
           <Link href="/settings/branding">Marca</Link>
         </Button>
         <Button variant="outline" asChild>

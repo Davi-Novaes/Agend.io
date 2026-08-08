@@ -12,6 +12,9 @@
     <Project Path="src/modules/Catalog/Agendio.Modules.Catalog/Agendio.Modules.Catalog.csproj" />
     <Project Path="src/modules/Catalog/Agendio.Modules.Catalog.Contracts/Agendio.Modules.Catalog.Contracts.csproj" />
   </Folder>
+  <Folder Name="/src/modules/Financeiro/">
+    <Project Path="src/modules/Financeiro/Agendio.Modules.Financeiro/Agendio.Modules.Financeiro.csproj" />
+  </Folder>
   <Folder Name="/src/modules/Customers/">
     <Project Path="src/modules/Customers/Agendio.Modules.Customers/Agendio.Modules.Customers.csproj" />
     <Project Path="src/modules/Customers/Agendio.Modules.Customers.Contracts/Agendio.Modules.Customers.Contracts.csproj" />
@@ -25,6 +28,7 @@
   </Folder>
   <Folder Name="/src/modules/Scheduling/">
     <Project Path="src/modules/Scheduling/Agendio.Modules.Scheduling/Agendio.Modules.Scheduling.csproj" />
+    <Project Path="src/modules/Scheduling/Agendio.Modules.Scheduling.Contracts/Agendio.Modules.Scheduling.Contracts.csproj" />
   </Folder>
   <Folder Name="/src/modules/Identity/">
     <Project Path="src/modules/Identity/Agendio.Modules.Identity.Contracts/Agendio.Modules.Identity.Contracts.csproj" />

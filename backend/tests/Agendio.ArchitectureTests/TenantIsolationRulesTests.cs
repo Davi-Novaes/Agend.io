@@ -6,6 +6,8 @@ using Agendio.Modules.Catalog.Domain;
 using Agendio.Modules.Catalog.Infrastructure.Persistence;
 using Agendio.Modules.Customers.Domain;
 using Agendio.Modules.Customers.Infrastructure.Persistence;
+using Agendio.Modules.Financeiro.Domain;
+using Agendio.Modules.Financeiro.Infrastructure.Persistence;
 using Agendio.Modules.Identity.Domain;
 using Agendio.Modules.Identity.Infrastructure.Persistence;
 using Agendio.Modules.Resources.Domain;
@@ -156,6 +158,25 @@ public class TenantIsolationRulesTests
         tenantOwnedEntityTypes.ShouldBeEmpty();
     }
 
+    [Fact]
+    public void Financeiro_Module_Should_Have_Exactly_Three_TenantOwned_Entities_All_With_A_Query_Filter()
+    {
+        using var dbContext = CreateFinanceiroDbContext();
+
+        var tenantOwnedEntityTypes = dbContext.Model.GetEntityTypes()
+            .Where(entityType => typeof(ITenantOwned).IsAssignableFrom(entityType.ClrType))
+            .ToList();
+
+        tenantOwnedEntityTypes.Select(e => e.ClrType).ShouldBe(
+            [typeof(AccountReceivable), typeof(AccountPayable), typeof(CommissionRule)], ignoreOrder: true);
+
+        foreach (var entityType in tenantOwnedEntityTypes)
+        {
+            entityType.GetDeclaredQueryFilters().ShouldNotBeEmpty(
+                $"{entityType.ClrType.Name} implementa ITenantOwned mas nao tem Global Query Filter configurado no DbContext.");
+        }
+    }
+
     private static IdentityDbContext CreateIdentityDbContext()
     {
         var optionsBuilder = new DbContextOptionsBuilder<IdentityDbContext>()
@@ -215,6 +236,15 @@ public class TenantIsolationRulesTests
             .UseSnakeCaseNamingConvention();
 
         return new SchedulingDbContext(optionsBuilder.Options, new NullTenantContext());
+    }
+
+    private static FinanceiroDbContext CreateFinanceiroDbContext()
+    {
+        var optionsBuilder = new DbContextOptionsBuilder<FinanceiroDbContext>()
+            .UseNpgsql("Host=localhost;Database=architecture_tests_only")
+            .UseSnakeCaseNamingConvention();
+
+        return new FinanceiroDbContext(optionsBuilder.Options, new NullTenantContext());
     }
 
     private static BillingDbContext CreateBillingDbContext()

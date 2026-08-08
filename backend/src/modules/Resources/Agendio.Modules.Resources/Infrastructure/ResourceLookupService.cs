@@ -23,4 +23,23 @@ internal sealed class ResourceLookupService(ResourcesDbContext dbContext) : IRes
 
         return new ResourceLookupResult(resource.Id.Value, resource.Name, resource.Type.ToString(), resource.Capacity, resource.IsActive, workingHours);
     }
+
+    public async Task<IReadOnlyList<ResourceLookupResult>> ListActiveByTypeAsync(string type, CancellationToken cancellationToken = default)
+    {
+        if (!Enum.TryParse<ResourceType>(type, ignoreCase: true, out var parsedType))
+        {
+            return [];
+        }
+
+        var resources = await dbContext.Resources.AsNoTracking()
+            .Where(r => r.Type == parsedType && r.IsActive)
+            .OrderBy(r => r.Name)
+            .ToListAsync(cancellationToken);
+
+        return resources
+            .Select(r => new ResourceLookupResult(
+                r.Id.Value, r.Name, r.Type.ToString(), r.Capacity, r.IsActive,
+                r.WorkingHours.Select(w => new WorkingHourLookup(w.DayOfWeek, w.StartTime, w.EndTime)).ToList()))
+            .ToList();
+    }
 }

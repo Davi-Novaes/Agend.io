@@ -20,6 +20,7 @@ public class ModuleDependencyRulesTests
     private static readonly Assembly SchedulingAssembly = typeof(Agendio.Modules.Scheduling.Domain.Appointment).Assembly;
     private static readonly Assembly PlatformAssembly = typeof(Agendio.Modules.Platform.Domain.PlatformAdmin).Assembly;
     private static readonly Assembly BillingAssembly = typeof(Agendio.Modules.Billing.Domain.Subscription).Assembly;
+    private static readonly Assembly FinanceiroAssembly = typeof(Agendio.Modules.Financeiro.Domain.AccountReceivable).Assembly;
 
     [Theory]
     [InlineData("Agendio.Modules.Identity.Domain")]
@@ -30,6 +31,7 @@ public class ModuleDependencyRulesTests
     [InlineData("Agendio.Modules.Scheduling.Domain")]
     [InlineData("Agendio.Modules.Platform.Domain")]
     [InlineData("Agendio.Modules.Billing.Domain")]
+    [InlineData("Agendio.Modules.Financeiro.Domain")]
     public void Domain_Should_Not_Depend_On_Application_Or_Infrastructure(string domainNamespace)
     {
         var assembly = domainNamespace switch
@@ -41,6 +43,7 @@ public class ModuleDependencyRulesTests
             _ when domainNamespace.Contains("Scheduling") => SchedulingAssembly,
             _ when domainNamespace.Contains("Platform") => PlatformAssembly,
             _ when domainNamespace.Contains("Billing") => BillingAssembly,
+            _ when domainNamespace.Contains("Financeiro") => FinanceiroAssembly,
             _ => TenancyAssembly,
         };
         var moduleRoot = domainNamespace[..domainNamespace.LastIndexOf(".Domain", StringComparison.Ordinal)];
@@ -229,6 +232,37 @@ public class ModuleDependencyRulesTests
 
         result.IsSuccessful.ShouldBeTrue(
             "Billing so pode depender do .Contracts de Tenancy, nunca de nenhum modulo inteiro. " +
+            "Tipos violando a regra: " + string.Join(", ", result.FailingTypeNames ?? []));
+    }
+
+    [Fact]
+    public void Financeiro_Module_Should_Not_Depend_On_Resources_Or_Scheduling_Internals()
+    {
+        // Financeiro reage a AppointmentCompletedDomainEvent (via
+        // SchedulingIntegrationEventTypes, so uma constante de string) e resolve
+        // nome/tipo de profissional via IResourceLookupService — nunca deveria
+        // enxergar Resources.Domain ou Scheduling.Domain diretamente.
+        var forbiddenNamespaces = new[]
+        {
+            "Agendio.Modules.Resources.Domain",
+            "Agendio.Modules.Resources.Application",
+            "Agendio.Modules.Resources.Infrastructure",
+            "Agendio.Modules.Resources.Endpoints",
+            "Agendio.Modules.Resources.DependencyInjection",
+            "Agendio.Modules.Scheduling.Domain",
+            "Agendio.Modules.Scheduling.Application",
+            "Agendio.Modules.Scheduling.Infrastructure",
+            "Agendio.Modules.Scheduling.Endpoints",
+            "Agendio.Modules.Scheduling.DependencyInjection",
+        };
+
+        var result = Types.InAssembly(FinanceiroAssembly)
+            .That().ResideInNamespace("Agendio.Modules.Financeiro")
+            .ShouldNot().HaveDependencyOnAny(forbiddenNamespaces)
+            .GetResult();
+
+        result.IsSuccessful.ShouldBeTrue(
+            "Financeiro so pode depender dos .Contracts de Resources/Scheduling, nunca dos modulos inteiros. " +
             "Tipos violando a regra: " + string.Join(", ", result.FailingTypeNames ?? []));
     }
 }

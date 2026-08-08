@@ -705,3 +705,139 @@ export type SubscriptionAdminSummary = {
 export function listSubscriptionsForPlatform(accessToken: string): Promise<SubscriptionAdminSummary[]> {
   return request<SubscriptionAdminSummary[]>("/api/platform/subscriptions", {}, accessToken);
 }
+
+// ---------- Financeiro ----------
+
+export type AccountReceivableStatus = "Pending" | "Received" | "Cancelled";
+export type AccountPayableStatus = "Pending" | "Paid" | "Cancelled";
+export type ExpenseCategory = "Rent" | "Supplies" | "Commission" | "Salary" | "Utilities" | "Marketing" | "Other";
+export type CommissionCalculationType = "Percentage" | "FixedAmount";
+
+export type AccountReceivableSummary = {
+  id: string;
+  description: string;
+  amount: number;
+  currency: string;
+  dueDate: string;
+  status: AccountReceivableStatus;
+  receivedAtUtc: string | null;
+  sourceAppointmentId: string | null;
+};
+
+export type AccountPayableSummary = {
+  id: string;
+  description: string;
+  amount: number;
+  currency: string;
+  dueDate: string;
+  category: ExpenseCategory;
+  status: AccountPayableStatus;
+  paidAtUtc: string | null;
+  resourceId: string | null;
+  sourceAppointmentId: string | null;
+};
+
+export function listAccountsReceivable(
+  params: { status?: AccountReceivableStatus; from?: string; to?: string; page?: number; pageSize?: number },
+  accessToken: string
+): Promise<PagedResult<AccountReceivableSummary>> {
+  const query = new URLSearchParams();
+  if (params.status) query.set("status", params.status);
+  if (params.from) query.set("from", params.from);
+  if (params.to) query.set("to", params.to);
+  query.set("page", String(params.page ?? 1));
+  query.set("pageSize", String(params.pageSize ?? 20));
+  return request(`/api/financeiro/contas-a-receber?${query.toString()}`, {}, accessToken);
+}
+
+export function markAccountReceivableReceived(id: string, accessToken: string): Promise<void> {
+  return request(`/api/financeiro/contas-a-receber/${id}/receber`, { method: "PATCH" }, accessToken);
+}
+
+export function listAccountsPayable(
+  params: {
+    status?: AccountPayableStatus;
+    category?: ExpenseCategory;
+    from?: string;
+    to?: string;
+    page?: number;
+    pageSize?: number;
+  },
+  accessToken: string
+): Promise<PagedResult<AccountPayableSummary>> {
+  const query = new URLSearchParams();
+  if (params.status) query.set("status", params.status);
+  if (params.category) query.set("category", params.category);
+  if (params.from) query.set("from", params.from);
+  if (params.to) query.set("to", params.to);
+  query.set("page", String(params.page ?? 1));
+  query.set("pageSize", String(params.pageSize ?? 20));
+  return request(`/api/financeiro/contas-a-pagar?${query.toString()}`, {}, accessToken);
+}
+
+export type CreateAccountPayableInput = {
+  description: string;
+  amount: number;
+  dueDate: string;
+  category: ExpenseCategory;
+};
+
+export function createAccountPayable(input: CreateAccountPayableInput, accessToken: string): Promise<{ id: string }> {
+  return request("/api/financeiro/contas-a-pagar", { method: "POST", body: JSON.stringify(input) }, accessToken);
+}
+
+export function markAccountPayablePaid(id: string, accessToken: string): Promise<void> {
+  return request(`/api/financeiro/contas-a-pagar/${id}/pagar`, { method: "PATCH" }, accessToken);
+}
+
+export function cancelAccountPayable(id: string, accessToken: string): Promise<void> {
+  return request(`/api/financeiro/contas-a-pagar/${id}/cancelar`, { method: "PATCH" }, accessToken);
+}
+
+export type CommissionRuleSummary = {
+  resourceId: string;
+  resourceName: string;
+  calculationType: CommissionCalculationType | null;
+  value: number | null;
+  isActive: boolean;
+};
+
+export function listCommissionRules(accessToken: string): Promise<CommissionRuleSummary[]> {
+  return request<CommissionRuleSummary[]>("/api/financeiro/comissoes", {}, accessToken);
+}
+
+export function upsertCommissionRule(
+  resourceId: string,
+  input: { calculationType: CommissionCalculationType; value: number },
+  accessToken: string
+): Promise<void> {
+  return request(`/api/financeiro/comissoes/${resourceId}`, { method: "PUT", body: JSON.stringify(input) }, accessToken);
+}
+
+export function deactivateCommissionRule(resourceId: string, accessToken: string): Promise<void> {
+  return request(`/api/financeiro/comissoes/${resourceId}`, { method: "DELETE" }, accessToken);
+}
+
+export type CashFlowMonthPoint = {
+  month: string;
+  received: number;
+  paid: number;
+};
+
+export type CashFlowCategoryPoint = {
+  category: string;
+  total: number;
+};
+
+export type CashFlowSummary = {
+  totalReceived: number;
+  totalPaid: number;
+  netBalance: number;
+  seriesByMonth: CashFlowMonthPoint[];
+  categoryBreakdown: CashFlowCategoryPoint[];
+};
+
+export function getCashFlowSummary(params: { from: string; to: string }, accessToken: string): Promise<CashFlowSummary> {
+  const query = new URLSearchParams({ from: params.from, to: params.to });
+  return request(`/api/financeiro/fluxo-de-caixa?${query.toString()}`, {}, accessToken);
+}
