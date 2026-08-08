@@ -126,6 +126,10 @@ namespace Agendio.Modules.Customers.Infrastructure.Persistence.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("id");
 
+                    b.Property<string>("Cpf")
+                        .HasColumnType("text")
+                        .HasColumnName("cpf");
+
                     b.Property<DateTimeOffset>("CreatedAtUtc")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("created_at_utc");
@@ -158,6 +162,10 @@ namespace Agendio.Modules.Customers.Infrastructure.Persistence.Migrations
                         .HasMaxLength(200)
                         .HasColumnType("character varying(200)")
                         .HasColumnName("full_name");
+
+                    b.Property<string>("HealthNotes")
+                        .HasColumnType("text")
+                        .HasColumnName("health_notes");
 
                     b.Property<bool>("IsActive")
                         .HasColumnType("boolean")

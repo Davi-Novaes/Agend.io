@@ -49,6 +49,9 @@ export default function DashboardPage() {
         <Button variant="outline" asChild>
           <Link href="/settings/billing">Plano</Link>
         </Button>
+        <Button variant="outline" asChild>
+          <Link href="/settings/security">Segurança</Link>
+        </Button>
       </div>
       <Button
         variant="outline"

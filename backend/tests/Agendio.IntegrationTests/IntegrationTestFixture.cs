@@ -1,5 +1,6 @@
 using System.Globalization;
 using Agendio.Infrastructure.Multitenancy;
+using Agendio.Infrastructure.Security;
 using Agendio.Modules.Billing.Infrastructure.Asaas;
 using Agendio.Modules.Billing.Infrastructure.Persistence;
 using Agendio.Modules.Catalog.Infrastructure.Persistence;
@@ -17,6 +18,7 @@ using Microsoft.AspNetCore.TestHost;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Options;
 using Npgsql;
 using Testcontainers.PostgreSql;
 using Testcontainers.RabbitMq;
@@ -148,6 +150,22 @@ public sealed class IntegrationTestFixture : WebApplicationFactory<Program>, IAs
     /// <summary>Base da API REST do MailHog (GET /api/v2/messages) — usada pelos testes para confirmar entrega real.</summary>
     public string MailHogApiBaseUrl => $"http://{_mailHog.Hostname}:{_mailHog.GetMappedPublicPort(8025)}";
 
+    /// <summary>
+    /// Exposta so para testes que precisam ler a coluna CRUA (bypassando a API
+    /// e o EF Core) — ex.: confirmar que um campo criptografado nao esta em
+    /// texto plano no banco. Role owner de proposito: precisa enxergar a linha
+    /// mesmo com RLS habilitada.
+    /// </summary>
+    public string DatabaseOwnerConnectionString => OwnerConnectionString;
+
+    /// <summary>
+    /// Role de runtime da aplicacao (agendio_app, NOBYPASSRLS) — usada por testes
+    /// que precisam provar isolamento via Row Level Security de verdade, nao so
+    /// via Global Query Filter do EF Core. Precisa de `SELECT set_config('app.tenant_id', ...)`
+    /// apos abrir a conexao, mesmo comando do TenantConnectionInterceptor real.
+    /// </summary>
+    public string DatabaseAppConnectionString => AppConnectionString;
+
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
         builder.UseEnvironment("Testing");
@@ -175,6 +193,7 @@ public sealed class IntegrationTestFixture : WebApplicationFactory<Program>, IAs
         builder.UseSetting("PlatformJwt:Issuer", "https://agendio.test/platform");
         builder.UseSetting("PlatformJwt:Audience", "agendio-platform-tests");
         builder.UseSetting("PlatformJwt:SigningKey", "integration-test-platform-signing-key-min-32-bytes!!");
+        builder.UseSetting("ColumnEncryption:Key", "aW50ZWdyYXRpb24tdGVzdC1jb2wta2V5LTMyYnl0ZXM=");
         builder.UseSetting("Cors:AllowedOrigins:0", "http://localhost");
 
         // O limite global de rate limiting e por IP, mas o TestServer nao tem
@@ -183,6 +202,13 @@ public sealed class IntegrationTestFixture : WebApplicationFactory<Program>, IAs
         // especial o teste de concorrencia do Scheduling, que sozinho manda 50)
         // no mesmo minuto derrubaria testes depois dele com 429, sem ser bug.
         builder.UseSetting("RateLimiting:GlobalPermitLimit", "100000");
+
+        // Mesmo raciocinio para a politica "auth": agora cobre login/registro
+        // do tenant tambem, e praticamente todo teste de integracao registra e
+        // loga um tenant pelo menos uma vez — 10/min derrubaria a suite inteira
+        // com 429. RateLimitingTests.cs usa builder.UseSetting proprio (valor
+        // baixo) so nas classes que precisam exercitar o 429 de verdade.
+        builder.UseSetting("RateLimiting:AuthPermitLimit", "100000");
 
         builder.UseSetting("Smtp:Host", _mailHog.Hostname);
         builder.UseSetting("Smtp:Port", _mailHog.GetMappedPublicPort(1025).ToString(CultureInfo.InvariantCulture));
@@ -221,7 +247,10 @@ public sealed class IntegrationTestFixture : WebApplicationFactory<Program>, IAs
             .UseNpgsql(OwnerConnectionString)
             .UseSnakeCaseNamingConvention();
 
-        return new IdentityDbContext(optionsBuilder.Options, new NullTenantContext());
+        var encryptionService = new AesGcmEncryptionService(
+            Options.Create(new ColumnEncryptionOptions { Key = "aW50ZWdyYXRpb24tdGVzdC1jb2wta2V5LTMyYnl0ZXM=" }));
+
+        return new IdentityDbContext(optionsBuilder.Options, new NullTenantContext(), encryptionService);
     }
 
     private CustomersDbContext CreateCustomersDbContext()
@@ -230,7 +259,13 @@ public sealed class IntegrationTestFixture : WebApplicationFactory<Program>, IAs
             .UseNpgsql(OwnerConnectionString)
             .UseSnakeCaseNamingConvention();
 
-        return new CustomersDbContext(optionsBuilder.Options, new NullTenantContext());
+        // So roda MigrateAsync aqui (nunca criptografa/descriptografa nada de
+        // verdade) — qualquer chave de 32 bytes serve, mesma usada em
+        // ConfigureWebHost (ColumnEncryption:Key) para o host de teste real.
+        var encryptionService = new AesGcmEncryptionService(
+            Options.Create(new ColumnEncryptionOptions { Key = "aW50ZWdyYXRpb24tdGVzdC1jb2wta2V5LTMyYnl0ZXM=" }));
+
+        return new CustomersDbContext(optionsBuilder.Options, new NullTenantContext(), encryptionService);
     }
 
     private CatalogDbContext CreateCatalogDbContext()

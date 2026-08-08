@@ -1,8 +1,10 @@
 using Agendio.Infrastructure.Multitenancy;
 using Agendio.Infrastructure.Persistence;
+using Agendio.Infrastructure.Security;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Design;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Options;
 
 namespace Agendio.Modules.Identity.Infrastructure.Persistence;
 
@@ -25,6 +27,10 @@ public sealed class IdentityDbContextFactory : IDesignTimeDbContextFactory<Ident
         optionsBuilder.UseNpgsql(connectionString);
         optionsBuilder.UseSnakeCaseNamingConvention();
 
-        return new IdentityDbContext(optionsBuilder.Options, new NullTenantContext());
+        var encryptionOptions = configuration.GetSection(ColumnEncryptionOptions.SectionName).Get<ColumnEncryptionOptions>()
+            ?? throw new InvalidOperationException("Secao 'ColumnEncryption' nao configurada para design-time.");
+        var encryptionService = new AesGcmEncryptionService(Options.Create(encryptionOptions));
+
+        return new IdentityDbContext(optionsBuilder.Options, new NullTenantContext(), encryptionService);
     }
 }

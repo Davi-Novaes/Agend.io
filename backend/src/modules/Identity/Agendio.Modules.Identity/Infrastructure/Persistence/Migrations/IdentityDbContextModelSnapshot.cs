@@ -120,6 +120,47 @@ namespace Agendio.Modules.Identity.Infrastructure.Persistence.Migrations
                     b.ToTable("outbox_messages", "identity");
                 });
 
+            modelBuilder.Entity("Agendio.Modules.Identity.Domain.MfaRecoveryCode", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<string>("CodeHash")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("code_hash");
+
+                    b.Property<DateTimeOffset>("CreatedAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at_utc");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("tenant_id");
+
+                    b.Property<DateTimeOffset?>("UsedAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("used_at_utc");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("user_id");
+
+                    b.HasKey("Id")
+                        .HasName("pk_mfa_recovery_codes");
+
+                    b.HasIndex("CodeHash")
+                        .IsUnique()
+                        .HasDatabaseName("ix_mfa_recovery_codes_code_hash");
+
+                    b.HasIndex("TenantId", "UserId")
+                        .HasDatabaseName("ix_mfa_recovery_codes_tenant_id_user_id");
+
+                    b.ToTable("mfa_recovery_codes", "identity");
+                });
+
             modelBuilder.Entity("Agendio.Modules.Identity.Domain.RefreshToken", b =>
                 {
                     b.Property<Guid>("Id")
@@ -263,6 +304,16 @@ namespace Agendio.Modules.Identity.Infrastructure.Persistence.Migrations
                     b.Property<bool>("IsDeleted")
                         .HasColumnType("boolean")
                         .HasColumnName("is_deleted");
+
+                    b.Property<bool>("MfaEnabled")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(false)
+                        .HasColumnName("mfa_enabled");
+
+                    b.Property<string>("MfaSecretEncrypted")
+                        .HasColumnType("text")
+                        .HasColumnName("mfa_secret_encrypted");
 
                     b.Property<string>("PasswordHash")
                         .IsRequired()
