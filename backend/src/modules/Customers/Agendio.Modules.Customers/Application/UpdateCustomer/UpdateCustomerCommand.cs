@@ -9,4 +9,6 @@ public sealed record UpdateCustomerCommand(
     string? Phone,
     string? Notes,
     DateOnly? DateOfBirth,
-    Dictionary<string, string>? CustomData) : ICommand;
+    Dictionary<string, string>? CustomData,
+    string? Cpf = null,
+    string? HealthNotes = null) : ICommand;

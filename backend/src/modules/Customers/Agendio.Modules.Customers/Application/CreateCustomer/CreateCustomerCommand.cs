@@ -10,4 +10,6 @@ public sealed record CreateCustomerCommand(
     string? Phone,
     string? Notes,
     DateOnly? DateOfBirth,
-    Dictionary<string, string>? CustomData) : ICommand<Guid>;
+    Dictionary<string, string>? CustomData,
+    string? Cpf = null,
+    string? HealthNotes = null) : ICommand<Guid>;

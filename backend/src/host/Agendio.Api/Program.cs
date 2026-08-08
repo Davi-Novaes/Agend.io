@@ -6,6 +6,7 @@ using Agendio.Api;
 using Agendio.Infrastructure.DependencyInjection;
 using Agendio.Infrastructure.Endpoints;
 using Agendio.Infrastructure.Messaging;
+using Agendio.Infrastructure.Multitenancy;
 using Agendio.Infrastructure.Security;
 using Agendio.Modules.Billing.DependencyInjection;
 using Agendio.Modules.Billing.Infrastructure.Jobs;
@@ -130,13 +131,33 @@ try
     var globalRateLimitPermits = builder.Configuration.GetValue("RateLimiting:GlobalPermitLimit", 200);
     var globalRateLimitWindowSeconds = builder.Configuration.GetValue("RateLimiting:GlobalWindowSeconds", 60);
 
+    // Configuravel pelo mesmo motivo do global acima: a partir de agora a
+    // politica "auth" tambem cobre /api/auth/login e /api/auth/register do
+    // tenant (nao so o login da Platform), e virtualmente todo teste de
+    // integracao registra+loga um tenant — sem um limite alto nos testes essa
+    // unica particao IP "unknown" estouraria 10/min ja nos primeiros testes.
+    var authRateLimitPermits = builder.Configuration.GetValue("RateLimiting:AuthPermitLimit", 10);
+    var authRateLimitWindowSeconds = builder.Configuration.GetValue("RateLimiting:AuthWindowSeconds", 60);
+
+    // Particiona por tenant (claim do JWT) quando a requisicao esta autenticada,
+    // e cai para IP quando nao ha claim (login/registro/portal publico). Isso
+    // exige que UseRateLimiter() rode DEPOIS de UseAuthentication() no pipeline
+    // (ver abaixo) — antes disso HttpContext.User nunca tem a claim populada.
+    static string ResolveGlobalRateLimitPartitionKey(HttpContext httpContext)
+    {
+        var tenantClaim = httpContext.User.FindFirst(HttpTenantContext.TenantIdClaimType)?.Value;
+        return !string.IsNullOrEmpty(tenantClaim)
+            ? $"tenant:{tenantClaim}"
+            : $"ip:{httpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown"}";
+    }
+
     builder.Services.AddRateLimiter(options =>
     {
         options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
 
         options.GlobalLimiter = PartitionedRateLimiter.Create<HttpContext, string>(httpContext =>
             RateLimitPartition.GetFixedWindowLimiter(
-                partitionKey: httpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+                partitionKey: ResolveGlobalRateLimitPartitionKey(httpContext),
                 factory: _ => new FixedWindowRateLimiterOptions
                 {
                     PermitLimit = globalRateLimitPermits,
@@ -148,8 +169,8 @@ try
                 partitionKey: httpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown",
                 factory: _ => new FixedWindowRateLimiterOptions
                 {
-                    PermitLimit = 10,
-                    Window = TimeSpan.FromMinutes(1),
+                    PermitLimit = authRateLimitPermits,
+                    Window = TimeSpan.FromSeconds(authRateLimitWindowSeconds),
                 }));
     });
 
@@ -260,9 +281,17 @@ try
     });
 
     app.UseCors("Default");
-    app.UseRateLimiter();
 
+    // UseRateLimiter fica entre autenticacao e autorizacao de proposito:
+    // UseAuthentication ja populou a claim tenant_id quando ha um JWT valido
+    // (sem nunca rejeitar a requisicao — token ausente/invalido vira principal
+    // anonimo, o fallback por IP da partition key acima), mas ainda precisa
+    // rodar ANTES de UseAuthorization para que um flood sem token valido contra
+    // rota protegida continue consumindo o limiter em vez de ser barrado por
+    // 401 antes de chegar aqui (senao reabre o gap de DoS que a ordem antiga
+    // — limiter antes de tudo — evitava).
     app.UseAuthentication();
+    app.UseRateLimiter();
     app.UseAuthorization();
 
     // /health/live: o processo esta de pe (nao verifica dependencia externa —

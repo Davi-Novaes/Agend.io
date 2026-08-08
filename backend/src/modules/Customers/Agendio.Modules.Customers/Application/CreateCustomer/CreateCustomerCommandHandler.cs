@@ -12,7 +12,7 @@ public sealed class CreateCustomerCommandHandler(CustomersDbContext dbContext, I
     {
         var customerResult = Domain.Customer.Create(
             tenantContext.TenantId, request.FullName, request.Email, request.Phone,
-            request.Notes, request.DateOfBirth, request.CustomData);
+            request.Notes, request.DateOfBirth, request.CustomData, request.Cpf, request.HealthNotes);
 
         if (customerResult.IsFailure)
         {

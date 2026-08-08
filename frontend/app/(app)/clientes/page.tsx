@@ -43,11 +43,21 @@ const customerSchema = z.object({
   phone: z.string(),
   notes: z.string(),
   dateOfBirth: z.string(),
+  cpf: z.string(),
+  healthNotes: z.string(),
 });
 
 type CustomerFormValues = z.infer<typeof customerSchema>;
 
-const emptyCustomerForm: CustomerFormValues = { fullName: "", email: "", phone: "", notes: "", dateOfBirth: "" };
+const emptyCustomerForm: CustomerFormValues = {
+  fullName: "",
+  email: "",
+  phone: "",
+  notes: "",
+  dateOfBirth: "",
+  cpf: "",
+  healthNotes: "",
+};
 
 function toNullable(value: string): string | null {
   return value.trim() === "" ? null : value.trim();
@@ -96,6 +106,8 @@ export default function CustomersPage() {
           phone: toNullable(values.phone),
           notes: toNullable(values.notes),
           dateOfBirth: toNullable(values.dateOfBirth),
+          cpf: toNullable(values.cpf),
+          healthNotes: toNullable(values.healthNotes),
         },
         accessToken
       ),
@@ -120,6 +132,8 @@ export default function CustomersPage() {
           phone: toNullable(values.phone),
           notes: toNullable(values.notes),
           dateOfBirth: toNullable(values.dateOfBirth),
+          cpf: toNullable(values.cpf),
+          healthNotes: toNullable(values.healthNotes),
         },
         accessToken
       );
@@ -173,6 +187,8 @@ export default function CustomersPage() {
         phone: details.phone ?? "",
         notes: details.notes ?? "",
         dateOfBirth: details.dateOfBirth ?? "",
+        cpf: details.cpf ?? "",
+        healthNotes: details.healthNotes ?? "",
       });
       setDialogOpen(true);
     } catch (error) {
@@ -372,12 +388,38 @@ export default function CustomersPage() {
               />
               <FormField
                 control={form.control}
+                name="cpf"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>CPF</FormLabel>
+                    <FormControl>
+                      <Input placeholder="Opcional" autoComplete="off" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
                 name="notes"
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Observacoes</FormLabel>
                     <FormControl>
                       <Textarea rows={3} {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="healthNotes"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Dados de saude (convenio, alergia, restricao)</FormLabel>
+                    <FormControl>
+                      <Textarea rows={2} placeholder="Opcional" {...field} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>

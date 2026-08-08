@@ -1,4 +1,5 @@
 using Agendio.Infrastructure.Multitenancy;
+using Agendio.Infrastructure.Security;
 using Agendio.Modules.Billing.Domain;
 using Agendio.Modules.Billing.Infrastructure.Persistence;
 using Agendio.Modules.Catalog.Domain;
@@ -15,6 +16,7 @@ using Agendio.Modules.Tenancy.Domain;
 using Agendio.Modules.Tenancy.Infrastructure.Persistence;
 using Agendio.SharedKernel.Multitenancy;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
 
 namespace Agendio.ArchitectureTests;
 
@@ -30,7 +32,7 @@ namespace Agendio.ArchitectureTests;
 public class TenantIsolationRulesTests
 {
     [Fact]
-    public void Identity_Module_Should_Have_Exactly_Three_TenantOwned_Entities_All_With_A_Query_Filter()
+    public void Identity_Module_Should_Have_Exactly_Four_TenantOwned_Entities_All_With_A_Query_Filter()
     {
         using var dbContext = CreateIdentityDbContext();
 
@@ -39,7 +41,7 @@ public class TenantIsolationRulesTests
             .ToList();
 
         tenantOwnedEntityTypes.Select(e => e.ClrType).ShouldBe(
-            [typeof(User), typeof(RefreshToken), typeof(TeamInvitation)], ignoreOrder: true);
+            [typeof(User), typeof(RefreshToken), typeof(TeamInvitation), typeof(MfaRecoveryCode)], ignoreOrder: true);
 
         foreach (var entityType in tenantOwnedEntityTypes)
         {
@@ -160,7 +162,7 @@ public class TenantIsolationRulesTests
             .UseNpgsql("Host=localhost;Database=architecture_tests_only")
             .UseSnakeCaseNamingConvention();
 
-        return new IdentityDbContext(optionsBuilder.Options, new NullTenantContext());
+        return new IdentityDbContext(optionsBuilder.Options, new NullTenantContext(), CreateEncryptionService());
     }
 
     private static TenancyDbContext CreateTenancyDbContext()
@@ -178,8 +180,15 @@ public class TenantIsolationRulesTests
             .UseNpgsql("Host=localhost;Database=architecture_tests_only")
             .UseSnakeCaseNamingConvention();
 
-        return new CustomersDbContext(optionsBuilder.Options, new NullTenantContext());
+        return new CustomersDbContext(optionsBuilder.Options, new NullTenantContext(), CreateEncryptionService());
     }
+
+    // So o Model precisa ser construido aqui (nunca abre conexao de verdade),
+    // mas o EncryptedStringConverter de Customer.Cpf/HealthNotes exige um
+    // IEncryptionService valido no construtor do DbContext — qualquer chave de
+    // 32 bytes serve, nada e efetivamente criptografado/descriptografado neste teste.
+    private static AesGcmEncryptionService CreateEncryptionService() =>
+        new(Options.Create(new ColumnEncryptionOptions { Key = "aW50ZWdyYXRpb24tdGVzdC1jb2wta2V5LTMyYnl0ZXM=" }));
 
     private static CatalogDbContext CreateCatalogDbContext()
     {
