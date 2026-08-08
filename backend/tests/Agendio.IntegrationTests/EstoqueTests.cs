@@ -168,6 +168,44 @@ public class EstoqueTests(IntegrationTestFixture fixture)
     }
 
     [Fact]
+    public async Task Inventory_Summary_Should_Count_Active_Low_Stock_And_Total_Value()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var client = fixture.CreateClient();
+        var accessToken = await CreateTenantWithOwnerAndLoginAsync(client, cancellationToken);
+
+        // Ativo, estoque ok, com preco: entra em ActiveProductCount e no valor total (10 * 20 = 200).
+        (await AuthorizedRequestHelpers.PostAuthorizedAsync(
+            client, accessToken, "/api/estoque/produtos",
+            new { name = "Produto A", sku = (string?)null, description = (string?)null, quantityInStock = 10, minimumStock = 2, salePrice = 20.00m, currency = "BRL" },
+            cancellationToken)).StatusCode.ShouldBe(HttpStatusCode.Created);
+
+        // Ativo, estoque baixo, com preco: entra em LowStockCount e no valor total (1 * 15 = 15).
+        (await AuthorizedRequestHelpers.PostAuthorizedAsync(
+            client, accessToken, "/api/estoque/produtos",
+            new { name = "Produto B", sku = (string?)null, description = (string?)null, quantityInStock = 1, minimumStock = 5, salePrice = 15.00m, currency = "BRL" },
+            cancellationToken)).StatusCode.ShouldBe(HttpStatusCode.Created);
+
+        // Ativo, sem preco cadastrado: conta em ActiveProductCount mas fica fora do valor total.
+        (await AuthorizedRequestHelpers.PostAuthorizedAsync(
+            client, accessToken, "/api/estoque/produtos",
+            new { name = "Produto C", sku = (string?)null, description = (string?)null, quantityInStock = 5, minimumStock = 1, salePrice = (decimal?)null, currency = (string?)null },
+            cancellationToken)).StatusCode.ShouldBe(HttpStatusCode.Created);
+
+        var response = await AuthorizedRequestHelpers.GetAuthorizedAsync(client, accessToken, "/api/estoque/resumo", cancellationToken);
+        response.StatusCode.ShouldBe(HttpStatusCode.OK);
+
+        var summary = await response.Content.ReadFromJsonAsync<JsonElement>(cancellationToken);
+        summary.GetProperty("activeProductCount").GetInt32().ShouldBe(3);
+        summary.GetProperty("lowStockCount").GetInt32().ShouldBe(1);
+
+        var totalStockValue = summary.GetProperty("totalStockValue");
+        totalStockValue.GetArrayLength().ShouldBe(1);
+        totalStockValue[0].GetProperty("currency").GetString().ShouldBe("BRL");
+        totalStockValue[0].GetProperty("total").GetDecimal().ShouldBe(215.00m);
+    }
+
+    [Fact]
     public async Task Owner_Can_Update_And_Toggle_Active_Status_Of_A_Product()
     {
         var cancellationToken = TestContext.Current.CancellationToken;

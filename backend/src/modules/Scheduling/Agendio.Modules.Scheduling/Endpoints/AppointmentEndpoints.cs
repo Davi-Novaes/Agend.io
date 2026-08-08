@@ -3,6 +3,7 @@ using Agendio.Modules.Scheduling.Application.CancelAppointment;
 using Agendio.Modules.Scheduling.Application.CompleteAppointment;
 using Agendio.Modules.Scheduling.Application.ConfirmAppointment;
 using Agendio.Modules.Scheduling.Application.GetAppointmentById;
+using Agendio.Modules.Scheduling.Application.GetAppointmentStats;
 using Agendio.Modules.Scheduling.Application.ListAppointments;
 using Agendio.Modules.Scheduling.Application.MarkAppointmentNoShow;
 using Agendio.Modules.Scheduling.Application.RescheduleAppointment;
@@ -28,6 +29,14 @@ public sealed class AppointmentEndpoints : IEndpointModule
         })
         .WithName("ListAppointments")
         .WithSummary("Lista agendamentos que se sobrepoem a janela [from, to), opcionalmente filtrando por recurso.");
+
+        group.MapGet("/stats", async (DateOnly from, DateOnly to, IDispatcher dispatcher, CancellationToken cancellationToken) =>
+        {
+            var result = await dispatcher.Query(new GetAppointmentStatsQuery(from, to), cancellationToken);
+            return result.IsSuccess ? Results.Ok(result.Value) : result.Error.ToProblemResult();
+        })
+        .WithName("GetAppointmentStats")
+        .WithSummary("Estatisticas de agendamentos no periodo: conclusao, no-show, cancelamento e faturamento por servico/profissional.");
 
         group.MapGet("/{id:guid}", async (Guid id, IDispatcher dispatcher, CancellationToken cancellationToken) =>
         {

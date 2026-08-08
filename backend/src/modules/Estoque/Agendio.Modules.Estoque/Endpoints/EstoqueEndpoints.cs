@@ -1,5 +1,6 @@
 using Agendio.Infrastructure.Endpoints;
 using Agendio.Modules.Estoque.Application.CreateProduct;
+using Agendio.Modules.Estoque.Application.GetInventorySummary;
 using Agendio.Modules.Estoque.Application.GetProductById;
 using Agendio.Modules.Estoque.Application.ListProducts;
 using Agendio.Modules.Estoque.Application.ListStockMovements;
@@ -19,6 +20,14 @@ public sealed class EstoqueEndpoints : IEndpointModule
     public void MapEndpoints(IEndpointRouteBuilder endpoints)
     {
         var group = endpoints.MapGroup("/api/estoque").WithTags("Estoque").RequireAuthorization();
+
+        group.MapGet("/resumo", async (IDispatcher dispatcher, CancellationToken cancellationToken) =>
+        {
+            var result = await dispatcher.Query(new GetInventorySummaryQuery(), cancellationToken);
+            return result.IsSuccess ? Results.Ok(result.Value) : result.Error.ToProblemResult();
+        })
+        .WithName("GetInventorySummary")
+        .WithSummary("Resumo do estoque atual: produtos ativos, estoque baixo e valor total em estoque.");
 
         group.MapGet("/produtos", async (
             string? search, bool? isActive, IDispatcher dispatcher, CancellationToken cancellationToken,

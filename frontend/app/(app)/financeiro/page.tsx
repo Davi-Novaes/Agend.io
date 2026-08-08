@@ -38,6 +38,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { CashFlowChart, CATEGORY_LABELS } from "@/components/financeiro/cash-flow-chart";
+import { PeriodFilter } from "@/components/shared/period-filter";
+import { toDateOnly, startOfMonth } from "@/lib/date-utils";
 
 const PAGE_SIZE = 20;
 
@@ -61,20 +63,6 @@ function formatCurrency(value: number): string {
 
 function formatDate(value: string): string {
   return new Date(`${value.slice(0, 10)}T00:00:00`).toLocaleDateString("pt-BR");
-}
-
-function toDateOnly(date: Date): string {
-  return date.toISOString().slice(0, 10);
-}
-
-function startOfMonth(date: Date): Date {
-  return new Date(date.getFullYear(), date.getMonth(), 1);
-}
-
-function daysAgo(days: number): Date {
-  const date = new Date();
-  date.setDate(date.getDate() - days);
-  return date;
 }
 
 const expenseSchema = z.object({
@@ -154,48 +142,11 @@ function ResumoTab({ accessToken }: { accessToken: string }) {
     queryFn: () => getCashFlowSummary({ from, to }, accessToken),
   });
 
-  function applyPreset(preset: "month" | "30" | "90") {
-    if (preset === "month") {
-      setFrom(toDateOnly(startOfMonth(new Date())));
-    } else if (preset === "30") {
-      setFrom(toDateOnly(daysAgo(30)));
-    } else {
-      setFrom(toDateOnly(daysAgo(90)));
-    }
-    setTo(toDateOnly(new Date()));
-  }
-
   const summary = summaryQuery.data;
 
   return (
     <div className="flex flex-col gap-4">
-      <div className="flex flex-wrap items-end gap-2">
-        <div className="flex gap-1">
-          <Button type="button" variant="outline" size="sm" onClick={() => applyPreset("month")}>
-            Este mes
-          </Button>
-          <Button type="button" variant="outline" size="sm" onClick={() => applyPreset("30")}>
-            Ultimos 30 dias
-          </Button>
-          <Button type="button" variant="outline" size="sm" onClick={() => applyPreset("90")}>
-            Ultimos 90 dias
-          </Button>
-        </div>
-        <div className="flex items-end gap-2">
-          <div>
-            <label htmlFor="from-date" className="text-muted-foreground mb-1 block text-xs">
-              De
-            </label>
-            <Input id="from-date" type="date" value={from} onChange={(event) => setFrom(event.target.value)} />
-          </div>
-          <div>
-            <label htmlFor="to-date" className="text-muted-foreground mb-1 block text-xs">
-              Ate
-            </label>
-            <Input id="to-date" type="date" value={to} onChange={(event) => setTo(event.target.value)} />
-          </div>
-        </div>
-      </div>
+      <PeriodFilter from={from} to={to} onFromChange={setFrom} onToChange={setTo} />
 
       <div className="grid gap-4 sm:grid-cols-3">
         <Card>
