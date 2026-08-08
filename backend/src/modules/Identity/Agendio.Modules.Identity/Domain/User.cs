@@ -22,6 +22,11 @@ public sealed class User : AggregateRoot<UserId>, ITenantOwned, IAuditable, ISof
 
     public bool IsActive { get; private set; }
 
+    public bool MfaEnabled { get; private set; }
+
+    /// <summary>Segredo TOTP (base32) criptografado em coluna (ver docs/adr/0007) — null enquanto MFA nao esta habilitado.</summary>
+    public string? MfaSecretEncrypted { get; private set; }
+
     public DateTimeOffset CreatedAtUtc { get; set; }
 
     public string? CreatedBy { get; set; }
@@ -70,4 +75,16 @@ public sealed class User : AggregateRoot<UserId>, ITenantOwned, IAuditable, ISof
     public void Deactivate() => IsActive = false;
 
     public void Activate() => IsActive = true;
+
+    public void EnableMfa(string secret)
+    {
+        MfaSecretEncrypted = secret;
+        MfaEnabled = true;
+    }
+
+    public void DisableMfa()
+    {
+        MfaSecretEncrypted = null;
+        MfaEnabled = false;
+    }
 }

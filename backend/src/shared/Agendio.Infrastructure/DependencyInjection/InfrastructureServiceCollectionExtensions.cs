@@ -37,6 +37,9 @@ public static class InfrastructureServiceCollectionExtensions
         services.Configure<PlatformJwtOptions>(configuration.GetSection(PlatformJwtOptions.SectionName));
         services.AddSingleton<IPlatformJwtTokenService, PlatformJwtTokenService>();
 
+        services.Configure<ColumnEncryptionOptions>(configuration.GetSection(ColumnEncryptionOptions.SectionName));
+        services.AddSingleton<IEncryptionService, AesGcmEncryptionService>();
+
         services.Configure<RabbitMqOptions>(configuration.GetSection(RabbitMqOptions.SectionName));
         services.AddSingleton<IIntegrationEventPublisher, RabbitMqIntegrationEventPublisher>();
 

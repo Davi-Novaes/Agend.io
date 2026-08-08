@@ -13,4 +13,6 @@ public sealed record CustomerDetails(
     DateOnly? DateOfBirth,
     IReadOnlyDictionary<string, string> CustomData,
     bool IsActive,
-    DateTimeOffset CreatedAtUtc);
+    DateTimeOffset CreatedAtUtc,
+    string? Cpf,
+    string? HealthNotes);
