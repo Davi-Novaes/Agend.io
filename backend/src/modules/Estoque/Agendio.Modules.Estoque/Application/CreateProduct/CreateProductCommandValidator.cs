@@ -1,0 +1,16 @@
+using FluentValidation;
+
+namespace Agendio.Modules.Estoque.Application.CreateProduct;
+
+public sealed class CreateProductCommandValidator : AbstractValidator<CreateProductCommand>
+{
+    public CreateProductCommandValidator()
+    {
+        RuleFor(c => c.Name).NotEmpty().MaximumLength(200);
+        RuleFor(c => c.Sku).MaximumLength(50);
+        RuleFor(c => c.Description).MaximumLength(1000);
+        RuleFor(c => c.QuantityInStock).GreaterThanOrEqualTo(0);
+        RuleFor(c => c.MinimumStock).GreaterThanOrEqualTo(0);
+        RuleFor(c => c.SalePrice).GreaterThan(0).When(c => c.SalePrice is not null);
+    }
+}

@@ -841,3 +841,126 @@ export function getCashFlowSummary(params: { from: string; to: string }, accessT
   const query = new URLSearchParams({ from: params.from, to: params.to });
   return request(`/api/financeiro/fluxo-de-caixa?${query.toString()}`, {}, accessToken);
 }
+
+// ---------- Estoque ----------
+
+export type StockMovementType = "Entry" | "Exit";
+export type StockMovementReason = "Purchase" | "Sale" | "Loss" | "Adjustment" | "Other";
+
+export type ProductSummary = {
+  id: string;
+  name: string;
+  sku: string | null;
+  quantityInStock: number;
+  minimumStock: number;
+  salePrice: number | null;
+  currency: string | null;
+  isActive: boolean;
+  isLowStock: boolean;
+};
+
+export type ProductDetails = ProductSummary & {
+  description: string | null;
+};
+
+export type CreateProductInput = {
+  name: string;
+  sku?: string | null;
+  description?: string | null;
+  quantityInStock: number;
+  minimumStock: number;
+  salePrice?: number | null;
+  currency?: string | null;
+};
+
+export type UpdateProductInput = {
+  name: string;
+  sku?: string | null;
+  description?: string | null;
+  minimumStock: number;
+  salePrice?: number | null;
+  currency?: string | null;
+};
+
+export function listProducts(
+  params: { search?: string; isActive?: boolean; lowStockOnly?: boolean; page?: number; pageSize?: number },
+  accessToken: string
+): Promise<PagedResult<ProductSummary>> {
+  const query = new URLSearchParams();
+  if (params.search) query.set("search", params.search);
+  if (params.isActive !== undefined) query.set("isActive", String(params.isActive));
+  if (params.lowStockOnly) query.set("lowStockOnly", "true");
+  query.set("page", String(params.page ?? 1));
+  query.set("pageSize", String(params.pageSize ?? 20));
+  return request(`/api/estoque/produtos?${query.toString()}`, {}, accessToken);
+}
+
+export function getProductById(id: string, accessToken: string): Promise<ProductDetails> {
+  return request(`/api/estoque/produtos/${id}`, {}, accessToken);
+}
+
+export function createProduct(input: CreateProductInput, accessToken: string): Promise<{ id: string }> {
+  return request("/api/estoque/produtos", { method: "POST", body: JSON.stringify(input) }, accessToken);
+}
+
+export function updateProduct(id: string, input: UpdateProductInput, accessToken: string): Promise<void> {
+  return request(`/api/estoque/produtos/${id}`, { method: "PUT", body: JSON.stringify(input) }, accessToken);
+}
+
+export function setProductActiveStatus(id: string, isActive: boolean, accessToken: string): Promise<void> {
+  return request(`/api/estoque/produtos/${id}/status`, { method: "PATCH", body: JSON.stringify({ isActive }) }, accessToken);
+}
+
+export type RegisterStockMovementInput = {
+  type: StockMovementType;
+  quantity: number;
+  reason: StockMovementReason;
+  notes?: string | null;
+  occurredAtUtc?: string | null;
+};
+
+export function registerStockMovement(
+  productId: string,
+  input: RegisterStockMovementInput,
+  accessToken: string
+): Promise<{ id: string }> {
+  return request(
+    `/api/estoque/produtos/${productId}/movimentacoes`,
+    { method: "POST", body: JSON.stringify(input) },
+    accessToken
+  );
+}
+
+export type StockMovementSummary = {
+  id: string;
+  productId: string;
+  productName: string;
+  type: StockMovementType;
+  quantity: number;
+  reason: StockMovementReason;
+  notes: string | null;
+  occurredAtUtc: string;
+};
+
+export function listStockMovements(
+  params: {
+    productId?: string;
+    type?: StockMovementType;
+    reason?: StockMovementReason;
+    from?: string;
+    to?: string;
+    page?: number;
+    pageSize?: number;
+  },
+  accessToken: string
+): Promise<PagedResult<StockMovementSummary>> {
+  const query = new URLSearchParams();
+  if (params.productId) query.set("productId", params.productId);
+  if (params.type) query.set("type", params.type);
+  if (params.reason) query.set("reason", params.reason);
+  if (params.from) query.set("from", params.from);
+  if (params.to) query.set("to", params.to);
+  query.set("page", String(params.page ?? 1));
+  query.set("pageSize", String(params.pageSize ?? 20));
+  return request(`/api/estoque/movimentacoes?${query.toString()}`, {}, accessToken);
+}

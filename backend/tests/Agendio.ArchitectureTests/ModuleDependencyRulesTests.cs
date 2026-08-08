@@ -21,6 +21,7 @@ public class ModuleDependencyRulesTests
     private static readonly Assembly PlatformAssembly = typeof(Agendio.Modules.Platform.Domain.PlatformAdmin).Assembly;
     private static readonly Assembly BillingAssembly = typeof(Agendio.Modules.Billing.Domain.Subscription).Assembly;
     private static readonly Assembly FinanceiroAssembly = typeof(Agendio.Modules.Financeiro.Domain.AccountReceivable).Assembly;
+    private static readonly Assembly EstoqueAssembly = typeof(Agendio.Modules.Estoque.Domain.Product).Assembly;
 
     [Theory]
     [InlineData("Agendio.Modules.Identity.Domain")]
@@ -32,6 +33,7 @@ public class ModuleDependencyRulesTests
     [InlineData("Agendio.Modules.Platform.Domain")]
     [InlineData("Agendio.Modules.Billing.Domain")]
     [InlineData("Agendio.Modules.Financeiro.Domain")]
+    [InlineData("Agendio.Modules.Estoque.Domain")]
     public void Domain_Should_Not_Depend_On_Application_Or_Infrastructure(string domainNamespace)
     {
         var assembly = domainNamespace switch
@@ -44,6 +46,7 @@ public class ModuleDependencyRulesTests
             _ when domainNamespace.Contains("Platform") => PlatformAssembly,
             _ when domainNamespace.Contains("Billing") => BillingAssembly,
             _ when domainNamespace.Contains("Financeiro") => FinanceiroAssembly,
+            _ when domainNamespace.Contains("Estoque") => EstoqueAssembly,
             _ => TenancyAssembly,
         };
         var moduleRoot = domainNamespace[..domainNamespace.LastIndexOf(".Domain", StringComparison.Ordinal)];
