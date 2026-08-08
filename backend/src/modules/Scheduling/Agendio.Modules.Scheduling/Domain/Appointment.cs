@@ -99,7 +99,7 @@ public sealed class Appointment : AggregateRoot<AppointmentId>, ITenantOwned, IA
         return Result.Success();
     }
 
-    public Result Complete()
+    public Result Complete(DateTimeOffset nowUtc)
     {
         if (Status != AppointmentStatus.InProgress)
         {
@@ -107,6 +107,7 @@ public sealed class Appointment : AggregateRoot<AppointmentId>, ITenantOwned, IA
         }
 
         Status = AppointmentStatus.Completed;
+        Raise(new AppointmentCompletedDomainEvent(Id, TenantId, ResourceId, ServiceName, Price, nowUtc));
         return Result.Success();
     }
 

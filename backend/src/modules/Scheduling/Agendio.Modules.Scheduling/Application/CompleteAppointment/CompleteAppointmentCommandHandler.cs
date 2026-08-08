@@ -2,11 +2,12 @@ using Agendio.Modules.Scheduling.Domain;
 using Agendio.Modules.Scheduling.Infrastructure.Persistence;
 using Agendio.SharedKernel.Messaging;
 using Agendio.SharedKernel.Results;
+using Agendio.SharedKernel.Time;
 using Microsoft.EntityFrameworkCore;
 
 namespace Agendio.Modules.Scheduling.Application.CompleteAppointment;
 
-public sealed class CompleteAppointmentCommandHandler(SchedulingDbContext dbContext) : ICommandHandler<CompleteAppointmentCommand>
+public sealed class CompleteAppointmentCommandHandler(SchedulingDbContext dbContext, IClock clock) : ICommandHandler<CompleteAppointmentCommand>
 {
     public async Task<Result> Handle(CompleteAppointmentCommand request, CancellationToken cancellationToken)
     {
@@ -18,7 +19,7 @@ public sealed class CompleteAppointmentCommandHandler(SchedulingDbContext dbCont
             return Result.Failure(Error.NotFound("Appointment.NotFound", "Agendamento nao encontrado."));
         }
 
-        var result = appointment.Complete();
+        var result = appointment.Complete(clock.UtcNow);
         if (result.IsFailure)
         {
             return result;

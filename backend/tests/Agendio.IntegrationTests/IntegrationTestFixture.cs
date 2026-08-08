@@ -5,6 +5,7 @@ using Agendio.Modules.Billing.Infrastructure.Asaas;
 using Agendio.Modules.Billing.Infrastructure.Persistence;
 using Agendio.Modules.Catalog.Infrastructure.Persistence;
 using Agendio.Modules.Customers.Infrastructure.Persistence;
+using Agendio.Modules.Financeiro.Infrastructure.Persistence;
 using Agendio.Modules.Identity.Infrastructure.Persistence;
 using Agendio.Modules.Platform.Infrastructure.Persistence;
 using Agendio.Modules.Resources.Infrastructure.Persistence;
@@ -135,6 +136,11 @@ public sealed class IntegrationTestFixture : WebApplicationFactory<Program>, IAs
         await using (var billingDbContext = CreateBillingDbContext())
         {
             await billingDbContext.Database.MigrateAsync();
+        }
+
+        await using (var financeiroDbContext = CreateFinanceiroDbContext())
+        {
+            await financeiroDbContext.Database.MigrateAsync();
         }
     }
 
@@ -311,6 +317,15 @@ public sealed class IntegrationTestFixture : WebApplicationFactory<Program>, IAs
             .UseSnakeCaseNamingConvention();
 
         return new BillingDbContext(optionsBuilder.Options);
+    }
+
+    private FinanceiroDbContext CreateFinanceiroDbContext()
+    {
+        var optionsBuilder = new DbContextOptionsBuilder<FinanceiroDbContext>()
+            .UseNpgsql(OwnerConnectionString)
+            .UseSnakeCaseNamingConvention();
+
+        return new FinanceiroDbContext(optionsBuilder.Options, new NullTenantContext());
     }
 
     private string BuildConnectionString(string username, string password)

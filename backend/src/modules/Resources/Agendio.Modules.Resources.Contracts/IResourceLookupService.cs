@@ -8,4 +8,7 @@ namespace Agendio.Modules.Resources.Contracts;
 public interface IResourceLookupService
 {
     Task<ResourceLookupResult?> FindByIdAsync(Guid resourceId, CancellationToken cancellationToken = default);
+
+    /// <summary>Recursos ATIVOS de um tipo (ex.: "Person") — usado por Financeiro para listar profissionais elegiveis a regra de comissao.</summary>
+    Task<IReadOnlyList<ResourceLookupResult>> ListActiveByTypeAsync(string type, CancellationToken cancellationToken = default);
 }
