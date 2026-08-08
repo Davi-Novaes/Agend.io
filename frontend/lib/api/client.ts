@@ -964,3 +964,36 @@ export function listStockMovements(
   query.set("pageSize", String(params.pageSize ?? 20));
   return request(`/api/estoque/movimentacoes?${query.toString()}`, {}, accessToken);
 }
+
+// ---------- Relatorios ----------
+
+export type ServiceRevenuePoint = { serviceName: string; total: number };
+export type ProfessionalRevenuePoint = { resourceId: string; resourceName: string; total: number };
+
+export type AppointmentStats = {
+  totalCount: number;
+  completedCount: number;
+  noShowCount: number;
+  cancelledCount: number;
+  noShowRate: number;
+  cancellationRate: number;
+  revenueByService: ServiceRevenuePoint[];
+  revenueByProfessional: ProfessionalRevenuePoint[];
+};
+
+export function getAppointmentStats(params: { from: string; to: string }, accessToken: string): Promise<AppointmentStats> {
+  const query = new URLSearchParams({ from: params.from, to: params.to });
+  return request(`/api/appointments/stats?${query.toString()}`, {}, accessToken);
+}
+
+export type StockValueByCurrency = { currency: string; total: number };
+
+export type InventorySummary = {
+  activeProductCount: number;
+  lowStockCount: number;
+  totalStockValue: StockValueByCurrency[];
+};
+
+export function getInventorySummary(accessToken: string): Promise<InventorySummary> {
+  return request("/api/estoque/resumo", {}, accessToken);
+}

@@ -227,6 +227,91 @@ public class SchedulingTests(IntegrationTestFixture fixture)
     }
 
     [Fact]
+    public async Task Appointment_Stats_Should_Aggregate_Revenue_By_Service_And_Professional_And_Compute_Rates()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var client = fixture.CreateClient();
+        var accessToken = await CreateTenantWithOwnerAndLoginAsync(client, cancellationToken);
+
+        var customerId = await CreateCustomerAsync(client, accessToken, cancellationToken);
+        var resource1Id = await CreateResourceAsync(client, accessToken, "Cadeira 1", cancellationToken);
+        var resource2Id = await CreateResourceAsync(client, accessToken, "Cadeira 2", cancellationToken);
+        var service1Id = await CreateServiceAsync(client, accessToken, "Corte VIP", 80.00m, cancellationToken);
+        var service2Id = await CreateServiceAsync(client, accessToken, "Corte Simples", 30.00m, cancellationToken);
+
+        var inPeriodStart = DateTimeOffset.UtcNow.AddDays(1);
+
+        // Completado: recurso 1 / servico VIP (80,00).
+        var appointment1Id = await ScheduleAppointmentAsync(
+            client, accessToken, customerId, resource1Id, service1Id, inPeriodStart, cancellationToken);
+        await CompleteAppointmentAsync(client, accessToken, appointment1Id, cancellationToken);
+
+        // Completado: recurso 2 / servico Simples (30,00).
+        var appointment2Id = await ScheduleAppointmentAsync(
+            client, accessToken, customerId, resource2Id, service2Id, inPeriodStart.AddDays(1), cancellationToken);
+        await CompleteAppointmentAsync(client, accessToken, appointment2Id, cancellationToken);
+
+        // Nao compareceu: recurso 1 / servico VIP de novo, horario diferente — nao entra no faturamento.
+        var appointment3Id = await ScheduleAppointmentAsync(
+            client, accessToken, customerId, resource1Id, service1Id, inPeriodStart.AddHours(3), cancellationToken);
+        (await AuthorizedRequestHelpers.PostAuthorizedAsync(
+            client, accessToken, $"/api/appointments/{appointment3Id}/no-show", new { }, cancellationToken))
+            .StatusCode.ShouldBe(HttpStatusCode.NoContent);
+
+        // Fora do periodo do relatorio — prova que o filtro por StartUtc exclui.
+        await ScheduleAppointmentAsync(client, accessToken, customerId, resource1Id, service1Id, inPeriodStart.AddDays(10), cancellationToken);
+
+        var from = DateOnly.FromDateTime(inPeriodStart.UtcDateTime);
+        var to = from.AddDays(3);
+
+        var statsResponse = await AuthorizedRequestHelpers.GetAuthorizedAsync(
+            client, accessToken, $"/api/appointments/stats?from={Iso(from)}&to={Iso(to)}", cancellationToken);
+        statsResponse.StatusCode.ShouldBe(HttpStatusCode.OK);
+
+        var stats = await statsResponse.Content.ReadFromJsonAsync<JsonElement>(cancellationToken);
+        stats.GetProperty("totalCount").GetInt32().ShouldBe(3);
+        stats.GetProperty("completedCount").GetInt32().ShouldBe(2);
+        stats.GetProperty("noShowCount").GetInt32().ShouldBe(1);
+        stats.GetProperty("cancelledCount").GetInt32().ShouldBe(0);
+        stats.GetProperty("noShowRate").GetDecimal().ShouldBe(33.3m);
+        stats.GetProperty("cancellationRate").GetDecimal().ShouldBe(0m);
+
+        var revenueByService = stats.GetProperty("revenueByService");
+        revenueByService.GetArrayLength().ShouldBe(2);
+        revenueByService[0].GetProperty("serviceName").GetString().ShouldBe("Corte VIP");
+        revenueByService[0].GetProperty("total").GetDecimal().ShouldBe(80.00m);
+        revenueByService[1].GetProperty("serviceName").GetString().ShouldBe("Corte Simples");
+        revenueByService[1].GetProperty("total").GetDecimal().ShouldBe(30.00m);
+
+        var revenueByProfessional = stats.GetProperty("revenueByProfessional");
+        revenueByProfessional.GetArrayLength().ShouldBe(2);
+        revenueByProfessional[0].GetProperty("resourceName").GetString().ShouldBe("Cadeira 1");
+        revenueByProfessional[0].GetProperty("total").GetDecimal().ShouldBe(80.00m);
+        revenueByProfessional[1].GetProperty("resourceName").GetString().ShouldBe("Cadeira 2");
+        revenueByProfessional[1].GetProperty("total").GetDecimal().ShouldBe(30.00m);
+    }
+
+    [Fact]
+    public async Task Appointment_Stats_For_A_Period_With_No_Appointments_Should_Return_Zeroed_Result()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var client = fixture.CreateClient();
+        var accessToken = await CreateTenantWithOwnerAndLoginAsync(client, cancellationToken);
+
+        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        var response = await AuthorizedRequestHelpers.GetAuthorizedAsync(
+            client, accessToken, $"/api/appointments/stats?from={Iso(today)}&to={Iso(today.AddDays(7))}", cancellationToken);
+        response.StatusCode.ShouldBe(HttpStatusCode.OK);
+
+        var stats = await response.Content.ReadFromJsonAsync<JsonElement>(cancellationToken);
+        stats.GetProperty("totalCount").GetInt32().ShouldBe(0);
+        stats.GetProperty("noShowRate").GetDecimal().ShouldBe(0m);
+        stats.GetProperty("cancellationRate").GetDecimal().ShouldBe(0m);
+        stats.GetProperty("revenueByService").GetArrayLength().ShouldBe(0);
+        stats.GetProperty("revenueByProfessional").GetArrayLength().ShouldBe(0);
+    }
+
+    [Fact]
     public async Task Anonymous_Request_To_List_Appointments_Should_Be_Unauthorized()
     {
         var cancellationToken = TestContext.Current.CancellationToken;
@@ -237,6 +322,59 @@ public class SchedulingTests(IntegrationTestFixture fixture)
         var response = await client.GetAsync($"/api/appointments?from={Uri.EscapeDataString(from.ToString("O"))}&to={Uri.EscapeDataString(to.ToString("O"))}", cancellationToken);
 
         response.StatusCode.ShouldBe(HttpStatusCode.Unauthorized);
+    }
+
+    private static string Iso(DateOnly date) => date.ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture);
+
+    private static async Task<Guid> CreateCustomerAsync(HttpClient client, string accessToken, CancellationToken cancellationToken)
+    {
+        var response = await AuthorizedRequestHelpers.PostAuthorizedAsync(
+            client, accessToken, "/api/customers", new { fullName = "Cliente de Teste" }, cancellationToken);
+        var body = await response.Content.ReadFromJsonAsync<JsonElement>(cancellationToken);
+        return body.GetProperty("id").GetGuid();
+    }
+
+    private static async Task<Guid> CreateResourceAsync(HttpClient client, string accessToken, string name, CancellationToken cancellationToken)
+    {
+        var response = await AuthorizedRequestHelpers.PostAuthorizedAsync(
+            client, accessToken, "/api/resources", new { name, type = "Room", capacity = 1, description = (string?)null }, cancellationToken);
+        var body = await response.Content.ReadFromJsonAsync<JsonElement>(cancellationToken);
+        return body.GetProperty("id").GetGuid();
+    }
+
+    private static async Task<Guid> CreateServiceAsync(
+        HttpClient client, string accessToken, string name, decimal price, CancellationToken cancellationToken)
+    {
+        var response = await AuthorizedRequestHelpers.PostAuthorizedAsync(
+            client, accessToken, "/api/services",
+            new { name, description = (string?)null, durationMinutes = 30, price, currency = "BRL", category = (string?)null },
+            cancellationToken);
+        var body = await response.Content.ReadFromJsonAsync<JsonElement>(cancellationToken);
+        return body.GetProperty("id").GetGuid();
+    }
+
+    private static async Task<Guid> ScheduleAppointmentAsync(
+        HttpClient client, string accessToken, Guid customerId, Guid resourceId, Guid serviceId, DateTimeOffset startAtUtc,
+        CancellationToken cancellationToken)
+    {
+        var response = await AuthorizedRequestHelpers.PostAuthorizedAsync(
+            client, accessToken, "/api/appointments",
+            new { customerId, resourceId, serviceId, startAtUtc, notes = (string?)null },
+            cancellationToken);
+        response.StatusCode.ShouldBe(HttpStatusCode.Created);
+        var body = await response.Content.ReadFromJsonAsync<JsonElement>(cancellationToken);
+        return body.GetProperty("id").GetGuid();
+    }
+
+    private static async Task CompleteAppointmentAsync(
+        HttpClient client, string accessToken, Guid appointmentId, CancellationToken cancellationToken)
+    {
+        (await AuthorizedRequestHelpers.PostAuthorizedAsync(client, accessToken, $"/api/appointments/{appointmentId}/confirm", new { }, cancellationToken))
+            .StatusCode.ShouldBe(HttpStatusCode.NoContent);
+        (await AuthorizedRequestHelpers.PostAuthorizedAsync(client, accessToken, $"/api/appointments/{appointmentId}/start", new { }, cancellationToken))
+            .StatusCode.ShouldBe(HttpStatusCode.NoContent);
+        (await AuthorizedRequestHelpers.PostAuthorizedAsync(client, accessToken, $"/api/appointments/{appointmentId}/complete", new { }, cancellationToken))
+            .StatusCode.ShouldBe(HttpStatusCode.NoContent);
     }
 
     private static async Task<(Guid CustomerId, Guid ResourceId, Guid ServiceId)> CreateBookingPrerequisitesAsync(

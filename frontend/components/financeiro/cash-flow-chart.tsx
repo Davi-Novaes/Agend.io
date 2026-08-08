@@ -148,8 +148,22 @@ function MonthlyEvolutionChart({ data }: { data: CashFlowMonthPoint[] }) {
   );
 }
 
-/** Categorias de despesa: barras horizontais, hue sequencial unico (ver skill dataviz). */
-function CategoryBreakdownChart({ data }: { data: CashFlowCategoryPoint[] }) {
+/** Lista generica de categoria/total: barras horizontais, hue sequencial unico (ver skill dataviz). */
+export function CategoryBreakdownChart({
+  data,
+  id = "category-breakdown",
+  title = "Despesas por categoria",
+  subtitle = "Saidas pagas no periodo",
+  emptyMessage = "Nenhuma despesa paga no periodo.",
+  categoryLabel = "Categoria",
+}: {
+  data: CashFlowCategoryPoint[];
+  id?: string;
+  title?: string;
+  subtitle?: string;
+  emptyMessage?: string;
+  categoryLabel?: string;
+}) {
   const [view, setView] = React.useState<ViewMode>("chart");
   const max = Math.max(1, ...data.map((point) => point.total));
 
@@ -157,19 +171,19 @@ function CategoryBreakdownChart({ data }: { data: CashFlowCategoryPoint[] }) {
     <div className="rounded-lg border p-4">
       <div className="mb-3 flex items-center justify-between gap-2">
         <div>
-          <h3 className="text-sm font-semibold">Despesas por categoria</h3>
-          <p className="text-muted-foreground text-xs">Saidas pagas no periodo</p>
+          <h3 className="text-sm font-semibold">{title}</h3>
+          <p className="text-muted-foreground text-xs">{subtitle}</p>
         </div>
-        <ViewToggle view={view} onChange={setView} id="category-breakdown" />
+        <ViewToggle view={view} onChange={setView} id={id} />
       </div>
 
       {data.length === 0 ? (
-        <p className="text-muted-foreground py-8 text-center text-sm">Nenhuma despesa paga no periodo.</p>
+        <p className="text-muted-foreground py-8 text-center text-sm">{emptyMessage}</p>
       ) : view === "table" ? (
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead>Categoria</TableHead>
+              <TableHead>{categoryLabel}</TableHead>
               <TableHead className="text-right">Total</TableHead>
             </TableRow>
           </TableHeader>
