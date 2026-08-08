@@ -6,6 +6,8 @@ using Agendio.Modules.Catalog.Domain;
 using Agendio.Modules.Catalog.Infrastructure.Persistence;
 using Agendio.Modules.Customers.Domain;
 using Agendio.Modules.Customers.Infrastructure.Persistence;
+using Agendio.Modules.Estoque.Domain;
+using Agendio.Modules.Estoque.Infrastructure.Persistence;
 using Agendio.Modules.Financeiro.Domain;
 using Agendio.Modules.Financeiro.Infrastructure.Persistence;
 using Agendio.Modules.Identity.Domain;
@@ -177,6 +179,24 @@ public class TenantIsolationRulesTests
         }
     }
 
+    [Fact]
+    public void Estoque_Module_Should_Have_Exactly_Two_TenantOwned_Entities_All_With_A_Query_Filter()
+    {
+        using var dbContext = CreateEstoqueDbContext();
+
+        var tenantOwnedEntityTypes = dbContext.Model.GetEntityTypes()
+            .Where(entityType => typeof(ITenantOwned).IsAssignableFrom(entityType.ClrType))
+            .ToList();
+
+        tenantOwnedEntityTypes.Select(e => e.ClrType).ShouldBe([typeof(Product), typeof(StockMovement)], ignoreOrder: true);
+
+        foreach (var entityType in tenantOwnedEntityTypes)
+        {
+            entityType.GetDeclaredQueryFilters().ShouldNotBeEmpty(
+                $"{entityType.ClrType.Name} implementa ITenantOwned mas nao tem Global Query Filter configurado no DbContext.");
+        }
+    }
+
     private static IdentityDbContext CreateIdentityDbContext()
     {
         var optionsBuilder = new DbContextOptionsBuilder<IdentityDbContext>()
@@ -245,6 +265,15 @@ public class TenantIsolationRulesTests
             .UseSnakeCaseNamingConvention();
 
         return new FinanceiroDbContext(optionsBuilder.Options, new NullTenantContext());
+    }
+
+    private static EstoqueDbContext CreateEstoqueDbContext()
+    {
+        var optionsBuilder = new DbContextOptionsBuilder<EstoqueDbContext>()
+            .UseNpgsql("Host=localhost;Database=architecture_tests_only")
+            .UseSnakeCaseNamingConvention();
+
+        return new EstoqueDbContext(optionsBuilder.Options, new NullTenantContext());
     }
 
     private static BillingDbContext CreateBillingDbContext()

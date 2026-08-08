@@ -12,6 +12,7 @@ using Agendio.Modules.Billing.DependencyInjection;
 using Agendio.Modules.Billing.Infrastructure.Jobs;
 using Agendio.Modules.Catalog.DependencyInjection;
 using Agendio.Modules.Customers.DependencyInjection;
+using Agendio.Modules.Estoque.DependencyInjection;
 using Agendio.Modules.Financeiro.DependencyInjection;
 using Agendio.Modules.Identity.DependencyInjection;
 using Agendio.Modules.Platform.DependencyInjection;
@@ -76,6 +77,7 @@ try
     builder.Services.AddPlatformModule(builder.Configuration);
     builder.Services.AddBillingModule(builder.Configuration);
     builder.Services.AddFinanceiroModule(builder.Configuration);
+    builder.Services.AddEstoqueModule(builder.Configuration);
     builder.Services.AddAgendioHangfire(builder.Configuration);
 
     // ---------- Autenticacao / Autorizacao ----------
@@ -229,6 +231,7 @@ try
     app.Services.ScheduleOutboxProcessing<Agendio.Modules.Platform.Infrastructure.Persistence.PlatformDbContext>("platform");
     app.Services.ScheduleOutboxProcessing<Agendio.Modules.Billing.Infrastructure.Persistence.BillingDbContext>("billing");
     app.Services.ScheduleOutboxProcessing<Agendio.Modules.Financeiro.Infrastructure.Persistence.FinanceiroDbContext>("financeiro");
+    app.Services.ScheduleOutboxProcessing<Agendio.Modules.Estoque.Infrastructure.Persistence.EstoqueDbContext>("estoque");
 
     // ---------- Conciliacao de assinaturas (diaria, ver Sprint 7) ----------
     // IRecurringJobManager resolvido do DI (nunca o facade estatico RecurringJob

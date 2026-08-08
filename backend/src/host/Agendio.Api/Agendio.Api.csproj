@@ -43,6 +43,7 @@
     <ProjectReference Include="..\..\modules\Platform\Agendio.Modules.Platform\Agendio.Modules.Platform.csproj" />
     <ProjectReference Include="..\..\modules\Billing\Agendio.Modules.Billing\Agendio.Modules.Billing.csproj" />
     <ProjectReference Include="..\..\modules\Financeiro\Agendio.Modules.Financeiro\Agendio.Modules.Financeiro.csproj" />
+    <ProjectReference Include="..\..\modules\Estoque\Agendio.Modules.Estoque\Agendio.Modules.Estoque.csproj" />
   </ItemGroup>
 
 </Project>
