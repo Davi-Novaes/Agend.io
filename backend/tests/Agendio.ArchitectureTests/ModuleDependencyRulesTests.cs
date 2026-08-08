@@ -22,6 +22,7 @@ public class ModuleDependencyRulesTests
     private static readonly Assembly BillingAssembly = typeof(Agendio.Modules.Billing.Domain.Subscription).Assembly;
     private static readonly Assembly FinanceiroAssembly = typeof(Agendio.Modules.Financeiro.Domain.AccountReceivable).Assembly;
     private static readonly Assembly EstoqueAssembly = typeof(Agendio.Modules.Estoque.Domain.Product).Assembly;
+    private static readonly Assembly MarketingAssembly = typeof(Agendio.Modules.Marketing.Domain.Campaign).Assembly;
 
     [Theory]
     [InlineData("Agendio.Modules.Identity.Domain")]
@@ -34,6 +35,7 @@ public class ModuleDependencyRulesTests
     [InlineData("Agendio.Modules.Billing.Domain")]
     [InlineData("Agendio.Modules.Financeiro.Domain")]
     [InlineData("Agendio.Modules.Estoque.Domain")]
+    [InlineData("Agendio.Modules.Marketing.Domain")]
     public void Domain_Should_Not_Depend_On_Application_Or_Infrastructure(string domainNamespace)
     {
         var assembly = domainNamespace switch
@@ -47,6 +49,7 @@ public class ModuleDependencyRulesTests
             _ when domainNamespace.Contains("Billing") => BillingAssembly,
             _ when domainNamespace.Contains("Financeiro") => FinanceiroAssembly,
             _ when domainNamespace.Contains("Estoque") => EstoqueAssembly,
+            _ when domainNamespace.Contains("Marketing") => MarketingAssembly,
             _ => TenancyAssembly,
         };
         var moduleRoot = domainNamespace[..domainNamespace.LastIndexOf(".Domain", StringComparison.Ordinal)];
@@ -266,6 +269,56 @@ public class ModuleDependencyRulesTests
 
         result.IsSuccessful.ShouldBeTrue(
             "Financeiro so pode depender dos .Contracts de Resources/Scheduling, nunca dos modulos inteiros. " +
+            "Tipos violando a regra: " + string.Join(", ", result.FailingTypeNames ?? []));
+    }
+
+    [Fact]
+    public void Marketing_Module_Should_Not_Depend_On_Any_Module_Internals_Except_Customers_Contracts()
+    {
+        // Marketing so precisa resolver a lista de clientes ativos com e-mail
+        // (ICustomerLookupService.ListActiveWithEmailAsync) — nunca deveria
+        // enxergar Customers.Domain ou qualquer outro modulo diretamente.
+        var forbiddenNamespaces = new[]
+        {
+            "Agendio.Modules.Customers.Domain",
+            "Agendio.Modules.Customers.Application",
+            "Agendio.Modules.Customers.Infrastructure",
+            "Agendio.Modules.Customers.Endpoints",
+            "Agendio.Modules.Customers.DependencyInjection",
+            "Agendio.Modules.Identity.Domain",
+            "Agendio.Modules.Identity.Application",
+            "Agendio.Modules.Identity.Infrastructure",
+            "Agendio.Modules.Identity.Endpoints",
+            "Agendio.Modules.Identity.DependencyInjection",
+            "Agendio.Modules.Catalog.Domain",
+            "Agendio.Modules.Catalog.Application",
+            "Agendio.Modules.Catalog.Infrastructure",
+            "Agendio.Modules.Catalog.Endpoints",
+            "Agendio.Modules.Catalog.DependencyInjection",
+            "Agendio.Modules.Resources.Domain",
+            "Agendio.Modules.Resources.Application",
+            "Agendio.Modules.Resources.Infrastructure",
+            "Agendio.Modules.Resources.Endpoints",
+            "Agendio.Modules.Resources.DependencyInjection",
+            "Agendio.Modules.Scheduling.Domain",
+            "Agendio.Modules.Scheduling.Application",
+            "Agendio.Modules.Scheduling.Infrastructure",
+            "Agendio.Modules.Scheduling.Endpoints",
+            "Agendio.Modules.Scheduling.DependencyInjection",
+            "Agendio.Modules.Tenancy.Domain",
+            "Agendio.Modules.Tenancy.Application",
+            "Agendio.Modules.Tenancy.Infrastructure",
+            "Agendio.Modules.Tenancy.Endpoints",
+            "Agendio.Modules.Tenancy.DependencyInjection",
+        };
+
+        var result = Types.InAssembly(MarketingAssembly)
+            .That().ResideInNamespace("Agendio.Modules.Marketing")
+            .ShouldNot().HaveDependencyOnAny(forbiddenNamespaces)
+            .GetResult();
+
+        result.IsSuccessful.ShouldBeTrue(
+            "Marketing so pode depender do .Contracts de Customers, nunca de nenhum modulo inteiro. " +
             "Tipos violando a regra: " + string.Join(", ", result.FailingTypeNames ?? []));
     }
 }

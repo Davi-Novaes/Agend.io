@@ -14,4 +14,16 @@ internal sealed class CustomerLookupService(CustomersDbContext dbContext) : ICus
 
         return customer is null ? null : new CustomerLookupResult(customer.Id.Value, customer.FullName, customer.Email?.Value, customer.IsActive);
     }
+
+    public async Task<IReadOnlyList<CustomerLookupResult>> ListActiveWithEmailAsync(CancellationToken cancellationToken = default)
+    {
+        var customers = await dbContext.Customers.AsNoTracking()
+            .Where(c => c.IsActive && c.Email != null)
+            .OrderBy(c => c.FullName)
+            .ToListAsync(cancellationToken);
+
+        return customers
+            .Select(c => new CustomerLookupResult(c.Id.Value, c.FullName, c.Email!.Value, c.IsActive))
+            .ToList();
+    }
 }

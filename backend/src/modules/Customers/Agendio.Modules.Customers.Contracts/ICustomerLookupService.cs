@@ -8,4 +8,7 @@ namespace Agendio.Modules.Customers.Contracts;
 public interface ICustomerLookupService
 {
     Task<CustomerLookupResult?> FindByIdAsync(Guid customerId, CancellationToken cancellationToken = default);
+
+    /// <summary>Clientes ativos com e-mail cadastrado — usado por Marketing para montar a lista de destinatarios de uma campanha.</summary>
+    Task<IReadOnlyList<CustomerLookupResult>> ListActiveWithEmailAsync(CancellationToken cancellationToken = default);
 }
