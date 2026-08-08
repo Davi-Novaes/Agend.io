@@ -997,3 +997,31 @@ export type InventorySummary = {
 export function getInventorySummary(accessToken: string): Promise<InventorySummary> {
   return request("/api/estoque/resumo", {}, accessToken);
 }
+
+// ---------- Marketing ----------
+
+export type CampaignSummary = {
+  id: string;
+  subject: string;
+  recipientCount: number;
+  sentAtUtc: string;
+};
+
+export type SendCampaignInput = {
+  subject: string;
+  body: string;
+};
+
+export function sendCampaign(input: SendCampaignInput, accessToken: string): Promise<{ id: string; recipientCount: number }> {
+  return request("/api/marketing/campanhas", { method: "POST", body: JSON.stringify(input) }, accessToken);
+}
+
+export function listCampaigns(
+  params: { page?: number; pageSize?: number },
+  accessToken: string
+): Promise<PagedResult<CampaignSummary>> {
+  const query = new URLSearchParams();
+  query.set("page", String(params.page ?? 1));
+  query.set("pageSize", String(params.pageSize ?? 20));
+  return request(`/api/marketing/campanhas?${query.toString()}`, {}, accessToken);
+}

@@ -18,6 +18,9 @@
   <Folder Name="/src/modules/Estoque/">
     <Project Path="src/modules/Estoque/Agendio.Modules.Estoque/Agendio.Modules.Estoque.csproj" />
   </Folder>
+  <Folder Name="/src/modules/Marketing/">
+    <Project Path="src/modules/Marketing/Agendio.Modules.Marketing/Agendio.Modules.Marketing.csproj" />
+  </Folder>
   <Folder Name="/src/modules/Customers/">
     <Project Path="src/modules/Customers/Agendio.Modules.Customers/Agendio.Modules.Customers.csproj" />
     <Project Path="src/modules/Customers/Agendio.Modules.Customers.Contracts/Agendio.Modules.Customers.Contracts.csproj" />
