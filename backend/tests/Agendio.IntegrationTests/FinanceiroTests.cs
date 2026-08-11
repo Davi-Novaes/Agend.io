@@ -182,7 +182,7 @@ public class FinanceiroTests(IntegrationTestFixture fixture)
 
         var today = DateOnly.FromDateTime(DateTime.UtcNow);
         var summaryResponse = await AuthorizedRequestHelpers.GetAuthorizedAsync(
-            client, accessToken, $"/api/financeiro/fluxo-de-caixa?from={today.AddDays(-1)}&to={today.AddDays(1)}", cancellationToken);
+            client, accessToken, $"/api/financeiro/fluxo-de-caixa?from={Iso(today.AddDays(-1))}&to={Iso(today.AddDays(1))}", cancellationToken);
         summaryResponse.StatusCode.ShouldBe(HttpStatusCode.OK);
 
         var summary = await summaryResponse.Content.ReadFromJsonAsync<JsonElement>(cancellationToken);
@@ -283,6 +283,8 @@ public class FinanceiroTests(IntegrationTestFixture fixture)
 
         return null;
     }
+
+    private static string Iso(DateOnly date) => date.ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture);
 
     private static async Task<Guid> GetTenantIdFromTokenAsync(HttpClient client, string accessToken, CancellationToken cancellationToken)
     {
