@@ -17,6 +17,7 @@ import {
   updateResource,
   setResourceActiveStatus,
   setResourceWorkingHours,
+  listUnits,
   ApiError,
   type ResourceSummary,
   type ResourceType,
@@ -56,11 +57,15 @@ const DAY_OPTIONS: { value: DayOfWeekName; label: string }[] = [
   { value: "Sunday", label: "Domingo" },
 ];
 
+// Radix Select nao aceita value="" num item — usa um sentinela pra "sem unidade".
+const NO_UNIT_VALUE = "none";
+
 const resourceSchema = z.object({
   name: z.string().min(1, "Informe o nome."),
   type: z.enum(["Person", "Room", "Equipment"]),
   capacity: z.coerce.number().int("Use um numero inteiro.").min(1, "A capacidade precisa ser maior que zero."),
   description: z.string(),
+  unitId: z.string(),
 });
 
 // z.coerce faz o tipo de entrada (antes da validacao) divergir do de saida
@@ -69,7 +74,7 @@ const resourceSchema = z.object({
 type ResourceFormValues = z.output<typeof resourceSchema>;
 type ResourceFormInput = z.input<typeof resourceSchema>;
 
-const emptyResourceForm: ResourceFormInput = { name: "", type: "Person", capacity: 1, description: "" };
+const emptyResourceForm: ResourceFormInput = { name: "", type: "Person", capacity: 1, description: "", unitId: NO_UNIT_VALUE };
 
 function toNullable(value: string): string | null {
   return value.trim() === "" ? null : value.trim();
@@ -123,6 +128,12 @@ export default function ResourcesPage() {
     placeholderData: (previous) => previous,
   });
 
+  const unitsQuery = useQuery({
+    queryKey: ["units"],
+    queryFn: () => listUnits(accessToken),
+    enabled: Boolean(session),
+  });
+
   const form = useForm<ResourceFormInput, unknown, ResourceFormValues>({
     resolver: zodResolver(resourceSchema),
     defaultValues: emptyResourceForm,
@@ -140,7 +151,13 @@ export default function ResourcesPage() {
   const createMutation = useMutation({
     mutationFn: (values: ResourceFormValues) =>
       createResource(
-        { name: values.name, type: values.type, capacity: values.capacity, description: toNullable(values.description) },
+        {
+          name: values.name,
+          type: values.type,
+          capacity: values.capacity,
+          description: toNullable(values.description),
+          unitId: values.unitId === NO_UNIT_VALUE ? null : values.unitId,
+        },
         accessToken
       ),
     onSuccess: () => {
@@ -158,7 +175,13 @@ export default function ResourcesPage() {
       }
       return updateResource(
         editingResource.id,
-        { name: values.name, type: values.type, capacity: values.capacity, description: toNullable(values.description) },
+        {
+          name: values.name,
+          type: values.type,
+          capacity: values.capacity,
+          description: toNullable(values.description),
+          unitId: values.unitId === NO_UNIT_VALUE ? null : values.unitId,
+        },
         accessToken
       );
     },
@@ -215,6 +238,7 @@ export default function ResourcesPage() {
         type: details.type,
         capacity: details.capacity,
         description: details.description ?? "",
+        unitId: details.unitId ?? NO_UNIT_VALUE,
       });
       setDialogOpen(true);
     } catch (error) {
@@ -428,6 +452,33 @@ export default function ResourcesPage() {
                   </FormItem>
                 )}
               />
+              {unitsQuery.data && unitsQuery.data.length > 0 && (
+                <FormField
+                  control={form.control}
+                  name="unitId"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Unidade</FormLabel>
+                      <Select value={field.value} onValueChange={field.onChange}>
+                        <FormControl>
+                          <SelectTrigger className="w-full">
+                            <SelectValue />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          <SelectItem value={NO_UNIT_VALUE}>Nenhuma</SelectItem>
+                          {unitsQuery.data.map((unit) => (
+                            <SelectItem key={unit.id} value={unit.id}>
+                              {unit.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              )}
               <DialogFooter>
                 <Button type="submit" disabled={createMutation.isPending || updateMutation.isPending}>
                   {createMutation.isPending || updateMutation.isPending ? "Salvando..." : "Salvar"}

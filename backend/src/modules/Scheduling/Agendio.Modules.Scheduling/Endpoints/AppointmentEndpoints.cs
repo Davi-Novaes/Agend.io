@@ -22,13 +22,13 @@ public sealed class AppointmentEndpoints : IEndpointModule
     {
         var group = endpoints.MapGroup("/api/appointments").WithTags("Scheduling").RequireAuthorization();
 
-        group.MapGet("/", async (DateTimeOffset from, DateTimeOffset to, Guid? resourceId, IDispatcher dispatcher, CancellationToken cancellationToken) =>
+        group.MapGet("/", async (DateTimeOffset from, DateTimeOffset to, Guid? resourceId, Guid? unitId, IDispatcher dispatcher, CancellationToken cancellationToken) =>
         {
-            var result = await dispatcher.Query(new ListAppointmentsQuery(from, to, resourceId), cancellationToken);
+            var result = await dispatcher.Query(new ListAppointmentsQuery(from, to, resourceId, unitId), cancellationToken);
             return result.IsSuccess ? Results.Ok(result.Value) : result.Error.ToProblemResult();
         })
         .WithName("ListAppointments")
-        .WithSummary("Lista agendamentos que se sobrepoem a janela [from, to), opcionalmente filtrando por recurso.");
+        .WithSummary("Lista agendamentos que se sobrepoem a janela [from, to), opcionalmente filtrando por recurso e/ou unidade.");
 
         group.MapGet("/stats", async (DateOnly from, DateOnly to, IDispatcher dispatcher, CancellationToken cancellationToken) =>
         {

@@ -8,6 +8,7 @@ public sealed record AppointmentDetails(
     Guid Id,
     Guid CustomerId,
     Guid ResourceId,
+    Guid? UnitId,
     Guid ServiceId,
     string ServiceName,
     DateTimeOffset StartUtc,

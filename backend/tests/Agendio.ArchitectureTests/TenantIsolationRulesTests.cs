@@ -127,7 +127,7 @@ public class TenantIsolationRulesTests
     }
 
     [Fact]
-    public void Tenant_Should_Deliberately_Not_Be_TenantOwned()
+    public void Tenancy_Module_Should_Have_Exactly_One_TenantOwned_Entity_All_With_A_Query_Filter()
     {
         // Tenant E o tenant — nao pertence a um. Se algum dia Tenant passar a
         // implementar ITenantOwned, algo mudou fundamentalmente no modelo e
@@ -135,10 +135,18 @@ public class TenantIsolationRulesTests
         typeof(ITenantOwned).IsAssignableFrom(typeof(Tenant)).ShouldBeFalse();
 
         using var dbContext = CreateTenancyDbContext();
-        var tenantOwnedEntityTypes = dbContext.Model.GetEntityTypes()
-            .Where(entityType => typeof(ITenantOwned).IsAssignableFrom(entityType.ClrType));
 
-        tenantOwnedEntityTypes.ShouldBeEmpty();
+        var tenantOwnedEntityTypes = dbContext.Model.GetEntityTypes()
+            .Where(entityType => typeof(ITenantOwned).IsAssignableFrom(entityType.ClrType))
+            .ToList();
+
+        tenantOwnedEntityTypes.Select(e => e.ClrType).ShouldBe([typeof(Unit)]);
+
+        foreach (var entityType in tenantOwnedEntityTypes)
+        {
+            entityType.GetDeclaredQueryFilters().ShouldNotBeEmpty(
+                $"{entityType.ClrType.Name} implementa ITenantOwned mas nao tem Global Query Filter configurado no DbContext.");
+        }
     }
 
     [Fact]
@@ -212,7 +220,7 @@ public class TenantIsolationRulesTests
             .UseNpgsql("Host=localhost;Database=architecture_tests_only")
             .UseSnakeCaseNamingConvention();
 
-        return new TenancyDbContext(optionsBuilder.Options);
+        return new TenancyDbContext(optionsBuilder.Options, new NullTenantContext());
     }
 
     private static CustomersDbContext CreateCustomersDbContext()

@@ -24,6 +24,8 @@ public sealed class Resource : AggregateRoot<ResourceId>, ITenantOwned, IAuditab
 
     public string? Description { get; private set; }
 
+    public Guid? UnitId { get; private set; }
+
     public bool IsActive { get; private set; }
 
     public IReadOnlyCollection<WorkingHoursEntry> WorkingHours => _workingHours;
@@ -44,7 +46,7 @@ public sealed class Resource : AggregateRoot<ResourceId>, ITenantOwned, IAuditab
     {
     }
 
-    private Resource(TenantId tenantId, string name, ResourceType type, int capacity, string? description)
+    private Resource(TenantId tenantId, string name, ResourceType type, int capacity, string? description, Guid? unitId)
         : base(ResourceId.New())
     {
         TenantId = tenantId;
@@ -52,10 +54,12 @@ public sealed class Resource : AggregateRoot<ResourceId>, ITenantOwned, IAuditab
         Type = type;
         Capacity = capacity;
         Description = description;
+        UnitId = unitId;
         IsActive = true;
     }
 
-    public static Result<Resource> Create(TenantId tenantId, string? name, ResourceType type, int capacity, string? description)
+    public static Result<Resource> Create(
+        TenantId tenantId, string? name, ResourceType type, int capacity, string? description, Guid? unitId = null)
     {
         if (string.IsNullOrWhiteSpace(name))
         {
@@ -67,13 +71,13 @@ public sealed class Resource : AggregateRoot<ResourceId>, ITenantOwned, IAuditab
             return Result.Failure<Resource>(Error.Validation("Resource.InvalidCapacity", "A capacidade precisa ser maior que zero."));
         }
 
-        var resource = new Resource(tenantId, name.Trim(), type, capacity, description?.Trim());
+        var resource = new Resource(tenantId, name.Trim(), type, capacity, description?.Trim(), unitId);
         resource.Raise(new ResourceCreatedDomainEvent(resource.Id, tenantId, resource.Name));
 
         return Result.Success(resource);
     }
 
-    public Result Update(string? name, ResourceType type, int capacity, string? description)
+    public Result Update(string? name, ResourceType type, int capacity, string? description, Guid? unitId = null)
     {
         if (string.IsNullOrWhiteSpace(name))
         {
@@ -89,6 +93,7 @@ public sealed class Resource : AggregateRoot<ResourceId>, ITenantOwned, IAuditab
         Type = type;
         Capacity = capacity;
         Description = description?.Trim();
+        UnitId = unitId;
 
         return Result.Success();
     }

@@ -23,6 +23,7 @@ public static class TenancyModuleServiceCollectionExtensions
 
         services.AddScoped<ITenantLookupService, TenantLookupService>();
         services.AddScoped<ITenantAdministrationService, TenantAdministrationService>();
+        services.AddScoped<IUnitLookupService, UnitLookupService>();
 
         services.AddValidatorsFromAssembly(moduleAssembly);
         services.AddHandlersFromAssembly(moduleAssembly);

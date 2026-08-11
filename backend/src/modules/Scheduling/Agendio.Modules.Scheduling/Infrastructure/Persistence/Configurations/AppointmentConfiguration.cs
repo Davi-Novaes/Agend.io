@@ -22,6 +22,7 @@ public sealed class AppointmentConfiguration : IEntityTypeConfiguration<Appointm
 
         builder.Property(a => a.CustomerId).IsRequired();
         builder.Property(a => a.ResourceId).IsRequired();
+        builder.Property(a => a.UnitId);
         builder.Property(a => a.ServiceId).IsRequired();
         builder.Property(a => a.ServiceName).IsRequired().HasMaxLength(200);
         builder.Property(a => a.Status).HasConversion<string>().HasMaxLength(30).IsRequired();

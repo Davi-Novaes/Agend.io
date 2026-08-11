@@ -39,7 +39,7 @@ public sealed class ResourceEndpoints : IEndpointModule
 
         group.MapPost("/", async (CreateResourceRequest request, IDispatcher dispatcher, CancellationToken cancellationToken) =>
         {
-            var command = new CreateResourceCommand(request.Name, request.Type, request.Capacity, request.Description);
+            var command = new CreateResourceCommand(request.Name, request.Type, request.Capacity, request.Description, request.UnitId);
             var result = await dispatcher.Send(command, cancellationToken);
 
             return result.IsSuccess
@@ -51,7 +51,7 @@ public sealed class ResourceEndpoints : IEndpointModule
 
         group.MapPut("/{id:guid}", async (Guid id, UpdateResourceRequest request, IDispatcher dispatcher, CancellationToken cancellationToken) =>
         {
-            var command = new UpdateResourceCommand(id, request.Name, request.Type, request.Capacity, request.Description);
+            var command = new UpdateResourceCommand(id, request.Name, request.Type, request.Capacity, request.Description, request.UnitId);
             var result = await dispatcher.Send(command, cancellationToken);
 
             return result.IsSuccess ? Results.NoContent() : result.Error.ToProblemResult();
@@ -77,9 +77,9 @@ public sealed class ResourceEndpoints : IEndpointModule
         .WithSummary("Substitui a semana inteira de horarios de trabalho do recurso.");
     }
 
-    private sealed record CreateResourceRequest(string Name, ResourceType Type, int Capacity, string? Description);
+    private sealed record CreateResourceRequest(string Name, ResourceType Type, int Capacity, string? Description, Guid? UnitId);
 
-    private sealed record UpdateResourceRequest(string Name, ResourceType Type, int Capacity, string? Description);
+    private sealed record UpdateResourceRequest(string Name, ResourceType Type, int Capacity, string? Description, Guid? UnitId);
 
     private sealed record SetActiveStatusRequest(bool IsActive);
 

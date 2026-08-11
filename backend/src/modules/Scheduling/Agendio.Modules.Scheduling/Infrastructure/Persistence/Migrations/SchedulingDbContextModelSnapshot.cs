@@ -168,6 +168,10 @@ namespace Agendio.Modules.Scheduling.Infrastructure.Persistence.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("tenant_id");
 
+                    b.Property<Guid?>("UnitId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("unit_id");
+
                     b.Property<DateTimeOffset?>("UpdatedAtUtc")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("updated_at_utc");

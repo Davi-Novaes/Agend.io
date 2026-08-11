@@ -53,6 +53,9 @@ export default function DashboardPage() {
           <Link href="/marketing">Marketing</Link>
         </Button>
         <Button variant="outline" asChild>
+          <Link href="/settings/units">Unidades</Link>
+        </Button>
+        <Button variant="outline" asChild>
           <Link href="/settings/branding">Marca</Link>
         </Button>
         <Button variant="outline" asChild>

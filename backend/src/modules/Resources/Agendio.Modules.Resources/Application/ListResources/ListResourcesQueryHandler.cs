@@ -29,7 +29,7 @@ public sealed class ListResourcesQueryHandler(ResourcesDbContext dbContext) : IQ
             .ToListAsync(cancellationToken);
 
         var items = resources
-            .Select(r => new ResourceSummary(r.Id.Value, r.Name, r.Type, r.Capacity, r.Description, r.IsActive))
+            .Select(r => new ResourceSummary(r.Id.Value, r.Name, r.Type, r.Capacity, r.Description, r.IsActive, r.UnitId))
             .ToList();
 
         return Result.Success(new ListResourcesResult(items, totalCount, page, pageSize));

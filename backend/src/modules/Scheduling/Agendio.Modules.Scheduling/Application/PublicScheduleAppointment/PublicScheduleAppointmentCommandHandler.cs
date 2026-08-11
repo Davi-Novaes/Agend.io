@@ -90,7 +90,7 @@ public sealed class PublicScheduleAppointmentCommandHandler(
                 cancellationToken);
 
             var appointmentResult = Appointment.Schedule(
-                tenantContext.TenantId, customerId, request.ResourceId, request.ServiceId,
+                tenantContext.TenantId, customerId, request.ResourceId, resource.UnitId, request.ServiceId,
                 service.Name, slotResult.Value, priceResult.Value, request.Notes);
 
             if (appointmentResult.IsFailure)
