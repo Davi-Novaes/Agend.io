@@ -91,6 +91,31 @@ public class ModuleDependencyRulesTests
     }
 
     [Fact]
+    public void Resources_Module_Should_Not_Depend_On_Tenancy_Internals()
+    {
+        // Resources resolve so a existencia/tenant de uma Unit via
+        // IUnitLookupService (validacao de Resource.UnitId) — nunca deveria
+        // enxergar Tenancy.Domain diretamente.
+        var forbiddenNamespaces = new[]
+        {
+            "Agendio.Modules.Tenancy.Domain",
+            "Agendio.Modules.Tenancy.Application",
+            "Agendio.Modules.Tenancy.Infrastructure",
+            "Agendio.Modules.Tenancy.Endpoints",
+            "Agendio.Modules.Tenancy.DependencyInjection",
+        };
+
+        var result = Types.InAssembly(ResourcesAssembly)
+            .That().ResideInNamespace("Agendio.Modules.Resources")
+            .ShouldNot().HaveDependencyOnAny(forbiddenNamespaces)
+            .GetResult();
+
+        result.IsSuccessful.ShouldBeTrue(
+            "Resources so pode depender do .Contracts de Tenancy, nunca do modulo inteiro. " +
+            "Tipos violando a regra: " + string.Join(", ", result.FailingTypeNames ?? []));
+    }
+
+    [Fact]
     public void Scheduling_Module_Should_Not_Depend_On_Customers_Catalog_Resources_Or_Tenancy_Internals()
     {
         // Scheduling e o modulo que mais depende de leitura de outros modulos

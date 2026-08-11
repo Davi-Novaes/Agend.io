@@ -29,6 +29,9 @@ public sealed class Appointment : AggregateRoot<AppointmentId>, ITenantOwned, IA
 
     public Guid ResourceId { get; private set; }
 
+    /// <summary>Snapshot do Resource.UnitId no momento do agendamento — mudar a unidade do recurso depois nao reescreve agendamentos ja marcados.</summary>
+    public Guid? UnitId { get; private set; }
+
     public Guid ServiceId { get; private set; }
 
     public string ServiceName { get; private set; } = string.Empty;
@@ -54,12 +57,14 @@ public sealed class Appointment : AggregateRoot<AppointmentId>, ITenantOwned, IA
     }
 
     private Appointment(
-        TenantId tenantId, Guid customerId, Guid resourceId, Guid serviceId, string serviceName, TimeSlot slot, Money price, string? notes)
+        TenantId tenantId, Guid customerId, Guid resourceId, Guid? unitId, Guid serviceId, string serviceName, TimeSlot slot, Money price,
+        string? notes)
         : base(AppointmentId.New())
     {
         TenantId = tenantId;
         CustomerId = customerId;
         ResourceId = resourceId;
+        UnitId = unitId;
         ServiceId = serviceId;
         ServiceName = serviceName;
         Slot = slot;
@@ -69,9 +74,10 @@ public sealed class Appointment : AggregateRoot<AppointmentId>, ITenantOwned, IA
     }
 
     public static Result<Appointment> Schedule(
-        TenantId tenantId, Guid customerId, Guid resourceId, Guid serviceId, string serviceName, TimeSlot slot, Money price, string? notes)
+        TenantId tenantId, Guid customerId, Guid resourceId, Guid? unitId, Guid serviceId, string serviceName, TimeSlot slot, Money price,
+        string? notes)
     {
-        var appointment = new Appointment(tenantId, customerId, resourceId, serviceId, serviceName, slot, price, notes?.Trim());
+        var appointment = new Appointment(tenantId, customerId, resourceId, unitId, serviceId, serviceName, slot, price, notes?.Trim());
         appointment.Raise(new AppointmentScheduledDomainEvent(appointment.Id, tenantId, resourceId, slot.StartUtc, slot.EndUtc));
 
         return Result.Success(appointment);

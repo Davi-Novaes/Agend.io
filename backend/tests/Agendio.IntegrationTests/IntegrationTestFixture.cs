@@ -256,7 +256,7 @@ public sealed class IntegrationTestFixture : WebApplicationFactory<Program>, IAs
             .UseNpgsql(OwnerConnectionString)
             .UseSnakeCaseNamingConvention();
 
-        return new TenancyDbContext(optionsBuilder.Options);
+        return new TenancyDbContext(optionsBuilder.Options, new NullTenantContext());
     }
 
     private IdentityDbContext CreateIdentityDbContext()

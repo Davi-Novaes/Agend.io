@@ -24,6 +24,11 @@ public sealed class ResourceConfiguration : IEntityTypeConfiguration<Resource>
         builder.Property(r => r.Type).HasConversion<string>().HasMaxLength(20).IsRequired();
         builder.Property(r => r.Capacity).IsRequired();
         builder.Property(r => r.Description).HasMaxLength(2000);
+
+        // Guid cru, sem FK de banco (cross-schema, mesmo motivo de
+        // Appointment.ResourceId nao ter FK para resources.resources).
+        builder.Property(r => r.UnitId);
+
         builder.Property(r => r.IsActive).IsRequired();
 
         // Colecao de Value Objects sem identidade propria — tabela filha, FK

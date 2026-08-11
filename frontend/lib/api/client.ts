@@ -428,6 +428,7 @@ export type ResourceSummary = {
   capacity: number;
   description: string | null;
   isActive: boolean;
+  unitId: string | null;
 };
 
 export type ResourceDetails = ResourceSummary & {
@@ -439,6 +440,7 @@ export type ResourceInput = {
   type: ResourceType;
   capacity: number;
   description?: string | null;
+  unitId?: string | null;
 };
 
 export function listResources(
@@ -472,6 +474,40 @@ export function setResourceWorkingHours(
   return request(`/api/resources/${id}/working-hours`, { method: "PUT", body: JSON.stringify({ entries }) }, accessToken);
 }
 
+// ---------- Units ----------
+
+export type UnitSummary = {
+  id: string;
+  name: string;
+  address: string | null;
+  isActive: boolean;
+};
+
+export type UnitInput = {
+  name: string;
+  address?: string | null;
+};
+
+export function listUnits(accessToken: string): Promise<UnitSummary[]> {
+  return request("/api/units", {}, accessToken);
+}
+
+export function getUnitById(id: string, accessToken: string): Promise<UnitSummary> {
+  return request(`/api/units/${id}`, {}, accessToken);
+}
+
+export function createUnit(input: UnitInput, accessToken: string): Promise<{ id: string }> {
+  return request("/api/units", { method: "POST", body: JSON.stringify(input) }, accessToken);
+}
+
+export function updateUnit(id: string, input: UnitInput, accessToken: string): Promise<void> {
+  return request(`/api/units/${id}`, { method: "PUT", body: JSON.stringify(input) }, accessToken);
+}
+
+export function setUnitActiveStatus(id: string, isActive: boolean, accessToken: string): Promise<void> {
+  return request(`/api/units/${id}/status`, { method: "PATCH", body: JSON.stringify({ isActive }) }, accessToken);
+}
+
 // ---------- Scheduling (Agenda) ----------
 
 export type AppointmentStatus =
@@ -487,6 +523,7 @@ export type AppointmentSummary = {
   id: string;
   customerId: string;
   resourceId: string;
+  unitId: string | null;
   serviceId: string;
   serviceName: string;
   startUtc: string;
@@ -508,12 +545,15 @@ export type ScheduleAppointmentInput = {
 };
 
 export function listAppointments(
-  params: { fromUtc: string; toUtc: string; resourceId?: string },
+  params: { fromUtc: string; toUtc: string; resourceId?: string; unitId?: string },
   accessToken: string
 ): Promise<AppointmentSummary[]> {
   const query = new URLSearchParams({ from: params.fromUtc, to: params.toUtc });
   if (params.resourceId) {
     query.set("resourceId", params.resourceId);
+  }
+  if (params.unitId) {
+    query.set("unitId", params.unitId);
   }
   return request(`/api/appointments?${query.toString()}`, {}, accessToken);
 }

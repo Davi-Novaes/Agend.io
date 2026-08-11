@@ -20,6 +20,7 @@
     <ProjectReference Include="..\..\..\shared\Agendio.SharedKernel\Agendio.SharedKernel.csproj" />
     <ProjectReference Include="..\..\..\shared\Agendio.Infrastructure\Agendio.Infrastructure.csproj" />
     <ProjectReference Include="..\Agendio.Modules.Resources.Contracts\Agendio.Modules.Resources.Contracts.csproj" />
+    <ProjectReference Include="..\..\Tenancy\Agendio.Modules.Tenancy.Contracts\Agendio.Modules.Tenancy.Contracts.csproj" />
   </ItemGroup>
 
 </Project>

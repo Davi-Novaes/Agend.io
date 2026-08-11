@@ -130,6 +130,69 @@ public class ResourceTests(IntegrationTestFixture fixture)
     }
 
     [Fact]
+    public async Task Creating_A_Resource_Without_A_UnitId_Should_Succeed()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var client = fixture.CreateClient();
+        var accessToken = await CreateTenantWithOwnerAndLoginAsync(client, cancellationToken);
+
+        var response = await AuthorizedRequestHelpers.PostAuthorizedAsync(
+            client, accessToken, "/api/resources",
+            new { name = "Sala Unica", type = "Room", capacity = 1, description = (string?)null },
+            cancellationToken);
+
+        response.StatusCode.ShouldBe(HttpStatusCode.Created);
+    }
+
+    [Fact]
+    public async Task Creating_A_Resource_With_A_UnitId_From_Another_Tenant_Should_Be_Rejected()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var client = fixture.CreateClient();
+
+        var tenantAToken = await CreateTenantWithOwnerAndLoginAsync(client, cancellationToken);
+        var tenantBToken = await CreateTenantWithOwnerAndLoginAsync(client, cancellationToken);
+
+        var unitResponse = await AuthorizedRequestHelpers.PostAuthorizedAsync(
+            client, tenantAToken, "/api/units", new { name = "Unidade do Tenant A", address = (string?)null }, cancellationToken);
+        var unitBody = await unitResponse.Content.ReadFromJsonAsync<JsonElement>(cancellationToken);
+        var unitId = unitBody.GetProperty("id").GetGuid();
+
+        var response = await AuthorizedRequestHelpers.PostAuthorizedAsync(
+            client, tenantBToken, "/api/resources",
+            new { name = "Recurso", type = "Room", capacity = 1, description = (string?)null, unitId },
+            cancellationToken);
+
+        response.StatusCode.ShouldBe(HttpStatusCode.BadRequest);
+    }
+
+    [Fact]
+    public async Task Creating_A_Resource_With_A_Valid_UnitId_Should_Succeed_And_Roundtrip()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var client = fixture.CreateClient();
+        var accessToken = await CreateTenantWithOwnerAndLoginAsync(client, cancellationToken);
+
+        var unitResponse = await AuthorizedRequestHelpers.PostAuthorizedAsync(
+            client, accessToken, "/api/units", new { name = "Unidade Centro", address = (string?)null }, cancellationToken);
+        var unitBody = await unitResponse.Content.ReadFromJsonAsync<JsonElement>(cancellationToken);
+        var unitId = unitBody.GetProperty("id").GetGuid();
+
+        var createResponse = await AuthorizedRequestHelpers.PostAuthorizedAsync(
+            client, accessToken, "/api/resources",
+            new { name = "Cadeira 1", type = "Room", capacity = 1, description = (string?)null, unitId },
+            cancellationToken);
+        createResponse.StatusCode.ShouldBe(HttpStatusCode.Created);
+        var createBody = await createResponse.Content.ReadFromJsonAsync<JsonElement>(cancellationToken);
+        var resourceId = createBody.GetProperty("id").GetGuid();
+
+        var getResponse = await AuthorizedRequestHelpers.GetAuthorizedAsync(
+            client, accessToken, $"/api/resources/{resourceId}", cancellationToken);
+        var getBody = await getResponse.Content.ReadFromJsonAsync<JsonElement>(cancellationToken);
+        getBody.GetProperty("unitId").GetGuid().ShouldBe(unitId);
+    }
+
+    [Fact]
     public async Task A_Tenant_Should_Never_See_A_Resource_Or_Its_Working_Hours_From_Another_Tenant()
     {
         var cancellationToken = TestContext.Current.CancellationToken;

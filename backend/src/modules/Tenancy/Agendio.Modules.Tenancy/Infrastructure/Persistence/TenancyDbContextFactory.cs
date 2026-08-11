@@ -1,3 +1,4 @@
+using Agendio.Infrastructure.Multitenancy;
 using Agendio.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Design;
@@ -23,6 +24,6 @@ public sealed class TenancyDbContextFactory : IDesignTimeDbContextFactory<Tenanc
         optionsBuilder.UseNpgsql(connectionString);
         optionsBuilder.UseSnakeCaseNamingConvention();
 
-        return new TenancyDbContext(optionsBuilder.Options);
+        return new TenancyDbContext(optionsBuilder.Options, new NullTenantContext());
     }
 }

@@ -20,11 +20,16 @@ public sealed class ListAppointmentsQueryHandler(SchedulingDbContext dbContext)
             query = query.Where(a => a.ResourceId == resourceId);
         }
 
+        if (request.UnitId is { } unitId)
+        {
+            query = query.Where(a => a.UnitId == unitId);
+        }
+
         var appointments = await query.OrderBy(a => a.Slot.StartUtc).ToListAsync(cancellationToken);
 
         IReadOnlyList<AppointmentSummary> items = appointments
             .Select(a => new AppointmentSummary(
-                a.Id.Value, a.CustomerId, a.ResourceId, a.ServiceId, a.ServiceName,
+                a.Id.Value, a.CustomerId, a.ResourceId, a.UnitId, a.ServiceId, a.ServiceName,
                 a.Slot.StartUtc, a.Slot.EndUtc, a.Status.ToString(), a.Price.Amount, a.Price.Currency, a.Notes))
             .ToList();
 

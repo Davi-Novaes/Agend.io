@@ -1,7 +1,12 @@
 using Agendio.Infrastructure.Endpoints;
 using Agendio.Modules.Tenancy.Application.CreateTenant;
+using Agendio.Modules.Tenancy.Application.CreateUnit;
+using Agendio.Modules.Tenancy.Application.GetUnitById;
+using Agendio.Modules.Tenancy.Application.ListUnits;
+using Agendio.Modules.Tenancy.Application.SetUnitActiveStatus;
 using Agendio.Modules.Tenancy.Application.UpdateTenantBranding;
 using Agendio.Modules.Tenancy.Application.UpdateTenantLogo;
+using Agendio.Modules.Tenancy.Application.UpdateUnit;
 using Agendio.Modules.Tenancy.Contracts;
 using Agendio.Modules.Tenancy.Domain;
 using Agendio.SharedKernel.Messaging;
@@ -89,7 +94,61 @@ public sealed class TenancyEndpoints : IEndpointModule
         .RequireAuthorization(policy => policy.RequireRole("Owner"))
         .WithName("UpdateTenantLogo")
         .WithSummary("Faz upload do logo do estabelecimento (PNG/JPEG/WEBP, ate 2MB).");
+
+        var units = endpoints.MapGroup("/api/units").WithTags("Units").RequireAuthorization(policy => policy.RequireRole("Owner"));
+
+        units.MapGet("/", async (IDispatcher dispatcher, CancellationToken cancellationToken) =>
+        {
+            var result = await dispatcher.Query(new ListUnitsQuery(), cancellationToken);
+            return result.IsSuccess ? Results.Ok(result.Value) : result.Error.ToProblemResult();
+        })
+        .WithName("ListUnits")
+        .WithSummary("Lista as unidades do estabelecimento.");
+
+        units.MapGet("/{id:guid}", async (Guid id, IDispatcher dispatcher, CancellationToken cancellationToken) =>
+        {
+            var result = await dispatcher.Query(new GetUnitByIdQuery(id), cancellationToken);
+            return result.IsSuccess ? Results.Ok(result.Value) : result.Error.ToProblemResult();
+        })
+        .WithName("GetUnitById")
+        .WithSummary("Busca uma unidade pelo Id.");
+
+        units.MapPost("/", async (CreateUnitRequest request, IDispatcher dispatcher, CancellationToken cancellationToken) =>
+        {
+            var command = new CreateUnitCommand(request.Name, request.Address);
+            var result = await dispatcher.Send(command, cancellationToken);
+
+            return result.IsSuccess
+                ? Results.Created($"/api/units/{result.Value}", new { id = result.Value })
+                : result.Error.ToProblemResult();
+        })
+        .WithName("CreateUnit")
+        .WithSummary("Cadastra uma nova unidade do estabelecimento.");
+
+        units.MapPut("/{id:guid}", async (Guid id, UpdateUnitRequest request, IDispatcher dispatcher, CancellationToken cancellationToken) =>
+        {
+            var command = new UpdateUnitCommand(id, request.Name, request.Address);
+            var result = await dispatcher.Send(command, cancellationToken);
+
+            return result.IsSuccess ? Results.NoContent() : result.Error.ToProblemResult();
+        })
+        .WithName("UpdateUnit")
+        .WithSummary("Atualiza os dados de uma unidade.");
+
+        units.MapPatch("/{id:guid}/status", async (Guid id, SetUnitStatusRequest request, IDispatcher dispatcher, CancellationToken cancellationToken) =>
+        {
+            var result = await dispatcher.Send(new SetUnitActiveStatusCommand(id, request.IsActive), cancellationToken);
+            return result.IsSuccess ? Results.NoContent() : result.Error.ToProblemResult();
+        })
+        .WithName("SetUnitActiveStatus")
+        .WithSummary("Ativa ou desativa uma unidade.");
     }
+
+    private sealed record CreateUnitRequest(string Name, string? Address);
+
+    private sealed record UpdateUnitRequest(string Name, string? Address);
+
+    private sealed record SetUnitStatusRequest(bool IsActive);
 
     private static object ToResponse(BusinessTypeDefinition definition) => new
     {

@@ -22,6 +22,7 @@ import {
   listResources,
   listCustomers,
   listServices,
+  listUnits,
   ApiError,
   type AppointmentSummary,
   type AppointmentStatus,
@@ -127,6 +128,7 @@ export default function AgendaPage() {
   const [view, setView] = React.useState<"day" | "week" | "month">("day");
   const [currentDate, setCurrentDate] = React.useState(() => startOfDay(new Date()));
   const [selectedResourceId, setSelectedResourceId] = React.useState<string | null>(null);
+  const [selectedUnitId, setSelectedUnitId] = React.useState<string | null>(null);
   const [createDialogState, setCreateDialogState] = React.useState<{ resourceId: string; start: Date } | null>(null);
   const [selectedAppointmentId, setSelectedAppointmentId] = React.useState<string | null>(null);
   const [reschedulingOpen, setReschedulingOpen] = React.useState(false);
@@ -158,10 +160,21 @@ export default function AgendaPage() {
     enabled: Boolean(session),
   });
 
-  const activeResources = React.useMemo(
-    () => (resourcesQuery.data?.items ?? []).filter((r) => r.isActive),
-    [resourcesQuery.data]
-  );
+  const unitsQuery = useQuery({
+    queryKey: ["units"],
+    queryFn: () => listUnits(accessToken),
+    enabled: Boolean(session),
+  });
+
+  // O filtro de unidade so aparece com mais de uma cadastrada — tenant de
+  // unidade unica nao deveria ver um controle inutil (CLAUDE.md: defaults
+  // sensatos sem o dono precisar configurar nada).
+  const showUnitFilter = (unitsQuery.data?.length ?? 0) > 1;
+
+  const activeResources = React.useMemo(() => {
+    const active = (resourcesQuery.data?.items ?? []).filter((r) => r.isActive);
+    return showUnitFilter && selectedUnitId ? active.filter((r) => r.unitId === selectedUnitId) : active;
+  }, [resourcesQuery.data, showUnitFilter, selectedUnitId]);
 
   // Deriva o recurso selecionado em vez de sincronizar via efeito: evita um
   // re-render em cascata so para aplicar o default assim que os recursos chegam.
@@ -183,7 +196,12 @@ export default function AgendaPage() {
   const appointmentsQuery = useQuery({
     queryKey: [
       "appointments",
-      { from: range.from.toISOString(), to: range.to.toISOString(), resourceId: view === "week" ? resolvedResourceId : undefined },
+      {
+        from: range.from.toISOString(),
+        to: range.to.toISOString(),
+        resourceId: view === "week" ? resolvedResourceId : undefined,
+        unitId: showUnitFilter ? selectedUnitId : undefined,
+      },
     ],
     queryFn: () =>
       listAppointments(
@@ -191,6 +209,7 @@ export default function AgendaPage() {
           fromUtc: range.from.toISOString(),
           toUtc: range.to.toISOString(),
           resourceId: view === "week" ? (resolvedResourceId ?? undefined) : undefined,
+          unitId: showUnitFilter && selectedUnitId ? selectedUnitId : undefined,
         },
         accessToken
       ),
@@ -533,6 +552,26 @@ export default function AgendaPage() {
           <p className="text-muted-foreground mt-1 text-sm capitalize">{rangeLabel}</p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
+          {showUnitFilter && (
+            <Select
+              value={selectedUnitId ?? undefined}
+              onValueChange={(value) => {
+                setSelectedUnitId(value);
+                setSelectedResourceId(null);
+              }}
+            >
+              <SelectTrigger className="w-40">
+                <SelectValue placeholder="Todas as unidades" />
+              </SelectTrigger>
+              <SelectContent>
+                {(unitsQuery.data ?? []).map((unit) => (
+                  <SelectItem key={unit.id} value={unit.id}>
+                    {unit.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          )}
           {view === "week" && (
             <Select value={resolvedResourceId ?? undefined} onValueChange={setSelectedResourceId}>
               <SelectTrigger className="w-40">

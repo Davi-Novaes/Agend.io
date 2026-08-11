@@ -14,4 +14,5 @@ public sealed record ResourceDetails(
     int Capacity,
     string? Description,
     bool IsActive,
+    Guid? UnitId,
     IReadOnlyList<WorkingHourEntryDetails> WorkingHours);

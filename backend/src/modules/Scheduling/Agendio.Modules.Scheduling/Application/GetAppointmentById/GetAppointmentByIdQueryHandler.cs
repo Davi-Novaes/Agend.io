@@ -19,8 +19,8 @@ public sealed class GetAppointmentByIdQueryHandler(SchedulingDbContext dbContext
         }
 
         var details = new AppointmentDetails(
-            appointment.Id.Value, appointment.CustomerId, appointment.ResourceId, appointment.ServiceId, appointment.ServiceName,
-            appointment.Slot.StartUtc, appointment.Slot.EndUtc, appointment.Status.ToString(),
+            appointment.Id.Value, appointment.CustomerId, appointment.ResourceId, appointment.UnitId, appointment.ServiceId,
+            appointment.ServiceName, appointment.Slot.StartUtc, appointment.Slot.EndUtc, appointment.Status.ToString(),
             appointment.Price.Amount, appointment.Price.Currency, appointment.Notes);
 
         return Result.Success(details);

@@ -21,7 +21,8 @@ internal sealed class ResourceLookupService(ResourcesDbContext dbContext) : IRes
             .Select(w => new WorkingHourLookup(w.DayOfWeek, w.StartTime, w.EndTime))
             .ToList();
 
-        return new ResourceLookupResult(resource.Id.Value, resource.Name, resource.Type.ToString(), resource.Capacity, resource.IsActive, workingHours);
+        return new ResourceLookupResult(
+            resource.Id.Value, resource.Name, resource.Type.ToString(), resource.Capacity, resource.IsActive, workingHours, resource.UnitId);
     }
 
     public async Task<IReadOnlyList<ResourceLookupResult>> ListActiveByTypeAsync(string type, CancellationToken cancellationToken = default)
@@ -39,7 +40,7 @@ internal sealed class ResourceLookupService(ResourcesDbContext dbContext) : IRes
         return resources
             .Select(r => new ResourceLookupResult(
                 r.Id.Value, r.Name, r.Type.ToString(), r.Capacity, r.IsActive,
-                r.WorkingHours.Select(w => new WorkingHourLookup(w.DayOfWeek, w.StartTime, w.EndTime)).ToList()))
+                r.WorkingHours.Select(w => new WorkingHourLookup(w.DayOfWeek, w.StartTime, w.EndTime)).ToList(), r.UnitId))
             .ToList();
     }
 }

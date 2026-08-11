@@ -312,6 +312,74 @@ public class SchedulingTests(IntegrationTestFixture fixture)
     }
 
     [Fact]
+    public async Task Scheduling_An_Appointment_Should_Snapshot_The_Resource_Unit_At_The_Time_Of_Booking()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var client = fixture.CreateClient();
+        var accessToken = await CreateTenantWithOwnerAndLoginAsync(client, cancellationToken);
+
+        var unitAId = await CreateUnitAsync(client, accessToken, "Unidade A", cancellationToken);
+        var unitBId = await CreateUnitAsync(client, accessToken, "Unidade B", cancellationToken);
+
+        var customerId = await CreateCustomerAsync(client, accessToken, cancellationToken);
+        var resourceId = await CreateResourceInUnitAsync(client, accessToken, "Cadeira 1", unitAId, cancellationToken);
+        var serviceId = await CreateServiceAsync(client, accessToken, "Corte", 40.00m, cancellationToken);
+
+        var appointmentId = await ScheduleAppointmentAsync(
+            client, accessToken, customerId, resourceId, serviceId, DateTimeOffset.UtcNow.AddDays(1), cancellationToken);
+
+        var beforeMoveResponse = await AuthorizedRequestHelpers.GetAuthorizedAsync(
+            client, accessToken, $"/api/appointments/{appointmentId}", cancellationToken);
+        var beforeMoveBody = await beforeMoveResponse.Content.ReadFromJsonAsync<JsonElement>(cancellationToken);
+        beforeMoveBody.GetProperty("unitId").GetGuid().ShouldBe(unitAId);
+
+        // Move o recurso para a unidade B DEPOIS do agendamento ja criado.
+        var updateResourceResponse = await AuthorizedRequestHelpers.PutAuthorizedAsync(
+            client, accessToken, $"/api/resources/{resourceId}",
+            new { name = "Cadeira 1", type = "Room", capacity = 1, description = (string?)null, unitId = unitBId },
+            cancellationToken);
+        updateResourceResponse.StatusCode.ShouldBe(HttpStatusCode.NoContent);
+
+        var afterMoveResponse = await AuthorizedRequestHelpers.GetAuthorizedAsync(
+            client, accessToken, $"/api/appointments/{appointmentId}", cancellationToken);
+        var afterMoveBody = await afterMoveResponse.Content.ReadFromJsonAsync<JsonElement>(cancellationToken);
+        afterMoveBody.GetProperty("unitId").GetGuid().ShouldBe(unitAId);
+    }
+
+    [Fact]
+    public async Task Listing_Appointments_Should_Filter_By_UnitId()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var client = fixture.CreateClient();
+        var accessToken = await CreateTenantWithOwnerAndLoginAsync(client, cancellationToken);
+
+        var unitAId = await CreateUnitAsync(client, accessToken, "Unidade A", cancellationToken);
+        var unitBId = await CreateUnitAsync(client, accessToken, "Unidade B", cancellationToken);
+
+        var customerId = await CreateCustomerAsync(client, accessToken, cancellationToken);
+        var resourceAId = await CreateResourceInUnitAsync(client, accessToken, "Cadeira A", unitAId, cancellationToken);
+        var resourceBId = await CreateResourceInUnitAsync(client, accessToken, "Cadeira B", unitBId, cancellationToken);
+        var serviceId = await CreateServiceAsync(client, accessToken, "Corte", 40.00m, cancellationToken);
+
+        var startAtUtc = DateTimeOffset.UtcNow.AddDays(1);
+        await ScheduleAppointmentAsync(client, accessToken, customerId, resourceAId, serviceId, startAtUtc, cancellationToken);
+        await ScheduleAppointmentAsync(client, accessToken, customerId, resourceBId, serviceId, startAtUtc.AddHours(2), cancellationToken);
+
+        var from = startAtUtc.AddHours(-1);
+        var to = startAtUtc.AddDays(1);
+
+        var response = await AuthorizedRequestHelpers.GetAuthorizedAsync(
+            client, accessToken,
+            $"/api/appointments?from={Uri.EscapeDataString(from.ToString("O"))}&to={Uri.EscapeDataString(to.ToString("O"))}&unitId={unitAId}",
+            cancellationToken);
+        response.StatusCode.ShouldBe(HttpStatusCode.OK);
+
+        var body = await response.Content.ReadFromJsonAsync<JsonElement>(cancellationToken);
+        body.GetArrayLength().ShouldBe(1);
+        body[0].GetProperty("resourceId").GetGuid().ShouldBe(resourceAId);
+    }
+
+    [Fact]
     public async Task Anonymous_Request_To_List_Appointments_Should_Be_Unauthorized()
     {
         var cancellationToken = TestContext.Current.CancellationToken;
@@ -338,6 +406,24 @@ public class SchedulingTests(IntegrationTestFixture fixture)
     {
         var response = await AuthorizedRequestHelpers.PostAuthorizedAsync(
             client, accessToken, "/api/resources", new { name, type = "Room", capacity = 1, description = (string?)null }, cancellationToken);
+        var body = await response.Content.ReadFromJsonAsync<JsonElement>(cancellationToken);
+        return body.GetProperty("id").GetGuid();
+    }
+
+    private static async Task<Guid> CreateUnitAsync(HttpClient client, string accessToken, string name, CancellationToken cancellationToken)
+    {
+        var response = await AuthorizedRequestHelpers.PostAuthorizedAsync(
+            client, accessToken, "/api/units", new { name, address = (string?)null }, cancellationToken);
+        var body = await response.Content.ReadFromJsonAsync<JsonElement>(cancellationToken);
+        return body.GetProperty("id").GetGuid();
+    }
+
+    private static async Task<Guid> CreateResourceInUnitAsync(
+        HttpClient client, string accessToken, string name, Guid unitId, CancellationToken cancellationToken)
+    {
+        var response = await AuthorizedRequestHelpers.PostAuthorizedAsync(
+            client, accessToken, "/api/resources",
+            new { name, type = "Room", capacity = 1, description = (string?)null, unitId }, cancellationToken);
         var body = await response.Content.ReadFromJsonAsync<JsonElement>(cancellationToken);
         return body.GetProperty("id").GetGuid();
     }
