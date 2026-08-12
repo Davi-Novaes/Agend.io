@@ -17,6 +17,8 @@ import {
 import { useSession } from "@/lib/auth/session-context";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Skeleton } from "@/components/ui/skeleton";
 import {
   Form,
   FormControl,
@@ -77,48 +79,67 @@ export default function TeamSettingsPage() {
   });
 
   return (
-    <div className="mx-auto flex w-full max-w-lg flex-1 flex-col">
-      <p className="text-muted-foreground mb-6 text-sm">
+    <div className="mx-auto flex w-full max-w-lg flex-1 flex-col gap-6">
+      <p className="text-muted-foreground text-sm">
         Membros com acesso ao painel do seu estabelecimento.
       </p>
 
-      <section className="mb-8">
-        <h2 className="mb-2 text-sm font-medium">Membros</h2>
-        <ul className="divide-border divide-y rounded-lg border">
-          {membersQuery.data?.map((member) => (
-            <li key={member.id} className="flex items-center justify-between gap-3 p-3 text-sm">
-              <div>
-                <p className="font-medium">{member.fullName}</p>
-                <p className="text-muted-foreground">{member.email}</p>
-              </div>
-              <span className="bg-muted rounded-full px-2 py-0.5 text-xs">
-                {member.role === "Owner" ? "Dono" : "Equipe"}
-              </span>
-            </li>
-          ))}
-        </ul>
-      </section>
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">Membros</CardTitle>
+        </CardHeader>
+        <CardContent>
+          {membersQuery.isLoading ? (
+            <div className="flex flex-col gap-3">
+              {Array.from({ length: 2 }).map((_, index) => (
+                <Skeleton key={index} className="h-12 w-full rounded-lg" />
+              ))}
+            </div>
+          ) : (
+            <ul className="divide-border divide-y rounded-lg border">
+              {membersQuery.data?.map((member) => (
+                <li key={member.id} className="flex items-center justify-between gap-3 p-3 text-sm">
+                  <div>
+                    <p className="font-medium">{member.fullName}</p>
+                    <p className="text-muted-foreground">{member.email}</p>
+                  </div>
+                  <span className="bg-muted rounded-full px-2 py-0.5 text-xs">
+                    {member.role === "Owner" ? "Dono" : "Equipe"}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          )}
+        </CardContent>
+      </Card>
 
       {isOwner && (
         <>
           {invitationsQuery.data && invitationsQuery.data.length > 0 && (
-            <section className="mb-8">
-              <h2 className="mb-2 text-sm font-medium">Convites pendentes</h2>
-              <ul className="divide-border divide-y rounded-lg border">
-                {invitationsQuery.data.map((invitation) => (
-                  <li key={invitation.id} className="flex items-center justify-between gap-3 p-3 text-sm">
-                    <span>{invitation.email}</span>
-                    <span className="text-muted-foreground text-xs">
-                      expira em {new Date(invitation.expiresAtUtc).toLocaleDateString("pt-BR")}
-                    </span>
-                  </li>
-                ))}
-              </ul>
-            </section>
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-base">Convites pendentes</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <ul className="divide-border divide-y rounded-lg border">
+                  {invitationsQuery.data.map((invitation) => (
+                    <li key={invitation.id} className="flex items-center justify-between gap-3 p-3 text-sm">
+                      <span>{invitation.email}</span>
+                      <span className="text-muted-foreground text-xs">
+                        expira em {new Date(invitation.expiresAtUtc).toLocaleDateString("pt-BR")}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              </CardContent>
+            </Card>
           )}
 
-          <section>
-            <h2 className="mb-2 text-sm font-medium">Convidar alguem</h2>
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base">Convidar alguem</CardTitle>
+            </CardHeader>
+            <CardContent>
             <Form {...form}>
               <form
                 onSubmit={form.handleSubmit((values) => inviteMutation.mutate(values))}
@@ -180,7 +201,8 @@ export default function TeamSettingsPage() {
             <p className="text-muted-foreground mt-2 text-xs">
               Envio automatico por e-mail chega em uma proxima etapa — por enquanto, compartilhe o link acima.
             </p>
-          </section>
+            </CardContent>
+          </Card>
         </>
       )}
     </div>

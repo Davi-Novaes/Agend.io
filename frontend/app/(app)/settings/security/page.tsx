@@ -14,6 +14,8 @@ import { getMfaStatus, setupMfa, enableMfa, disableMfa, ApiError, type SetupMfaR
 import { useSession } from "@/lib/auth/session-context";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Card, CardContent } from "@/components/ui/card";
+import { Skeleton } from "@/components/ui/skeleton";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 
 const confirmSchema = z.object({
@@ -113,9 +115,10 @@ export default function SecuritySettingsPage() {
       </p>
 
       {step === "idle" && (
-        <section className="rounded-lg border p-4">
+        <Card>
+        <CardContent className="p-4">
           {statusQuery.isLoading ? (
-            <p className="text-muted-foreground text-sm">Carregando...</p>
+            <Skeleton className="h-16 w-full" />
           ) : statusQuery.data?.mfaEnabled ? (
             <>
               <p className="text-sm">
@@ -137,11 +140,13 @@ export default function SecuritySettingsPage() {
               </Button>
             </>
           )}
-        </section>
+        </CardContent>
+        </Card>
       )}
 
       {step === "setup" && pendingSetup && (
-        <section className="rounded-lg border p-4">
+        <Card>
+        <CardContent className="p-4">
           <h2 className="mb-2 text-sm font-medium">1. Escaneie o QR code</h2>
           <p className="text-muted-foreground mb-3 text-sm">
             Use um aplicativo autenticador (Google Authenticator, Authy, 1Password...).
@@ -188,11 +193,13 @@ export default function SecuritySettingsPage() {
               </div>
             </form>
           </Form>
-        </section>
+        </CardContent>
+        </Card>
       )}
 
       {step === "recovery-codes" && (
-        <section className="rounded-lg border p-4">
+        <Card>
+        <CardContent className="p-4">
           <h2 className="mb-2 text-sm font-medium">MFA habilitado — guarde seus códigos de recuperação</h2>
           <p className="text-muted-foreground mb-3 text-sm">
             Cada código funciona uma única vez e serve para entrar caso você perca acesso ao aplicativo
@@ -232,11 +239,13 @@ export default function SecuritySettingsPage() {
           <Button className="mt-4" disabled={!recoveryCodesAcknowledged} onClick={() => setStep("idle")}>
             Concluir
           </Button>
-        </section>
+        </CardContent>
+        </Card>
       )}
 
       {step === "disable" && (
-        <section className="rounded-lg border p-4">
+        <Card>
+        <CardContent className="p-4">
           <h2 className="mb-2 text-sm font-medium">Desabilitar MFA</h2>
           <p className="text-muted-foreground mb-3 text-sm">
             Confirme sua senha e um código (do aplicativo autenticador ou de recuperação).
@@ -279,7 +288,8 @@ export default function SecuritySettingsPage() {
               </div>
             </form>
           </Form>
-        </section>
+        </CardContent>
+        </Card>
       )}
     </div>
   );

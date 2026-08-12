@@ -19,6 +19,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Skeleton } from "@/components/ui/skeleton";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 
 const subscribeSchema = z.object({
@@ -34,6 +35,13 @@ const STATUS_LABELS: Record<string, string> = {
   Active: "Ativa",
   PastDue: "Pagamento atrasado",
   Canceled: "Cancelada",
+};
+
+const STATUS_VARIANTS: Record<string, "success" | "info" | "destructive" | "secondary"> = {
+  Trialing: "info",
+  Active: "success",
+  PastDue: "destructive",
+  Canceled: "secondary",
 };
 
 function daysUntil(isoDate: string): number {
@@ -105,13 +113,20 @@ export default function BillingSettingsPage() {
       <p className="text-muted-foreground mb-6 text-sm">Acompanhe o status do seu plano no Agendio.</p>
 
       {subscriptionQuery.isLoading ? (
-        <p className="text-muted-foreground text-sm">Carregando...</p>
+        <Card className="mb-6">
+          <CardHeader>
+            <Skeleton className="h-6 w-40" />
+          </CardHeader>
+          <CardContent>
+            <Skeleton className="h-4 w-full" />
+          </CardContent>
+        </Card>
       ) : subscription ? (
         <Card className="mb-6">
           <CardHeader>
             <div className="flex items-center justify-between gap-2">
               <CardTitle>{subscription.planName}</CardTitle>
-              <Badge variant={subscription.status === "Active" ? "default" : "secondary"}>
+              <Badge variant={STATUS_VARIANTS[subscription.status] ?? "secondary"}>
                 {STATUS_LABELS[subscription.status] ?? subscription.status}
               </Badge>
             </div>

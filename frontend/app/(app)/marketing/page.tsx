@@ -6,14 +6,17 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { toast } from "sonner";
-import { Send } from "lucide-react";
+import { Megaphone, Send } from "lucide-react";
 
 import { sendCampaign, listCampaigns, ApiError } from "@/lib/api/client";
 import { useSession } from "@/lib/auth/session-context";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import { Card, CardContent } from "@/components/ui/card";
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from "@/components/ui/table";
+import { Skeleton } from "@/components/ui/skeleton";
+import { EmptyState } from "@/components/ui/empty-state";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 
@@ -92,47 +95,68 @@ export default function MarketingPage() {
         </Button>
       </div>
 
-      <div className="rounded-lg border">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Assunto</TableHead>
-              <TableHead>Enviada em</TableHead>
-              <TableHead className="text-right">Destinatarios</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {listQuery.data?.items.length === 0 && (
+      <Card>
+        <CardContent className="flex flex-col gap-4">
+          <Table>
+            <TableHeader>
               <TableRow>
-                <TableCell colSpan={3} className="text-muted-foreground py-6 text-center">
-                  Nenhuma campanha enviada ainda.
-                </TableCell>
+                <TableHead>Assunto</TableHead>
+                <TableHead>Enviada em</TableHead>
+                <TableHead className="text-right">Destinatarios</TableHead>
               </TableRow>
-            )}
-            {listQuery.data?.items.map((campaign) => (
-              <TableRow key={campaign.id}>
-                <TableCell className="font-medium">{campaign.subject}</TableCell>
-                <TableCell>{formatDateTime(campaign.sentAtUtc)}</TableCell>
-                <TableCell className="text-right tabular-nums">{campaign.recipientCount}</TableCell>
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
-      </div>
+            </TableHeader>
+            <TableBody>
+              {listQuery.isLoading ? (
+                Array.from({ length: 5 }).map((_, index) => (
+                  <TableRow key={index}>
+                    <TableCell><Skeleton className="h-4 w-48" /></TableCell>
+                    <TableCell><Skeleton className="h-4 w-32" /></TableCell>
+                    <TableCell className="text-right"><Skeleton className="ml-auto h-4 w-16" /></TableCell>
+                  </TableRow>
+                ))
+              ) : listQuery.data?.items.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={3} className="p-0">
+                    <EmptyState
+                      icon={Megaphone}
+                      title="Nenhuma campanha enviada ainda"
+                      description="Envie sua primeira campanha por e-mail para os clientes ativos."
+                      action={
+                        <Button size="sm" onClick={openCreateDialog}>
+                          <Send className="size-4" />
+                          Nova campanha
+                        </Button>
+                      }
+                    />
+                  </TableCell>
+                </TableRow>
+              ) : (
+                listQuery.data?.items.map((campaign) => (
+                  <TableRow key={campaign.id}>
+                    <TableCell className="font-medium">{campaign.subject}</TableCell>
+                    <TableCell>{formatDateTime(campaign.sentAtUtc)}</TableCell>
+                    <TableCell className="text-right tabular-nums">{campaign.recipientCount}</TableCell>
+                  </TableRow>
+                ))
+              )}
+            </TableBody>
+          </Table>
 
-      <div className="mt-4 flex items-center justify-between text-sm">
-        <span className="text-muted-foreground">
-          Pagina {listQuery.data?.page ?? page} de {totalPages}
-        </span>
-        <div className="flex gap-2">
-          <Button variant="outline" size="sm" disabled={page <= 1} onClick={() => setPage((current) => current - 1)}>
-            Anterior
-          </Button>
-          <Button variant="outline" size="sm" disabled={page >= totalPages} onClick={() => setPage((current) => current + 1)}>
-            Proxima
-          </Button>
-        </div>
-      </div>
+          <div className="flex items-center justify-between text-sm">
+            <span className="text-muted-foreground">
+              Pagina {listQuery.data?.page ?? page} de {totalPages}
+            </span>
+            <div className="flex gap-2">
+              <Button variant="outline" size="sm" disabled={page <= 1} onClick={() => setPage((current) => current - 1)}>
+                Anterior
+              </Button>
+              <Button variant="outline" size="sm" disabled={page >= totalPages} onClick={() => setPage((current) => current + 1)}>
+                Proxima
+              </Button>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
 
       <Dialog open={formDialogOpen} onOpenChange={setFormDialogOpen}>
         <DialogContent className="sm:max-w-md">
