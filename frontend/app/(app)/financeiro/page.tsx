@@ -6,7 +6,8 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { toast } from "sonner";
-import { Plus } from "lucide-react";
+import Link from "next/link";
+import { Plus, Inbox, ListFilter, Receipt, Users } from "lucide-react";
 
 import {
   listAccountsReceivable,
@@ -31,6 +32,8 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from "@/components/ui/table";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Skeleton } from "@/components/ui/skeleton";
+import { EmptyState } from "@/components/ui/empty-state";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
@@ -51,6 +54,18 @@ const PAYABLE_STATUS_LABELS: Record<AccountPayableStatus, string> = {
   Pending: "Pendente",
   Paid: "Pago",
   Cancelled: "Cancelado",
+};
+
+const RECEIVABLE_STATUS_VARIANTS: Record<AccountReceivableStatus, "secondary" | "success" | "destructive"> = {
+  Pending: "secondary",
+  Received: "success",
+  Cancelled: "destructive",
+};
+
+const PAYABLE_STATUS_VARIANTS: Record<AccountPayableStatus, "secondary" | "success" | "destructive"> = {
+  Pending: "secondary",
+  Paid: "success",
+  Cancelled: "destructive",
 };
 
 const EXPENSE_CATEGORIES: ExpenseCategory[] = ["Rent", "Supplies", "Commission", "Salary", "Utilities", "Marketing", "Other"];
@@ -139,7 +154,11 @@ function ResumoTab({ accessToken }: { accessToken: string }) {
             <CardTitle className="text-muted-foreground text-sm font-normal">Entradas</CardTitle>
           </CardHeader>
           <CardContent>
-            <p className="text-2xl font-semibold">{summary ? formatCurrency(summary.totalReceived) : "—"}</p>
+            {summaryQuery.isLoading ? (
+              <Skeleton className="h-8 w-32" />
+            ) : (
+              <p className="text-2xl font-semibold">{summary ? formatCurrency(summary.totalReceived) : "—"}</p>
+            )}
           </CardContent>
         </Card>
         <Card>
@@ -147,7 +166,11 @@ function ResumoTab({ accessToken }: { accessToken: string }) {
             <CardTitle className="text-muted-foreground text-sm font-normal">Saidas</CardTitle>
           </CardHeader>
           <CardContent>
-            <p className="text-2xl font-semibold">{summary ? formatCurrency(summary.totalPaid) : "—"}</p>
+            {summaryQuery.isLoading ? (
+              <Skeleton className="h-8 w-32" />
+            ) : (
+              <p className="text-2xl font-semibold">{summary ? formatCurrency(summary.totalPaid) : "—"}</p>
+            )}
           </CardContent>
         </Card>
         <Card>
@@ -155,12 +178,20 @@ function ResumoTab({ accessToken }: { accessToken: string }) {
             <CardTitle className="text-muted-foreground text-sm font-normal">Saldo</CardTitle>
           </CardHeader>
           <CardContent>
-            <p className="text-2xl font-semibold">{summary ? formatCurrency(summary.netBalance) : "—"}</p>
+            {summaryQuery.isLoading ? (
+              <Skeleton className="h-8 w-32" />
+            ) : (
+              <p className="text-2xl font-semibold">{summary ? formatCurrency(summary.netBalance) : "—"}</p>
+            )}
           </CardContent>
         </Card>
       </div>
 
-      {summary && <CashFlowChart seriesByMonth={summary.seriesByMonth} categoryBreakdown={summary.categoryBreakdown} />}
+      {summaryQuery.isLoading ? (
+        <Skeleton className="h-64 rounded-lg lg:col-span-2" />
+      ) : summary ? (
+        <CashFlowChart seriesByMonth={summary.seriesByMonth} categoryBreakdown={summary.categoryBreakdown} />
+      ) : null}
     </div>
   );
 }
@@ -189,7 +220,8 @@ function ContasAReceberTab({ accessToken }: { accessToken: string }) {
   const totalPages = Math.max(1, Math.ceil((listQuery.data?.totalCount ?? 0) / PAGE_SIZE));
 
   return (
-    <div className="flex flex-col gap-4">
+    <Card>
+      <CardContent className="flex flex-col gap-4">
       <div className="flex justify-end">
         <Select value={status} onValueChange={(value) => { setStatus(value as AccountReceivableStatus | "all"); setPage(1); }}>
           <SelectTrigger className="w-44">
@@ -206,7 +238,6 @@ function ContasAReceberTab({ accessToken }: { accessToken: string }) {
         </Select>
       </div>
 
-      <div className="rounded-lg border">
         <Table>
           <TableHeader>
             <TableRow>
@@ -218,20 +249,47 @@ function ContasAReceberTab({ accessToken }: { accessToken: string }) {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {listQuery.data?.items.length === 0 && (
+            {listQuery.isLoading ? (
+              Array.from({ length: 5 }).map((_, index) => (
+                <TableRow key={index}>
+                  <TableCell><Skeleton className="h-4 w-40" /></TableCell>
+                  <TableCell><Skeleton className="h-4 w-24" /></TableCell>
+                  <TableCell className="text-right"><Skeleton className="ml-auto h-4 w-24" /></TableCell>
+                  <TableCell><Skeleton className="h-5 w-20 rounded-full" /></TableCell>
+                  <TableCell className="text-right"><Skeleton className="ml-auto h-4 w-28" /></TableCell>
+                </TableRow>
+              ))
+            ) : listQuery.data?.items.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={5} className="text-muted-foreground py-6 text-center">
-                  Nenhuma conta a receber encontrada.
+                <TableCell colSpan={5} className="p-0">
+                  {status !== "all" ? (
+                    <EmptyState
+                      icon={ListFilter}
+                      title={`Nenhuma conta a receber com status "${RECEIVABLE_STATUS_LABELS[status]}"`}
+                      description="Tente outro filtro de status."
+                      action={
+                        <Button variant="outline" size="sm" onClick={() => { setStatus("all"); setPage(1); }}>
+                          Limpar filtro
+                        </Button>
+                      }
+                    />
+                  ) : (
+                    <EmptyState
+                      icon={Inbox}
+                      title="Nenhuma conta a receber registrada"
+                      description="Contas a receber sao geradas automaticamente quando um agendamento e concluido."
+                    />
+                  )}
                 </TableCell>
               </TableRow>
-            )}
-            {listQuery.data?.items.map((item) => (
+            ) : (
+              listQuery.data?.items.map((item) => (
               <TableRow key={item.id}>
                 <TableCell className="font-medium">{item.description}</TableCell>
                 <TableCell>{formatDate(item.dueDate)}</TableCell>
                 <TableCell className="text-right tabular-nums">{formatCurrency(item.amount)}</TableCell>
                 <TableCell>
-                  <Badge variant={item.status === "Received" ? "default" : "outline"}>{RECEIVABLE_STATUS_LABELS[item.status]}</Badge>
+                  <Badge variant={RECEIVABLE_STATUS_VARIANTS[item.status]}>{RECEIVABLE_STATUS_LABELS[item.status]}</Badge>
                 </TableCell>
                 <TableCell className="text-right">
                   {item.status === "Pending" && (
@@ -241,10 +299,10 @@ function ContasAReceberTab({ accessToken }: { accessToken: string }) {
                   )}
                 </TableCell>
               </TableRow>
-            ))}
+              ))
+            )}
           </TableBody>
         </Table>
-      </div>
 
       <div className="flex items-center justify-between text-sm">
         <span className="text-muted-foreground">
@@ -259,7 +317,8 @@ function ContasAReceberTab({ accessToken }: { accessToken: string }) {
           </Button>
         </div>
       </div>
-    </div>
+      </CardContent>
+    </Card>
   );
 }
 
@@ -322,7 +381,9 @@ function ContasAPagarTab({ accessToken }: { accessToken: string }) {
   const totalPages = Math.max(1, Math.ceil((listQuery.data?.totalCount ?? 0) / PAGE_SIZE));
 
   return (
-    <div className="flex flex-col gap-4">
+    <>
+    <Card>
+      <CardContent className="flex flex-col gap-4">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div className="flex gap-2">
           <Select value={status} onValueChange={(value) => { setStatus(value as AccountPayableStatus | "all"); setPage(1); }}>
@@ -363,7 +424,6 @@ function ContasAPagarTab({ accessToken }: { accessToken: string }) {
         </Button>
       </div>
 
-      <div className="rounded-lg border">
         <Table>
           <TableHeader>
             <TableRow>
@@ -376,21 +436,59 @@ function ContasAPagarTab({ accessToken }: { accessToken: string }) {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {listQuery.data?.items.length === 0 && (
+            {listQuery.isLoading ? (
+              Array.from({ length: 5 }).map((_, index) => (
+                <TableRow key={index}>
+                  <TableCell><Skeleton className="h-4 w-40" /></TableCell>
+                  <TableCell><Skeleton className="h-4 w-24" /></TableCell>
+                  <TableCell><Skeleton className="h-4 w-24" /></TableCell>
+                  <TableCell className="text-right"><Skeleton className="ml-auto h-4 w-24" /></TableCell>
+                  <TableCell><Skeleton className="h-5 w-20 rounded-full" /></TableCell>
+                  <TableCell className="text-right"><Skeleton className="ml-auto h-4 w-28" /></TableCell>
+                </TableRow>
+              ))
+            ) : listQuery.data?.items.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={6} className="text-muted-foreground py-6 text-center">
-                  Nenhuma conta a pagar encontrada.
+                <TableCell colSpan={6} className="p-0">
+                  {status !== "all" || category !== "all" ? (
+                    <EmptyState
+                      icon={ListFilter}
+                      title="Nenhuma conta a pagar encontrada para este filtro"
+                      description="Tente ajustar o status ou a categoria."
+                      action={
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => { setStatus("all"); setCategory("all"); setPage(1); }}
+                        >
+                          Limpar filtros
+                        </Button>
+                      }
+                    />
+                  ) : (
+                    <EmptyState
+                      icon={Receipt}
+                      title="Nenhuma conta a pagar registrada"
+                      description="Lance sua primeira despesa para comecar a acompanhar as saidas."
+                      action={
+                        <Button size="sm" onClick={() => { form.reset(emptyExpenseForm); setDialogOpen(true); }}>
+                          <Plus className="size-4" />
+                          Nova despesa
+                        </Button>
+                      }
+                    />
+                  )}
                 </TableCell>
               </TableRow>
-            )}
-            {listQuery.data?.items.map((item) => (
+            ) : (
+              listQuery.data?.items.map((item) => (
               <TableRow key={item.id}>
                 <TableCell className="font-medium">{item.description}</TableCell>
                 <TableCell>{CATEGORY_LABELS[item.category]}</TableCell>
                 <TableCell>{formatDate(item.dueDate)}</TableCell>
                 <TableCell className="text-right tabular-nums">{formatCurrency(item.amount)}</TableCell>
                 <TableCell>
-                  <Badge variant={item.status === "Paid" ? "default" : "outline"}>{PAYABLE_STATUS_LABELS[item.status]}</Badge>
+                  <Badge variant={PAYABLE_STATUS_VARIANTS[item.status]}>{PAYABLE_STATUS_LABELS[item.status]}</Badge>
                 </TableCell>
                 <TableCell className="text-right">
                   {item.status === "Pending" && (
@@ -405,10 +503,10 @@ function ContasAPagarTab({ accessToken }: { accessToken: string }) {
                   )}
                 </TableCell>
               </TableRow>
-            ))}
+              ))
+            )}
           </TableBody>
         </Table>
-      </div>
 
       <div className="flex items-center justify-between text-sm">
         <span className="text-muted-foreground">
@@ -423,6 +521,8 @@ function ContasAPagarTab({ accessToken }: { accessToken: string }) {
           </Button>
         </div>
       </div>
+      </CardContent>
+    </Card>
 
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
         <DialogContent className="sm:max-w-md">
@@ -505,7 +605,7 @@ function ContasAPagarTab({ accessToken }: { accessToken: string }) {
           </Form>
         </DialogContent>
       </Dialog>
-    </div>
+    </>
   );
 }
 
@@ -560,12 +660,13 @@ function ComissoesTab({ accessToken }: { accessToken: string }) {
   }
 
   return (
-    <div className="flex flex-col gap-4">
+    <>
+    <Card>
+      <CardContent className="flex flex-col gap-4">
       <p className="text-muted-foreground text-sm">
         Uma regra por profissional — aplicada a todos os servicos que ele presta.
       </p>
 
-      <div className="rounded-lg border">
         <Table>
           <TableHeader>
             <TableRow>
@@ -575,14 +676,31 @@ function ComissoesTab({ accessToken }: { accessToken: string }) {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {rulesQuery.data?.length === 0 && (
+            {rulesQuery.isLoading ? (
+              Array.from({ length: 5 }).map((_, index) => (
+                <TableRow key={index}>
+                  <TableCell><Skeleton className="h-4 w-40" /></TableCell>
+                  <TableCell><Skeleton className="h-4 w-20" /></TableCell>
+                  <TableCell className="text-right"><Skeleton className="ml-auto h-4 w-24" /></TableCell>
+                </TableRow>
+              ))
+            ) : rulesQuery.data?.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={3} className="text-muted-foreground py-6 text-center">
-                  Nenhum profissional cadastrado ainda.
+                <TableCell colSpan={3} className="p-0">
+                  <EmptyState
+                    icon={Users}
+                    title="Nenhum profissional cadastrado ainda"
+                    description="Cadastre profissionais em Recursos para configurar a comissao de cada um."
+                    action={
+                      <Button asChild size="sm">
+                        <Link href="/recursos">Ir para Recursos</Link>
+                      </Button>
+                    }
+                  />
                 </TableCell>
               </TableRow>
-            )}
-            {rulesQuery.data?.map((resource) => (
+            ) : (
+              rulesQuery.data?.map((resource) => (
               <TableRow key={resource.resourceId}>
                 <TableCell className="font-medium">{resource.resourceName}</TableCell>
                 <TableCell>
@@ -610,10 +728,12 @@ function ComissoesTab({ accessToken }: { accessToken: string }) {
                   </div>
                 </TableCell>
               </TableRow>
-            ))}
+              ))
+            )}
           </TableBody>
         </Table>
-      </div>
+      </CardContent>
+    </Card>
 
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
         <DialogContent className="sm:max-w-sm">
@@ -665,6 +785,6 @@ function ComissoesTab({ accessToken }: { accessToken: string }) {
           </Form>
         </DialogContent>
       </Dialog>
-    </div>
+    </>
   );
 }

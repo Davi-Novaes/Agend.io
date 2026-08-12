@@ -7,7 +7,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { toast } from "sonner";
-import { ChevronLeft, ChevronRight } from "lucide-react";
+import { ChevronLeft, ChevronRight, Users } from "lucide-react";
 
 import {
   listAppointments,
@@ -31,9 +31,13 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
+import { Card, CardContent } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+import { Skeleton } from "@/components/ui/skeleton";
+import { EmptyState } from "@/components/ui/empty-state";
 
 const DAY_START_HOUR = 7;
 const DAY_END_HOUR = 21;
@@ -52,14 +56,26 @@ const STATUS_LABELS: Record<AppointmentStatus, string> = {
   CancelledByStaff: "Cancelado (equipe)",
 };
 
-const STATUS_VARIANTS: Record<AppointmentStatus, "default" | "secondary" | "outline" | "destructive"> = {
+const STATUS_VARIANTS: Record<AppointmentStatus, "secondary" | "info" | "default" | "success" | "destructive"> = {
   Scheduled: "secondary",
-  Confirmed: "default",
+  Confirmed: "info",
   InProgress: "default",
-  Completed: "outline",
+  Completed: "success",
   NoShow: "destructive",
   CancelledByCustomer: "destructive",
   CancelledByStaff: "destructive",
+};
+
+// Mesmo agrupamento bom/ruim de components/dashboard/appointment-status-chart.tsx (Etapa 3),
+// aplicado como tom de fundo em vez de paleta fixa de status — aqui e badge de UI, nao mark de grafico.
+const CHIP_TONE: Record<AppointmentStatus, string> = {
+  Scheduled: "bg-secondary/70 text-secondary-foreground border-transparent",
+  Confirmed: "bg-info/10 text-info border-info/30",
+  InProgress: "bg-primary/10 text-primary border-primary/30",
+  Completed: "bg-muted text-muted-foreground opacity-70 border-l-4 border-l-success",
+  NoShow: "bg-muted text-muted-foreground opacity-70 border-l-4 border-l-destructive",
+  CancelledByCustomer: "bg-muted text-muted-foreground opacity-70 border-l-4 border-l-destructive",
+  CancelledByStaff: "bg-muted text-muted-foreground opacity-70 border-l-4 border-l-destructive",
 };
 
 const RESCHEDULABLE_STATUSES: AppointmentStatus[] = ["Scheduled", "Confirmed"];
@@ -358,7 +374,7 @@ export default function AgendaPage() {
     const slotCount = TOTAL_MINUTES / SLOT_MINUTES;
 
     return (
-      <div className="overflow-x-auto rounded-lg border">
+      <div className="overflow-x-auto rounded-lg">
         <div className="grid" style={{ gridTemplateColumns: `4rem repeat(${columns.length}, minmax(9rem, 1fr))` }}>
           <div className="border-b border-r" />
           {columns.map((column) => (
@@ -415,7 +431,6 @@ export default function AgendaPage() {
                   const end = new Date(appointment.endUtc);
                   const top = (minutesFromDayStart(start) / SLOT_MINUTES) * ROW_HEIGHT_PX;
                   const height = Math.max(((end.getTime() - start.getTime()) / 60000 / SLOT_MINUTES) * ROW_HEIGHT_PX, ROW_HEIGHT_PX / 2);
-                  const isCancelledOrDone = !RESCHEDULABLE_STATUSES.includes(appointment.status) && appointment.status !== "InProgress";
 
                   return (
                     <button
@@ -428,9 +443,7 @@ export default function AgendaPage() {
                         event.stopPropagation();
                         openDetailDialog(appointment.id);
                       }}
-                      className={`absolute inset-x-0.5 z-10 overflow-hidden rounded-md border p-1 text-left text-[11px] leading-tight shadow-sm ${
-                        isCancelledOrDone ? "bg-muted text-muted-foreground opacity-70" : "bg-primary/10 border-primary/30"
-                      }`}
+                      className={`absolute inset-x-0.5 z-10 overflow-hidden rounded-md border p-1 text-left text-[11px] leading-tight shadow-sm ${CHIP_TONE[appointment.status]}`}
                       style={{ top, height }}
                     >
                       <p className="truncate font-medium">{customerNameById.get(appointment.customerId) ?? "Cliente"}</p>
@@ -478,6 +491,9 @@ export default function AgendaPage() {
                 setCurrentDate(startOfDay(day));
                 setView("day");
               }}
+              aria-label={`${day.toLocaleDateString("pt-BR", { weekday: "long", day: "2-digit", month: "long", year: "numeric" })}${
+                dayAppointments.length > 0 ? `, ${dayAppointments.length} agendamento(s)` : ""
+              }`}
               className={`min-h-24 rounded-lg border p-2 text-left text-xs hover:bg-muted/50 ${isCurrentMonth ? "" : "text-muted-foreground opacity-50"}`}
             >
               <p className="mb-1 font-medium">{day.getDate()}</p>
@@ -527,83 +543,100 @@ export default function AgendaPage() {
     }
   }
 
+  const isLoadingGrid = resourcesQuery.isLoading || appointmentsQuery.isLoading;
+
   return (
     <div className="mx-auto flex w-full max-w-6xl flex-1 flex-col">
-      <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
-        <p className="text-muted-foreground text-sm capitalize">{rangeLabel}</p>
-        <div className="flex flex-wrap items-center gap-2">
-          {showUnitFilter && (
-            <Select
-              value={selectedUnitId ?? undefined}
-              onValueChange={(value) => {
-                setSelectedUnitId(value);
-                setSelectedResourceId(null);
-              }}
-            >
-              <SelectTrigger className="w-40">
-                <SelectValue placeholder="Todas as unidades" />
-              </SelectTrigger>
-              <SelectContent>
-                {(unitsQuery.data ?? []).map((unit) => (
-                  <SelectItem key={unit.id} value={unit.id}>
-                    {unit.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          )}
-          {view === "week" && (
-            <Select value={resolvedResourceId ?? undefined} onValueChange={setSelectedResourceId}>
-              <SelectTrigger className="w-40">
-                <SelectValue placeholder="Recurso" />
-              </SelectTrigger>
-              <SelectContent>
-                {activeResources.map((resource) => (
-                  <SelectItem key={resource.id} value={resource.id}>
-                    {resource.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          )}
-          <div className="flex overflow-hidden rounded-lg border">
-            <Button variant="ghost" size="sm" className="rounded-none" onClick={() => navigate(-1)} aria-label="Anterior">
-              <ChevronLeft className="size-4" />
-            </Button>
-            <Button variant="ghost" size="sm" className="rounded-none border-x" onClick={() => setCurrentDate(startOfDay(new Date()))}>
-              Hoje
-            </Button>
-            <Button variant="ghost" size="sm" className="rounded-none" onClick={() => navigate(1)} aria-label="Proximo">
-              <ChevronRight className="size-4" />
-            </Button>
-          </div>
-          <div className="flex overflow-hidden rounded-lg border">
-            {(["day", "week", "month"] as const).map((option) => (
-              <Button
-                key={option}
-                variant={view === option ? "default" : "ghost"}
-                size="sm"
-                className="rounded-none"
-                onClick={() => setView(option)}
-              >
-                {option === "day" ? "Dia" : option === "week" ? "Semana" : "Mes"}
-              </Button>
-            ))}
-          </div>
-        </div>
-      </div>
+      <Card>
+        <CardContent className="flex flex-col gap-6">
+          <Tabs value={view} onValueChange={(value) => setView(value as typeof view)}>
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <p className="text-muted-foreground text-sm capitalize">{rangeLabel}</p>
+              <div className="flex flex-wrap items-center gap-2">
+                {showUnitFilter && (
+                  <Select
+                    value={selectedUnitId ?? undefined}
+                    onValueChange={(value) => {
+                      setSelectedUnitId(value);
+                      setSelectedResourceId(null);
+                    }}
+                  >
+                    <SelectTrigger className="w-40" aria-label="Filtrar por unidade">
+                      <SelectValue placeholder="Todas as unidades" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {(unitsQuery.data ?? []).map((unit) => (
+                        <SelectItem key={unit.id} value={unit.id}>
+                          {unit.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                )}
+                {view === "week" && (
+                  <Select value={resolvedResourceId ?? undefined} onValueChange={setSelectedResourceId}>
+                    <SelectTrigger className="w-40" aria-label="Filtrar por recurso">
+                      <SelectValue placeholder="Recurso" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {activeResources.map((resource) => (
+                        <SelectItem key={resource.id} value={resource.id}>
+                          {resource.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                )}
+                <div className="flex overflow-hidden rounded-lg border">
+                  <Button variant="ghost" size="sm" className="rounded-none" onClick={() => navigate(-1)} aria-label="Anterior">
+                    <ChevronLeft className="size-4" />
+                  </Button>
+                  <Button variant="ghost" size="sm" className="rounded-none border-x" onClick={() => setCurrentDate(startOfDay(new Date()))}>
+                    Hoje
+                  </Button>
+                  <Button variant="ghost" size="sm" className="rounded-none" onClick={() => navigate(1)} aria-label="Proximo">
+                    <ChevronRight className="size-4" />
+                  </Button>
+                </div>
+                <TabsList>
+                  <TabsTrigger value="day">Dia</TabsTrigger>
+                  <TabsTrigger value="week">Semana</TabsTrigger>
+                  <TabsTrigger value="month">Mes</TabsTrigger>
+                </TabsList>
+              </div>
+            </div>
 
-      {activeResources.length === 0 ? (
-        <p className="text-muted-foreground text-sm">
-          Cadastre ao menos um recurso ativo em <Link href="/recursos" className="underline">Recursos</Link> para comecar a agendar.
-        </p>
-      ) : view === "month" ? (
-        renderMonthView()
-      ) : view === "day" ? (
-        renderTimeGrid(dayColumns)
-      ) : (
-        renderTimeGrid(weekColumns)
-      )}
+            {isLoadingGrid ? (
+              view === "month" ? (
+                <div className="grid grid-cols-7 gap-2">
+                  {Array.from({ length: 42 }).map((_, index) => (
+                    <Skeleton key={index} className="min-h-24 rounded-lg" />
+                  ))}
+                </div>
+              ) : (
+                <Skeleton className="h-[500px] rounded-lg" />
+              )
+            ) : activeResources.length === 0 ? (
+              <EmptyState
+                icon={Users}
+                title="Nenhum recurso ativo"
+                description="Cadastre ao menos um recurso ativo para comecar a agendar."
+                action={
+                  <Button asChild size="sm">
+                    <Link href="/recursos">Ir para Recursos</Link>
+                  </Button>
+                }
+              />
+            ) : (
+              <>
+                <TabsContent value="day">{renderTimeGrid(dayColumns)}</TabsContent>
+                <TabsContent value="week">{renderTimeGrid(weekColumns)}</TabsContent>
+                <TabsContent value="month">{renderMonthView()}</TabsContent>
+              </>
+            )}
+          </Tabs>
+        </CardContent>
+      </Card>
 
       <Dialog open={Boolean(createDialogState)} onOpenChange={(open) => !open && setCreateDialogState(null)}>
         <DialogContent className="sm:max-w-md">
