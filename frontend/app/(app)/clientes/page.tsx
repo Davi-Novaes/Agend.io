@@ -6,7 +6,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { toast } from "sonner";
-import { Plus, Search, Upload } from "lucide-react";
+import { Plus, Search, Upload, Users } from "lucide-react";
 
 import {
   listCustomers,
@@ -23,7 +23,10 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
+import { Card, CardContent } from "@/components/ui/card";
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from "@/components/ui/table";
+import { Skeleton } from "@/components/ui/skeleton";
+import { EmptyState } from "@/components/ui/empty-state";
 import {
   Dialog,
   DialogContent,
@@ -215,91 +218,137 @@ export default function CustomersPage() {
         </div>
       </div>
 
-      <div className="mb-4 flex gap-2">
-        <Input
-          placeholder="Buscar por nome..."
-          value={searchInput}
-          onChange={(event) => setSearchInput(event.target.value)}
-          onKeyDown={(event) => {
-            if (event.key === "Enter") {
-              setPage(1);
-              setSearch(searchInput);
-            }
-          }}
-        />
-        <Button
-          variant="outline"
-          onClick={() => {
-            setPage(1);
-            setSearch(searchInput);
-          }}
-        >
-          <Search className="size-4" />
-        </Button>
-      </div>
+      <Card>
+        <CardContent className="flex flex-col gap-4">
+          <div className="flex gap-2">
+            <Input
+              placeholder="Buscar por nome..."
+              value={searchInput}
+              onChange={(event) => setSearchInput(event.target.value)}
+              onKeyDown={(event) => {
+                if (event.key === "Enter") {
+                  setPage(1);
+                  setSearch(searchInput);
+                }
+              }}
+            />
+            <Button
+              variant="outline"
+              size="icon"
+              aria-label="Buscar clientes"
+              onClick={() => {
+                setPage(1);
+                setSearch(searchInput);
+              }}
+            >
+              <Search className="size-4" />
+            </Button>
+          </div>
 
-      <div className="rounded-lg border">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Nome</TableHead>
-              <TableHead>E-mail</TableHead>
-              <TableHead>Telefone</TableHead>
-              <TableHead>Status</TableHead>
-              <TableHead className="text-right">Acoes</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {customersQuery.data?.items.length === 0 && (
+          <Table>
+            <TableHeader>
               <TableRow>
-                <TableCell colSpan={5} className="text-muted-foreground py-6 text-center">
-                  Nenhum cliente encontrado.
-                </TableCell>
+                <TableHead>Nome</TableHead>
+                <TableHead>E-mail</TableHead>
+                <TableHead>Telefone</TableHead>
+                <TableHead>Status</TableHead>
+                <TableHead className="text-right">Acoes</TableHead>
               </TableRow>
-            )}
-            {customersQuery.data?.items.map((customer) => (
-              <TableRow key={customer.id}>
-                <TableCell className="font-medium">{customer.fullName}</TableCell>
-                <TableCell>{customer.email ?? "—"}</TableCell>
-                <TableCell>{customer.phone ?? "—"}</TableCell>
-                <TableCell>
-                  <Badge variant={customer.isActive ? "default" : "outline"}>
-                    {customer.isActive ? "Ativo" : "Inativo"}
-                  </Badge>
-                </TableCell>
-                <TableCell className="text-right">
-                  <div className="flex justify-end gap-2">
-                    <Button variant="ghost" size="sm" onClick={() => openEditDialog(customer)}>
-                      Editar
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => statusMutation.mutate({ id: customer.id, isActive: !customer.isActive })}
-                    >
-                      {customer.isActive ? "Desativar" : "Ativar"}
-                    </Button>
-                  </div>
-                </TableCell>
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
-      </div>
+            </TableHeader>
+            <TableBody>
+              {customersQuery.isLoading ? (
+                Array.from({ length: 5 }).map((_, index) => (
+                  <TableRow key={index}>
+                    <TableCell><Skeleton className="h-4 w-32" /></TableCell>
+                    <TableCell><Skeleton className="h-4 w-40" /></TableCell>
+                    <TableCell><Skeleton className="h-4 w-24" /></TableCell>
+                    <TableCell><Skeleton className="h-5 w-14 rounded-full" /></TableCell>
+                    <TableCell className="text-right"><Skeleton className="ml-auto h-4 w-20" /></TableCell>
+                  </TableRow>
+                ))
+              ) : customersQuery.data?.items.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={5} className="p-0">
+                    {search ? (
+                      <EmptyState
+                        icon={Search}
+                        title={`Nenhum cliente encontrado para "${search}"`}
+                        description="Tente ajustar os termos da busca ou limpe o filtro."
+                        action={
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => {
+                              setSearchInput("");
+                              setSearch("");
+                              setPage(1);
+                            }}
+                          >
+                            Limpar busca
+                          </Button>
+                        }
+                      />
+                    ) : (
+                      <EmptyState
+                        icon={Users}
+                        title="Nenhum cliente cadastrado ainda"
+                        description="Cadastre seu primeiro cliente ou importe uma lista via CSV."
+                        action={
+                          <Button size="sm" onClick={openCreateDialog}>
+                            <Plus className="size-4" />
+                            Novo cliente
+                          </Button>
+                        }
+                      />
+                    )}
+                  </TableCell>
+                </TableRow>
+              ) : (
+                customersQuery.data?.items.map((customer) => (
+                  <TableRow key={customer.id}>
+                    <TableCell className="font-medium">{customer.fullName}</TableCell>
+                    <TableCell>{customer.email ?? "—"}</TableCell>
+                    <TableCell>{customer.phone ?? "—"}</TableCell>
+                    <TableCell>
+                      <Badge variant={customer.isActive ? "default" : "outline"}>
+                        {customer.isActive ? "Ativo" : "Inativo"}
+                      </Badge>
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <div className="flex justify-end gap-2">
+                        <Button variant="ghost" size="sm" onClick={() => openEditDialog(customer)}>
+                          Editar
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => statusMutation.mutate({ id: customer.id, isActive: !customer.isActive })}
+                        >
+                          {customer.isActive ? "Desativar" : "Ativar"}
+                        </Button>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ))
+              )}
+            </TableBody>
+          </Table>
 
-      <div className="mt-4 flex items-center justify-between text-sm">
-        <span className="text-muted-foreground">
-          Pagina {customersQuery.data?.page ?? page} de {totalPages}
-        </span>
-        <div className="flex gap-2">
-          <Button variant="outline" size="sm" disabled={page <= 1} onClick={() => setPage((current) => current - 1)}>
-            Anterior
-          </Button>
-          <Button variant="outline" size="sm" disabled={page >= totalPages} onClick={() => setPage((current) => current + 1)}>
-            Proxima
-          </Button>
-        </div>
-      </div>
+          <div className="flex items-center justify-between text-sm">
+            <span className="text-muted-foreground" aria-live="polite">
+              Pagina {customersQuery.data?.page ?? page} de {totalPages}
+            </span>
+            <div className="flex gap-2">
+              <Button variant="outline" size="sm" disabled={page <= 1} onClick={() => setPage((current) => current - 1)}>
+                Anterior
+              </Button>
+              <Button variant="outline" size="sm" disabled={page >= totalPages} onClick={() => setPage((current) => current + 1)}>
+                Proxima
+              </Button>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
 
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
         <DialogContent className="sm:max-w-md">
