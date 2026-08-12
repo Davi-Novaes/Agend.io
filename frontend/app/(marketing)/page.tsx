@@ -24,6 +24,7 @@ import {
 import { Logo } from "@/components/logo";
 import { MobileNav } from "@/components/marketing/mobile-nav";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import {
   Card,
   CardContent,
@@ -31,6 +32,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 
 export const metadata: Metadata = {
   title: "Agendio — Agendamento e gestão para o seu negócio",
@@ -186,9 +188,9 @@ export default function MarketingHomePage() {
             className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_20%_10%,color-mix(in_oklch,var(--primary),transparent_92%),transparent_55%),radial-gradient(circle_at_85%_30%,color-mix(in_oklch,var(--primary),transparent_94%),transparent_60%)]"
           />
           <div className="relative mx-auto max-w-4xl px-4 py-20 text-center sm:px-6 sm:py-28">
-            <span className="bg-accent text-accent-foreground mb-6 inline-flex items-center rounded-full px-3 py-1 text-xs font-medium">
+            <Badge variant="secondary" className="mb-6 bg-accent text-accent-foreground">
               Feito para negócios com horário marcado
-            </span>
+            </Badge>
             <h1 className="text-4xl font-semibold tracking-tight text-balance sm:text-6xl">
               O sistema de agendamento que se adapta ao seu negócio
             </h1>
@@ -197,7 +199,7 @@ export default function MarketingHomePage() {
               barbearia, clínica, pet shop ou o que você faz, sem precisar mexer em nada técnico.
             </p>
             <div className="mt-8 flex flex-col items-center justify-center gap-3 sm:flex-row">
-              <Button size="lg" asChild>
+              <Button size="lg" asChild className="shadow-md">
                 <Link href="/onboarding">Criar minha conta grátis</Link>
               </Button>
               <Button size="lg" variant="outline" asChild>
@@ -219,13 +221,12 @@ export default function MarketingHomePage() {
             </div>
             <div className="mt-10 grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6">
               {SEGMENTS.map(({ icon: Icon, label }) => (
-                <div
-                  key={label}
-                  className="border-border flex flex-col items-center gap-2 rounded-lg border p-4 text-center"
-                >
-                  <Icon className="text-primary size-6" strokeWidth={1.75} />
-                  <span className="text-sm font-medium">{label}</span>
-                </div>
+                <Card key={label}>
+                  <CardContent className="flex flex-col items-center gap-2 text-center">
+                    <Icon className="text-primary size-6" strokeWidth={1.75} />
+                    <span className="text-sm font-medium">{label}</span>
+                  </CardContent>
+                </Card>
               ))}
             </div>
             <p className="text-muted-foreground mt-6 text-center text-sm">
@@ -268,11 +269,7 @@ export default function MarketingHomePage() {
               {PLANS.map((plan) => (
                 <Card key={plan.name} className={plan.highlighted ? "border-primary shadow-md" : undefined}>
                   <CardHeader>
-                    {plan.highlighted && (
-                      <span className="bg-primary text-primary-foreground mb-2 inline-flex w-fit items-center rounded-full px-2.5 py-0.5 text-xs font-medium">
-                        Mais escolhido
-                      </span>
-                    )}
+                    {plan.highlighted && <Badge className="mb-2">Mais escolhido</Badge>}
                     <CardTitle className="text-lg">{plan.name}</CardTitle>
                     <CardDescription>{plan.description}</CardDescription>
                     <p className="pt-2">
@@ -308,16 +305,14 @@ export default function MarketingHomePage() {
             <h2 className="text-center text-2xl font-semibold tracking-tight sm:text-3xl">
               Perguntas frequentes
             </h2>
-            <div className="mt-8 grid gap-3">
+            <Accordion type="multiple" className="mt-8 grid gap-3">
               {FAQ.map(({ question, answer }) => (
-                <details key={question} className="group border-border rounded-lg border bg-background p-4">
-                  <summary className="cursor-pointer list-none font-medium marker:content-none">
-                    {question}
-                  </summary>
-                  <p className="text-muted-foreground mt-2 text-sm">{answer}</p>
-                </details>
+                <AccordionItem key={question} value={question} className="border-border rounded-lg border bg-background px-4">
+                  <AccordionTrigger>{question}</AccordionTrigger>
+                  <AccordionContent className="text-muted-foreground">{answer}</AccordionContent>
+                </AccordionItem>
               ))}
-            </div>
+            </Accordion>
           </div>
         </section>
 
