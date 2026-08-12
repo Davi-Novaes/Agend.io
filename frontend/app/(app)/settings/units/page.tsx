@@ -1,14 +1,12 @@
 "use client";
 
 import * as React from "react";
-import { useRouter } from "next/navigation";
-import Link from "next/link";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { toast } from "sonner";
-import { ArrowLeft, Plus } from "lucide-react";
+import { Plus } from "lucide-react";
 
 import { listUnits, createUnit, updateUnit, setUnitActiveStatus, ApiError, type UnitSummary } from "@/lib/api/client";
 import { useSession } from "@/lib/auth/session-context";
@@ -32,18 +30,11 @@ function toNullable(value: string): string | null {
 }
 
 export default function UnitsSettingsPage() {
-  const router = useRouter();
   const { session } = useSession();
   const queryClient = useQueryClient();
 
   const [dialogOpen, setDialogOpen] = React.useState(false);
   const [editingUnit, setEditingUnit] = React.useState<UnitSummary | null>(null);
-
-  React.useEffect(() => {
-    if (!session) {
-      router.replace("/login");
-    }
-  }, [session, router]);
 
   const accessToken = session?.accessToken ?? "";
 
@@ -103,24 +94,12 @@ export default function UnitsSettingsPage() {
     setDialogOpen(true);
   }
 
-  if (!session) {
-    return null;
-  }
-
   return (
-    <main className="mx-auto flex min-h-full w-full max-w-2xl flex-1 flex-col p-6 sm:p-10">
-      <Link href="/painel" className="text-muted-foreground mb-6 inline-flex items-center gap-1.5 text-sm hover:text-foreground">
-        <ArrowLeft className="size-4" />
-        Voltar
-      </Link>
-
+    <div className="mx-auto flex w-full max-w-2xl flex-1 flex-col">
       <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h1 className="text-xl font-semibold tracking-tight">Unidades</h1>
-          <p className="text-muted-foreground mt-1 text-sm">
-            Lojas ou filiais do estabelecimento. Recursos e agendamentos podem ser vinculados a uma unidade.
-          </p>
-        </div>
+        <p className="text-muted-foreground text-sm">
+          Lojas ou filiais do estabelecimento. Recursos e agendamentos podem ser vinculados a uma unidade.
+        </p>
         <Button onClick={openCreateDialog}>
           <Plus className="size-4" />
           Nova unidade
@@ -217,6 +196,6 @@ export default function UnitsSettingsPage() {
           </Form>
         </DialogContent>
       </Dialog>
-    </main>
+    </div>
   );
 }

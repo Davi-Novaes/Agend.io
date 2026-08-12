@@ -1,14 +1,12 @@
 "use client";
 
 import * as React from "react";
-import { useRouter } from "next/navigation";
-import Link from "next/link";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { toast } from "sonner";
-import { ArrowLeft, Plus } from "lucide-react";
+import { Plus } from "lucide-react";
 
 import {
   listProducts,
@@ -86,29 +84,16 @@ type MovementFormValues = z.output<typeof movementSchema>;
 const emptyMovementForm: MovementFormInput = { type: "Entry", quantity: 1, reason: "Purchase", notes: "" };
 
 export default function EstoquePage() {
-  const router = useRouter();
   const { session } = useSession();
-
-  React.useEffect(() => {
-    if (!session) {
-      router.replace("/login");
-    }
-  }, [session, router]);
 
   if (!session) {
     return null;
   }
 
   return (
-    <main className="mx-auto flex min-h-full w-full max-w-5xl flex-1 flex-col p-6 sm:p-10">
-      <Link href="/painel" className="text-muted-foreground mb-6 inline-flex items-center gap-1.5 text-sm hover:text-foreground">
-        <ArrowLeft className="size-4" />
-        Voltar
-      </Link>
-
+    <div className="mx-auto flex w-full max-w-5xl flex-1 flex-col">
       <div className="mb-6">
-        <h1 className="text-xl font-semibold tracking-tight">Estoque</h1>
-        <p className="text-muted-foreground mt-1 text-sm">Produtos revendidos e movimentacoes de entrada e saida.</p>
+        <p className="text-muted-foreground text-sm">Produtos revendidos e movimentacoes de entrada e saida.</p>
       </div>
 
       <Tabs defaultValue="produtos">
@@ -124,7 +109,7 @@ export default function EstoquePage() {
           <MovimentacoesTab accessToken={session.accessToken} />
         </TabsContent>
       </Tabs>
-    </main>
+    </div>
   );
 }
 
