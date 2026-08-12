@@ -6,14 +6,17 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { toast } from "sonner";
-import { Plus } from "lucide-react";
+import { Building2, Plus } from "lucide-react";
 
 import { listUnits, createUnit, updateUnit, setUnitActiveStatus, ApiError, type UnitSummary } from "@/lib/api/client";
 import { useSession } from "@/lib/auth/session-context";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
+import { Card, CardContent } from "@/components/ui/card";
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from "@/components/ui/table";
+import { Skeleton } from "@/components/ui/skeleton";
+import { EmptyState } from "@/components/ui/empty-state";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 
@@ -106,50 +109,72 @@ export default function UnitsSettingsPage() {
         </Button>
       </div>
 
-      <div className="rounded-lg border">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Nome</TableHead>
-              <TableHead>Endereco</TableHead>
-              <TableHead>Status</TableHead>
-              <TableHead className="text-right">Acoes</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {unitsQuery.data?.length === 0 && (
+      <Card>
+        <CardContent>
+          <Table>
+            <TableHeader>
               <TableRow>
-                <TableCell colSpan={4} className="text-muted-foreground py-6 text-center">
-                  Nenhuma unidade cadastrada ainda.
-                </TableCell>
+                <TableHead>Nome</TableHead>
+                <TableHead>Endereco</TableHead>
+                <TableHead>Status</TableHead>
+                <TableHead className="text-right">Acoes</TableHead>
               </TableRow>
-            )}
-            {unitsQuery.data?.map((unit) => (
-              <TableRow key={unit.id}>
-                <TableCell className="font-medium">{unit.name}</TableCell>
-                <TableCell>{unit.address ?? "—"}</TableCell>
-                <TableCell>
-                  <Badge variant={unit.isActive ? "default" : "outline"}>{unit.isActive ? "Ativa" : "Inativa"}</Badge>
-                </TableCell>
-                <TableCell className="text-right">
-                  <div className="flex justify-end gap-2">
-                    <Button variant="ghost" size="sm" onClick={() => openEditDialog(unit)}>
-                      Editar
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => statusMutation.mutate({ id: unit.id, isActive: !unit.isActive })}
-                    >
-                      {unit.isActive ? "Desativar" : "Ativar"}
-                    </Button>
-                  </div>
-                </TableCell>
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
-      </div>
+            </TableHeader>
+            <TableBody>
+              {unitsQuery.isLoading ? (
+                Array.from({ length: 3 }).map((_, index) => (
+                  <TableRow key={index}>
+                    <TableCell><Skeleton className="h-4 w-32" /></TableCell>
+                    <TableCell><Skeleton className="h-4 w-48" /></TableCell>
+                    <TableCell><Skeleton className="h-5 w-14 rounded-full" /></TableCell>
+                    <TableCell className="text-right"><Skeleton className="ml-auto h-4 w-20" /></TableCell>
+                  </TableRow>
+                ))
+              ) : unitsQuery.data?.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={4} className="p-0">
+                    <EmptyState
+                      icon={Building2}
+                      title="Nenhuma unidade cadastrada ainda"
+                      description="Cadastre lojas ou filiais do seu estabelecimento."
+                      action={
+                        <Button size="sm" onClick={openCreateDialog}>
+                          <Plus className="size-4" />
+                          Nova unidade
+                        </Button>
+                      }
+                    />
+                  </TableCell>
+                </TableRow>
+              ) : (
+                unitsQuery.data?.map((unit) => (
+                  <TableRow key={unit.id}>
+                    <TableCell className="font-medium">{unit.name}</TableCell>
+                    <TableCell>{unit.address ?? "—"}</TableCell>
+                    <TableCell>
+                      <Badge variant={unit.isActive ? "default" : "outline"}>{unit.isActive ? "Ativa" : "Inativa"}</Badge>
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <div className="flex justify-end gap-2">
+                        <Button variant="ghost" size="sm" onClick={() => openEditDialog(unit)}>
+                          Editar
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => statusMutation.mutate({ id: unit.id, isActive: !unit.isActive })}
+                        >
+                          {unit.isActive ? "Desativar" : "Ativar"}
+                        </Button>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ))
+              )}
+            </TableBody>
+          </Table>
+        </CardContent>
+      </Card>
 
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
         <DialogContent className="sm:max-w-md">

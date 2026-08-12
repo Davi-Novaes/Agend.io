@@ -8,6 +8,7 @@ import { getCashFlowSummary, getAppointmentStats, getInventorySummary } from "@/
 import { useSession } from "@/lib/auth/session-context";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Skeleton } from "@/components/ui/skeleton";
 import { PeriodFilter } from "@/components/shared/period-filter";
 import { CashFlowChart, CategoryBreakdownChart } from "@/components/financeiro/cash-flow-chart";
 import { toDateOnly, startOfMonth } from "@/lib/date-utils";
@@ -53,14 +54,14 @@ function SectionHeading({ title, description }: { title: string; description: st
   );
 }
 
-function KpiCard({ label, value }: { label: string; value: React.ReactNode }) {
+function KpiCard({ label, value, isLoading }: { label: string; value: React.ReactNode; isLoading?: boolean }) {
   return (
     <Card>
       <CardHeader>
         <CardTitle className="text-muted-foreground text-sm font-normal">{label}</CardTitle>
       </CardHeader>
       <CardContent>
-        <p className="text-2xl font-semibold">{value}</p>
+        {isLoading ? <Skeleton className="h-8 w-24" /> : <p className="text-2xl font-semibold">{value}</p>}
       </CardContent>
     </Card>
   );
@@ -77,9 +78,9 @@ function FinanceiroSection({ from, to, accessToken }: { from: string; to: string
     <section className="flex flex-col gap-4">
       <SectionHeading title="Financeiro" description="Entradas, saidas e saldo no periodo selecionado." />
       <div className="grid gap-4 sm:grid-cols-3">
-        <KpiCard label="Entradas" value={summary ? formatCurrency(summary.totalReceived) : "—"} />
-        <KpiCard label="Saidas" value={summary ? formatCurrency(summary.totalPaid) : "—"} />
-        <KpiCard label="Saldo" value={summary ? formatCurrency(summary.netBalance) : "—"} />
+        <KpiCard label="Entradas" value={summary ? formatCurrency(summary.totalReceived) : "—"} isLoading={query.isLoading} />
+        <KpiCard label="Saidas" value={summary ? formatCurrency(summary.totalPaid) : "—"} isLoading={query.isLoading} />
+        <KpiCard label="Saldo" value={summary ? formatCurrency(summary.netBalance) : "—"} isLoading={query.isLoading} />
       </div>
       {summary && <CashFlowChart seriesByMonth={summary.seriesByMonth} categoryBreakdown={summary.categoryBreakdown} />}
     </section>
@@ -97,9 +98,9 @@ function AgendaSection({ from, to, accessToken }: { from: string; to: string; ac
     <section className="flex flex-col gap-4">
       <SectionHeading title="Agenda" description="Conclusao, no-show e faturamento dos agendamentos no periodo." />
       <div className="grid gap-4 sm:grid-cols-3">
-        <KpiCard label="Concluidos" value={stats ? stats.completedCount : "—"} />
-        <KpiCard label="Taxa de no-show" value={stats ? `${stats.noShowRate}%` : "—"} />
-        <KpiCard label="Taxa de cancelamento" value={stats ? `${stats.cancellationRate}%` : "—"} />
+        <KpiCard label="Concluidos" value={stats ? stats.completedCount : "—"} isLoading={query.isLoading} />
+        <KpiCard label="Taxa de no-show" value={stats ? `${stats.noShowRate}%` : "—"} isLoading={query.isLoading} />
+        <KpiCard label="Taxa de cancelamento" value={stats ? `${stats.cancellationRate}%` : "—"} isLoading={query.isLoading} />
       </div>
       {stats && (
         <div className="grid gap-4 lg:grid-cols-2">
@@ -142,9 +143,10 @@ function EstoqueSection({ accessToken }: { accessToken: string }) {
     <section className="flex flex-col gap-4">
       <SectionHeading title="Estoque" description="Situacao atual dos produtos, sem recorte por periodo." />
       <div className="grid gap-4 sm:grid-cols-3">
-        <KpiCard label="Produtos ativos" value={summary ? summary.activeProductCount : "—"} />
+        <KpiCard label="Produtos ativos" value={summary ? summary.activeProductCount : "—"} isLoading={query.isLoading} />
         <KpiCard
           label="Estoque baixo"
+          isLoading={query.isLoading}
           value={
             <span className="flex items-center gap-2">
               {summary ? summary.lowStockCount : "—"}
@@ -152,7 +154,7 @@ function EstoqueSection({ accessToken }: { accessToken: string }) {
             </span>
           }
         />
-        <KpiCard label="Valor total em estoque" value={totalValueLabel} />
+        <KpiCard label="Valor total em estoque" value={totalValueLabel} isLoading={query.isLoading} />
       </div>
       {summary && summary.lowStockCount > 0 && (
         <Link href="/estoque" className="text-primary w-fit text-sm underline-offset-4 hover:underline">
