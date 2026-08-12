@@ -1,14 +1,12 @@
 "use client";
 
 import * as React from "react";
-import { useRouter } from "next/navigation";
-import Link from "next/link";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { toast } from "sonner";
-import { ArrowLeft, Copy } from "lucide-react";
+import { Copy } from "lucide-react";
 
 import {
   listTeamMembers,
@@ -36,16 +34,9 @@ const inviteSchema = z.object({
 type InviteFormValues = z.infer<typeof inviteSchema>;
 
 export default function TeamSettingsPage() {
-  const router = useRouter();
   const { session } = useSession();
   const queryClient = useQueryClient();
   const [inviteLink, setInviteLink] = React.useState<string | null>(null);
-
-  React.useEffect(() => {
-    if (!session) {
-      router.replace("/login");
-    }
-  }, [session, router]);
 
   const accessToken = session?.accessToken ?? "";
 
@@ -85,19 +76,9 @@ export default function TeamSettingsPage() {
     defaultValues: { email: "", role: "Staff" },
   });
 
-  if (!session) {
-    return null;
-  }
-
   return (
-    <main className="mx-auto flex min-h-full w-full max-w-lg flex-1 flex-col p-6 sm:p-10">
-      <Link href="/painel" className="text-muted-foreground mb-6 inline-flex items-center gap-1.5 text-sm hover:text-foreground">
-        <ArrowLeft className="size-4" />
-        Voltar
-      </Link>
-
-      <h1 className="text-xl font-semibold tracking-tight">Equipe</h1>
-      <p className="text-muted-foreground mt-1 mb-6 text-sm">
+    <div className="mx-auto flex w-full max-w-lg flex-1 flex-col">
+      <p className="text-muted-foreground mb-6 text-sm">
         Membros com acesso ao painel do seu estabelecimento.
       </p>
 
@@ -202,6 +183,6 @@ export default function TeamSettingsPage() {
           </section>
         </>
       )}
-    </main>
+    </div>
   );
 }

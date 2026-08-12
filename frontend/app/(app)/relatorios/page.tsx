@@ -1,10 +1,8 @@
 "use client";
 
 import * as React from "react";
-import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { useQuery } from "@tanstack/react-query";
-import { ArrowLeft } from "lucide-react";
 
 import { getCashFlowSummary, getAppointmentStats, getInventorySummary } from "@/lib/api/client";
 import { useSession } from "@/lib/auth/session-context";
@@ -19,31 +17,18 @@ function formatCurrency(value: number): string {
 }
 
 export default function RelatoriosPage() {
-  const router = useRouter();
   const { session } = useSession();
   const [from, setFrom] = React.useState(() => toDateOnly(startOfMonth(new Date())));
   const [to, setTo] = React.useState(() => toDateOnly(new Date()));
-
-  React.useEffect(() => {
-    if (!session) {
-      router.replace("/login");
-    }
-  }, [session, router]);
 
   if (!session) {
     return null;
   }
 
   return (
-    <main className="mx-auto flex min-h-full w-full max-w-5xl flex-1 flex-col p-6 sm:p-10">
-      <Link href="/painel" className="text-muted-foreground mb-6 inline-flex items-center gap-1.5 text-sm hover:text-foreground">
-        <ArrowLeft className="size-4" />
-        Voltar
-      </Link>
-
+    <div className="mx-auto flex w-full max-w-5xl flex-1 flex-col">
       <div className="mb-6">
-        <h1 className="text-xl font-semibold tracking-tight">Relatorios</h1>
-        <p className="text-muted-foreground mt-1 text-sm">Visao consolidada de financeiro, agenda e estoque.</p>
+        <p className="text-muted-foreground text-sm">Visao consolidada de financeiro, agenda e estoque.</p>
       </div>
 
       <div className="mb-8">
@@ -55,7 +40,7 @@ export default function RelatoriosPage() {
         <AgendaSection from={from} to={to} accessToken={session.accessToken} />
         <EstoqueSection accessToken={session.accessToken} />
       </div>
-    </main>
+    </div>
   );
 }
 

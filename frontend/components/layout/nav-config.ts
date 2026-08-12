@@ -1,0 +1,76 @@
+import type { LucideIcon } from "lucide-react";
+import {
+  LayoutDashboard,
+  CalendarDays,
+  Users,
+  Sparkles,
+  Armchair,
+  Wallet,
+  Package,
+  BarChart3,
+  Megaphone,
+  Building2,
+  Palette,
+  UserCog,
+  CreditCard,
+  ShieldCheck,
+} from "lucide-react";
+
+export type NavItem = {
+  href: string;
+  label: string;
+  icon: LucideIcon;
+};
+
+export type NavGroup = {
+  label: string;
+  items: NavItem[];
+};
+
+// Fonte unica de navegacao — consumida pela Sidebar (grupos) e pelo Header
+// (usePathname() busca o item com href batendo, pra exibir o titulo da pagina).
+export const NAV_GROUPS: NavGroup[] = [
+  {
+    label: "Visão Geral",
+    items: [{ href: "/painel", label: "Painel", icon: LayoutDashboard }],
+  },
+  {
+    label: "Gestão",
+    items: [
+      { href: "/agenda", label: "Agenda", icon: CalendarDays },
+      { href: "/clientes", label: "Clientes", icon: Users },
+      { href: "/servicos", label: "Serviços", icon: Sparkles },
+      { href: "/recursos", label: "Recursos", icon: Armchair },
+    ],
+  },
+  {
+    label: "Financeiro",
+    items: [
+      { href: "/financeiro", label: "Financeiro", icon: Wallet },
+      { href: "/estoque", label: "Estoque", icon: Package },
+    ],
+  },
+  {
+    label: "Operação",
+    items: [{ href: "/relatorios", label: "Relatórios", icon: BarChart3 }],
+  },
+  {
+    label: "Marketing",
+    items: [{ href: "/marketing", label: "Marketing", icon: Megaphone }],
+  },
+  {
+    label: "Empresa",
+    items: [
+      { href: "/settings/units", label: "Unidades", icon: Building2 },
+      { href: "/settings/branding", label: "Marca", icon: Palette },
+      { href: "/settings/team", label: "Equipe", icon: UserCog },
+      { href: "/settings/billing", label: "Plano", icon: CreditCard },
+    ],
+  },
+  {
+    label: "Configurações",
+    items: [{ href: "/settings/security", label: "Segurança", icon: ShieldCheck }],
+  },
+];
+
+export const NAV_ITEMS: NavItem[] = NAV_GROUPS.flatMap((group) => group.items);

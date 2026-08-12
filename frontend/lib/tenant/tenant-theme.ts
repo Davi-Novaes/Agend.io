@@ -5,9 +5,9 @@ export type TenantTheme = {
   primaryForeground: string;
 };
 
-// Reaproveita o --primary/--primary-foreground padrao do shadcn (ver
+// Reaproveita o --primary/--primary-foreground padrao do design system (ver
 // app/globals.css) ate a empresa configurar uma paleta propria.
 export const DEFAULT_TENANT_THEME: TenantTheme = {
-  primary: "oklch(0.205 0 0)",
-  primaryForeground: "oklch(0.985 0 0)",
+  primary: "oklch(0.475 0.165 275)",
+  primaryForeground: "oklch(0.99 0 0)",
 };

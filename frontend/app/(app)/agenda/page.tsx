@@ -1,14 +1,13 @@
 "use client";
 
 import * as React from "react";
-import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { toast } from "sonner";
-import { ArrowLeft, ChevronLeft, ChevronRight } from "lucide-react";
+import { ChevronLeft, ChevronRight } from "lucide-react";
 
 import {
   listAppointments,
@@ -121,7 +120,6 @@ const rescheduleSchema = z.object({
 type RescheduleFormValues = z.infer<typeof rescheduleSchema>;
 
 export default function AgendaPage() {
-  const router = useRouter();
   const { session } = useSession();
   const queryClient = useQueryClient();
 
@@ -133,12 +131,6 @@ export default function AgendaPage() {
   const [selectedAppointmentId, setSelectedAppointmentId] = React.useState<string | null>(null);
   const [reschedulingOpen, setReschedulingOpen] = React.useState(false);
   const [draggingId, setDraggingId] = React.useState<string | null>(null);
-
-  React.useEffect(() => {
-    if (!session) {
-      router.replace("/login");
-    }
-  }, [session, router]);
 
   const accessToken = session?.accessToken ?? "";
 
@@ -501,10 +493,6 @@ export default function AgendaPage() {
     );
   }
 
-  if (!session) {
-    return null;
-  }
-
   const dayColumns = activeResources.map((resource) => ({
     key: resource.id,
     label: resource.name,
@@ -540,17 +528,9 @@ export default function AgendaPage() {
   }
 
   return (
-    <main className="mx-auto flex min-h-full w-full max-w-6xl flex-1 flex-col p-6 sm:p-10">
-      <Link href="/painel" className="text-muted-foreground mb-6 inline-flex items-center gap-1.5 text-sm hover:text-foreground">
-        <ArrowLeft className="size-4" />
-        Voltar
-      </Link>
-
+    <div className="mx-auto flex w-full max-w-6xl flex-1 flex-col">
       <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h1 className="text-xl font-semibold tracking-tight">Agenda</h1>
-          <p className="text-muted-foreground mt-1 text-sm capitalize">{rangeLabel}</p>
-        </div>
+        <p className="text-muted-foreground text-sm capitalize">{rangeLabel}</p>
         <div className="flex flex-wrap items-center gap-2">
           {showUnitFilter && (
             <Select
@@ -821,6 +801,6 @@ export default function AgendaPage() {
           )}
         </DialogContent>
       </Dialog>
-    </main>
+    </div>
   );
 }

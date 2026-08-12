@@ -1,10 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { useRouter } from "next/navigation";
-import Link from "next/link";
 import { toast } from "sonner";
-import { ArrowLeft } from "lucide-react";
 
 import { updateTenantBranding, uploadTenantLogo, resolveAssetUrl, ApiError } from "@/lib/api/client";
 import { meetsAaContrast, contrastRatio } from "@/lib/tenant/contrast";
@@ -25,7 +22,6 @@ function toHex(oklchOrHex: string): string {
 }
 
 export default function BrandingSettingsPage() {
-  const router = useRouter();
   const { session } = useSession();
   const [color, setColor] = React.useState(() => toHex(DEFAULT_TENANT_THEME.primary));
   const [isSaving, setIsSaving] = React.useState(false);
@@ -33,12 +29,6 @@ export default function BrandingSettingsPage() {
   const [selectedLogoFile, setSelectedLogoFile] = React.useState<File | null>(null);
   const [isUploadingLogo, setIsUploadingLogo] = React.useState(false);
   const logoInputRef = React.useRef<HTMLInputElement>(null);
-
-  React.useEffect(() => {
-    if (!session) {
-      router.replace("/login");
-    }
-  }, [session, router]);
 
   React.useEffect(() => {
     return () => {
@@ -109,14 +99,8 @@ export default function BrandingSettingsPage() {
   }
 
   return (
-    <main className="mx-auto flex min-h-full w-full max-w-lg flex-1 flex-col p-6 sm:p-10">
-      <Link href="/painel" className="text-muted-foreground mb-6 inline-flex items-center gap-1.5 text-sm hover:text-foreground">
-        <ArrowLeft className="size-4" />
-        Voltar
-      </Link>
-
-      <h1 className="text-xl font-semibold tracking-tight">Marca</h1>
-      <p className="text-muted-foreground mt-1 mb-6 text-sm">
+    <div className="mx-auto flex w-full max-w-lg flex-1 flex-col">
+      <p className="text-muted-foreground mb-6 text-sm">
         Escolha a cor principal do seu painel e do portal de agendamento.
       </p>
 
@@ -198,6 +182,6 @@ export default function BrandingSettingsPage() {
           {isSaving ? "Salvando..." : "Salvar cor de marca"}
         </Button>
       </div>
-    </main>
+    </div>
   );
 }

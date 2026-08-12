@@ -1,14 +1,12 @@
 "use client";
 
 import * as React from "react";
-import { useRouter } from "next/navigation";
-import Link from "next/link";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { toast } from "sonner";
-import { ArrowLeft, Plus, Search } from "lucide-react";
+import { Plus, Search } from "lucide-react";
 
 import {
   listServices,
@@ -62,7 +60,6 @@ function formatPrice(amount: number, currency: string): string {
 }
 
 export default function ServicesPage() {
-  const router = useRouter();
   const { session } = useSession();
   const queryClient = useQueryClient();
 
@@ -71,12 +68,6 @@ export default function ServicesPage() {
   const [search, setSearch] = React.useState("");
   const [dialogOpen, setDialogOpen] = React.useState(false);
   const [editingService, setEditingService] = React.useState<ServiceSummary | null>(null);
-
-  React.useEffect(() => {
-    if (!session) {
-      router.replace("/login");
-    }
-  }, [session, router]);
 
   const accessToken = session?.accessToken ?? "";
 
@@ -172,22 +163,10 @@ export default function ServicesPage() {
     }
   }
 
-  if (!session) {
-    return null;
-  }
-
   return (
-    <main className="mx-auto flex min-h-full w-full max-w-4xl flex-1 flex-col p-6 sm:p-10">
-      <Link href="/painel" className="text-muted-foreground mb-6 inline-flex items-center gap-1.5 text-sm hover:text-foreground">
-        <ArrowLeft className="size-4" />
-        Voltar
-      </Link>
-
+    <div className="mx-auto flex w-full max-w-4xl flex-1 flex-col">
       <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h1 className="text-xl font-semibold tracking-tight">Servicos</h1>
-          <p className="text-muted-foreground mt-1 text-sm">Catalogo de servicos oferecidos.</p>
-        </div>
+        <p className="text-muted-foreground text-sm">Catalogo de servicos oferecidos.</p>
         <Button onClick={openCreateDialog}>
           <Plus className="size-4" />
           Novo servico
@@ -370,6 +349,6 @@ export default function ServicesPage() {
           </Form>
         </DialogContent>
       </Dialog>
-    </main>
+    </div>
   );
 }

@@ -1,14 +1,11 @@
 "use client";
 
 import * as React from "react";
-import { useRouter } from "next/navigation";
-import Link from "next/link";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { ArrowLeft } from "lucide-react";
 
 import {
   listPlans,
@@ -44,15 +41,8 @@ function daysUntil(isoDate: string): number {
 }
 
 export default function BillingSettingsPage() {
-  const router = useRouter();
   const { session } = useSession();
   const queryClient = useQueryClient();
-
-  React.useEffect(() => {
-    if (!session) {
-      router.replace("/login");
-    }
-  }, [session, router]);
 
   const accessToken = session?.accessToken ?? "";
 
@@ -107,22 +97,12 @@ export default function BillingSettingsPage() {
     },
   });
 
-  if (!session) {
-    return null;
-  }
-
   const subscription = subscriptionQuery.data;
   const plan = plansQuery.data?.[0];
 
   return (
-    <main className="mx-auto flex min-h-full w-full max-w-lg flex-1 flex-col p-6 sm:p-10">
-      <Link href="/painel" className="text-muted-foreground mb-6 inline-flex items-center gap-1.5 text-sm hover:text-foreground">
-        <ArrowLeft className="size-4" />
-        Voltar
-      </Link>
-
-      <h1 className="text-xl font-semibold tracking-tight">Plano e assinatura</h1>
-      <p className="text-muted-foreground mt-1 mb-6 text-sm">Acompanhe o status do seu plano no Agendio.</p>
+    <div className="mx-auto flex w-full max-w-lg flex-1 flex-col">
+      <p className="text-muted-foreground mb-6 text-sm">Acompanhe o status do seu plano no Agendio.</p>
 
       {subscriptionQuery.isLoading ? (
         <p className="text-muted-foreground text-sm">Carregando...</p>
@@ -232,6 +212,6 @@ export default function BillingSettingsPage() {
           </CardContent>
         </Card>
       )}
-    </main>
+    </div>
   );
 }
