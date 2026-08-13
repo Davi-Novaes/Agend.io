@@ -6,7 +6,8 @@ import { useForm, useFieldArray } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { toast } from "sonner";
-import { Plus, Trash2 } from "lucide-react";
+import QRCode from "qrcode";
+import { Plus, Trash2, Download, Link2, MessageCircle, Share2, Camera } from "lucide-react";
 
 import {
   updateTenantBranding,
@@ -52,6 +53,18 @@ function toHex(oklchOrHex: string): string {
 
 function toNullable(value: string): string | null {
   return value.trim() === "" ? null : value.trim();
+}
+
+// window.location.origin so ha no cliente — useSyncExternalStore evita hidratacao
+// divergente (SSR sempre "") sem cair no lint de setState sincrono dentro de efeito.
+function subscribeToNothing() {
+  return () => {};
+}
+function getWindowOrigin() {
+  return window.location.origin;
+}
+function getServerOrigin() {
+  return "";
 }
 
 const FONT_OPTIONS: { value: PublicPageFont; label: string }[] = [
@@ -180,6 +193,35 @@ function BrandingForm({ profile, accessToken }: { profile: TenantProfile; access
   const [selectedBannerFile, setSelectedBannerFile] = React.useState<File | null>(null);
   const [isUploadingBanner, setIsUploadingBanner] = React.useState(false);
   const bannerInputRef = React.useRef<HTMLInputElement>(null);
+
+  const origin = React.useSyncExternalStore(subscribeToNothing, getWindowOrigin, getServerOrigin);
+  const [qrCodeDataUrl, setQrCodeDataUrl] = React.useState<string | null>(null);
+  const publicUrl = origin ? `${origin}/${profile.slug}` : "";
+
+  React.useEffect(() => {
+    if (!publicUrl) {
+      return;
+    }
+
+    let cancelled = false;
+    QRCode.toDataURL(`${publicUrl}?ref=qrcode`, { width: 240, margin: 1 }).then((dataUrl) => {
+      if (!cancelled) {
+        setQrCodeDataUrl(dataUrl);
+      }
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [publicUrl]);
+
+  function buildShareUrl(ref: string) {
+    return publicUrl ? `${publicUrl}?ref=${ref}` : "";
+  }
+
+  function handleCopyShareLink(ref: string, message: string) {
+    navigator.clipboard.writeText(buildShareUrl(ref));
+    toast.success(message);
+  }
 
   const [secondaryColor, setSecondaryColor] = React.useState(profile.secondaryColorHex ?? "");
   const [font, setFont] = React.useState<PublicPageFont>(profile.font);
@@ -666,6 +708,81 @@ function BrandingForm({ profile, accessToken }: { profile: TenantProfile; access
             <Button type="button" variant="outline" onClick={handlePreview} className="w-fit">
               Visualizar antes de salvar
             </Button>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">Compartilhar minha pagina</CardTitle>
+          <CardDescription>QR Code e links prontos para divulgar seu estabelecimento (Fase 5).</CardDescription>
+        </CardHeader>
+        <CardContent className="grid gap-4 sm:grid-cols-[auto_1fr]">
+          <div className="flex flex-col items-center gap-2">
+            <div className="bg-muted flex size-40 shrink-0 items-center justify-center overflow-hidden rounded-lg border">
+              {qrCodeDataUrl ? (
+                // eslint-disable-next-line @next/next/no-img-element -- data URL gerada localmente, nao um asset estatico do build.
+                <img src={qrCodeDataUrl} alt="QR Code da pagina publica" className="size-full object-contain" />
+              ) : (
+                <span className="text-muted-foreground text-xs">Gerando QR Code...</span>
+              )}
+            </div>
+            <Button asChild variant="outline" size="sm" disabled={!qrCodeDataUrl}>
+              <a href={qrCodeDataUrl ?? undefined} download={`qrcode-${profile.slug}.png`}>
+                <Download className="size-4" />
+                Baixar QR Code
+              </a>
+            </Button>
+          </div>
+
+          <div className="flex flex-col gap-3">
+            <div className="bg-muted flex items-center justify-between gap-2 rounded-lg p-3 text-sm">
+              <span className="truncate">{publicUrl || "Carregando link..."}</span>
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                aria-label="Copiar link"
+                disabled={!publicUrl}
+                onClick={() => handleCopyShareLink("link", "Link copiado.")}
+              >
+                <Link2 className="size-4" />
+              </Button>
+            </div>
+
+            <div className="flex flex-wrap gap-2">
+              <Button asChild variant="outline" disabled={!publicUrl}>
+                <a
+                  href={`https://wa.me/?text=${encodeURIComponent(`Agende com ${profile.name}: ${buildShareUrl("whatsapp")}`)}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
+                  <MessageCircle className="size-4" />
+                  WhatsApp
+                </a>
+              </Button>
+              <Button asChild variant="outline" disabled={!publicUrl}>
+                <a
+                  href={`https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(buildShareUrl("facebook"))}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
+                  <Share2 className="size-4" />
+                  Facebook
+                </a>
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                disabled={!publicUrl}
+                onClick={() =>
+                  handleCopyShareLink("instagram", "Link copiado - cole na bio ou em um story do Instagram.")
+                }
+              >
+                <Camera className="size-4" />
+                Instagram
+              </Button>
+            </div>
           </div>
         </CardContent>
       </Card>
