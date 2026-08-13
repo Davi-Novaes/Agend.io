@@ -48,6 +48,59 @@ public class PublicPortalTests(IntegrationTestFixture fixture)
     }
 
     [Fact]
+    public async Task Public_Services_Endpoint_Exposes_Image_And_Is_Ordered_By_DisplayOrder()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var client = fixture.CreateClient();
+        var (tenantId, accessToken) = await CreateTenantWithOwnerAndLoginAsync(client, cancellationToken);
+
+        var secondResponse = await AuthorizedRequestHelpers.PostAuthorizedAsync(
+            client, accessToken, "/api/services",
+            new { name = "Segundo", description = (string?)null, durationMinutes = 30, price = 10m, currency = "BRL", category = (string?)null, displayOrder = 2 },
+            cancellationToken);
+        var secondId = (await secondResponse.Content.ReadFromJsonAsync<JsonElement>(cancellationToken)).GetProperty("id").GetGuid();
+
+        var firstResponse = await AuthorizedRequestHelpers.PostAuthorizedAsync(
+            client, accessToken, "/api/services",
+            new { name = "Primeiro", description = (string?)null, durationMinutes = 30, price = 10m, currency = "BRL", category = (string?)null, displayOrder = 1 },
+            cancellationToken);
+        var firstId = (await firstResponse.Content.ReadFromJsonAsync<JsonElement>(cancellationToken)).GetProperty("id").GetGuid();
+
+        var servicesResponse = await client.GetAsync($"/api/public/tenants/{tenantId}/services", cancellationToken);
+        servicesResponse.StatusCode.ShouldBe(HttpStatusCode.OK);
+        var services = (await servicesResponse.Content.ReadFromJsonAsync<JsonElement>(cancellationToken)).EnumerateArray().ToList();
+
+        var orderedIds = services.Select(s => s.GetProperty("id").GetGuid()).ToList();
+        orderedIds.IndexOf(firstId).ShouldBeLessThan(orderedIds.IndexOf(secondId));
+        services.Single(s => s.GetProperty("id").GetGuid() == firstId).GetProperty("imageUrl").ValueKind.ShouldBe(JsonValueKind.Null);
+    }
+
+    [Fact]
+    public async Task Public_Resources_Endpoint_Exposes_Photo_And_Specialties()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var client = fixture.CreateClient();
+        var (tenantId, accessToken) = await CreateTenantWithOwnerAndLoginAsync(client, cancellationToken);
+
+        var resourceResponse = await AuthorizedRequestHelpers.PostAuthorizedAsync(
+            client, accessToken, "/api/resources",
+            new { name = "Dra. Ana", type = "Person", capacity = 1, description = (string?)null }, cancellationToken);
+        var resourceId = (await resourceResponse.Content.ReadFromJsonAsync<JsonElement>(cancellationToken)).GetProperty("id").GetGuid();
+
+        var specialtiesResponse = await AuthorizedRequestHelpers.PutAuthorizedAsync(
+            client, accessToken, $"/api/resources/{resourceId}/specialties", new { specialties = new[] { "Corte", "Coloracao" } }, cancellationToken);
+        specialtiesResponse.StatusCode.ShouldBe(HttpStatusCode.NoContent);
+
+        var resourcesResponse = await client.GetAsync($"/api/public/tenants/{tenantId}/resources", cancellationToken);
+        resourcesResponse.StatusCode.ShouldBe(HttpStatusCode.OK);
+        var resources = (await resourcesResponse.Content.ReadFromJsonAsync<JsonElement>(cancellationToken)).EnumerateArray().ToList();
+
+        var resource = resources.Single(r => r.GetProperty("id").GetGuid() == resourceId);
+        resource.GetProperty("specialties").EnumerateArray().Select(s => s.GetString()).ShouldBe(["Corte", "Coloracao"]);
+        resource.GetProperty("photoUrl").ValueKind.ShouldBe(JsonValueKind.Null);
+    }
+
+    [Fact]
     public async Task Availability_Respects_Working_Hours_And_Excludes_Booked_Slots()
     {
         var cancellationToken = TestContext.Current.CancellationToken;

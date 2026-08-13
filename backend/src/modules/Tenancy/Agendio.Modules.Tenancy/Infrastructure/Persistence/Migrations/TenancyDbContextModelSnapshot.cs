@@ -131,6 +131,11 @@ namespace Agendio.Modules.Tenancy.Infrastructure.Persistence.Migrations
                         .HasColumnType("character varying(500)")
                         .HasColumnName("address");
 
+                    b.Property<string>("BannerUrl")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("banner_url");
+
                     b.Property<string>("BusinessType")
                         .IsRequired()
                         .ValueGeneratedOnAdd()

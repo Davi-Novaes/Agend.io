@@ -51,13 +51,22 @@ async function request<TResponse>(
   return (await response.json()) as TResponse;
 }
 
-export type TenantSummary = {
+export type TenantPublicProfile = {
   id: string;
   name: string;
   slug: string;
   isActive: boolean;
   primaryColorHex: string | null;
   logoUrl: string | null;
+  bannerUrl: string | null;
+  description: string | null;
+  phone: string | null;
+  whatsApp: string | null;
+  email: string | null;
+  address: string | null;
+  instagramUrl: string | null;
+  facebookUrl: string | null;
+  businessHours: WorkingHourEntry[];
 };
 
 /** Resolve um logoUrl relativo (ex.: "/uploads/tenant-logos/x.png") para a origem da API. */
@@ -65,8 +74,8 @@ export function resolveAssetUrl(path: string): string {
   return `${API_BASE_URL}${path}`;
 }
 
-export function getTenantBySlug(slug: string): Promise<TenantSummary> {
-  return request<TenantSummary>(`/api/tenants/by-slug/${encodeURIComponent(slug)}`);
+export function getTenantBySlug(slug: string): Promise<TenantPublicProfile> {
+  return request<TenantPublicProfile>(`/api/tenants/by-slug/${encodeURIComponent(slug)}`);
 }
 
 export type TerminologyPack = {
@@ -206,11 +215,35 @@ export async function uploadTenantLogo(file: File, accessToken: string): Promise
   return response.json();
 }
 
+export async function uploadTenantBanner(file: File, accessToken: string): Promise<{ bannerUrl: string }> {
+  const formData = new FormData();
+  formData.append("file", file);
+
+  const response = await fetch(`${API_BASE_URL}/api/tenants/banner`, {
+    method: "POST",
+    credentials: "include",
+    headers: { Authorization: `Bearer ${accessToken}` },
+    body: formData,
+  });
+
+  if (!response.ok) {
+    const problem = (await response.json().catch(() => null)) as ProblemDetails | null;
+    throw new ApiError(
+      problem?.detail ?? problem?.title ?? "Nao foi possivel enviar o banner.",
+      response.status,
+      problem?.code
+    );
+  }
+
+  return response.json();
+}
+
 export type TenantProfile = {
   name: string;
   slug: string;
   primaryColorHex: string | null;
   logoUrl: string | null;
+  bannerUrl: string | null;
   description: string | null;
   phone: string | null;
   whatsApp: string | null;
@@ -716,6 +749,8 @@ export type PublicServiceSummary = {
   price: number;
   currency: string;
   category: string | null;
+  imageUrl: string | null;
+  displayOrder: number;
 };
 
 export type PublicResourceSummary = {
@@ -723,6 +758,8 @@ export type PublicResourceSummary = {
   name: string;
   type: ResourceType;
   description: string | null;
+  photoUrl: string | null;
+  specialties: string[];
 };
 
 export type AvailableSlot = {

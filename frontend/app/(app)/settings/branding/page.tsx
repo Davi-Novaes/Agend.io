@@ -11,6 +11,7 @@ import { Plus, Trash2 } from "lucide-react";
 import {
   updateTenantBranding,
   uploadTenantLogo,
+  uploadTenantBanner,
   getTenantProfile,
   updateTenantProfile,
   setTenantBusinessHours,
@@ -33,6 +34,8 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "
 
 const ALLOWED_LOGO_TYPES = ["image/png", "image/jpeg", "image/webp"];
 const MAX_LOGO_SIZE_BYTES = 2 * 1024 * 1024;
+const ALLOWED_BANNER_TYPES = ["image/png", "image/jpeg", "image/webp"];
+const MAX_BANNER_SIZE_BYTES = 4 * 1024 * 1024;
 
 // A UI sempre pareia --primary com texto branco (ver app/globals.css) — o
 // contraste e verificado contra ESTA cor fixa, tanto aqui quanto no backend.
@@ -111,6 +114,7 @@ export default function BrandingSettingsPage() {
       {profileQuery.isLoading || !profileQuery.data ? (
         <div className="flex flex-col gap-6">
           <Skeleton className="h-40 w-full" />
+          <Skeleton className="h-40 w-full" />
           <Skeleton className="h-56 w-full" />
           <Skeleton className="h-72 w-full" />
         </div>
@@ -136,6 +140,13 @@ function BrandingForm({ profile, accessToken }: { profile: TenantProfile; access
   const [selectedLogoFile, setSelectedLogoFile] = React.useState<File | null>(null);
   const [isUploadingLogo, setIsUploadingLogo] = React.useState(false);
   const logoInputRef = React.useRef<HTMLInputElement>(null);
+
+  const [bannerPreviewUrl, setBannerPreviewUrl] = React.useState<string | null>(
+    profile.bannerUrl ? resolveAssetUrl(profile.bannerUrl) : null
+  );
+  const [selectedBannerFile, setSelectedBannerFile] = React.useState<File | null>(null);
+  const [isUploadingBanner, setIsUploadingBanner] = React.useState(false);
+  const bannerInputRef = React.useRef<HTMLInputElement>(null);
 
   const profileForm = useForm<ProfileFormValues>({
     resolver: zodResolver(profileSchema),
@@ -170,6 +181,14 @@ function BrandingForm({ profile, accessToken }: { profile: TenantProfile; access
       }
     };
   }, [logoPreviewUrl]);
+
+  React.useEffect(() => {
+    return () => {
+      if (bannerPreviewUrl?.startsWith("blob:")) {
+        URL.revokeObjectURL(bannerPreviewUrl);
+      }
+    };
+  }, [bannerPreviewUrl]);
 
   const profileMutation = useMutation({
     mutationFn: (values: ProfileFormValues) =>
@@ -247,6 +266,45 @@ function BrandingForm({ profile, accessToken }: { profile: TenantProfile; access
     }
   }
 
+  function handleBannerFileChange(event: React.ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+    if (!file) {
+      return;
+    }
+
+    if (!ALLOWED_BANNER_TYPES.includes(file.type)) {
+      toast.error("Formato invalido. Envie um arquivo PNG, JPEG ou WEBP.");
+      return;
+    }
+
+    if (file.size > MAX_BANNER_SIZE_BYTES) {
+      toast.error("O arquivo nao pode ter mais que 4MB.");
+      return;
+    }
+
+    setSelectedBannerFile(file);
+    setBannerPreviewUrl(URL.createObjectURL(file));
+  }
+
+  async function handleBannerUpload() {
+    if (!selectedBannerFile) {
+      return;
+    }
+
+    setIsUploadingBanner(true);
+    try {
+      const result = await uploadTenantBanner(selectedBannerFile, accessToken);
+      setBannerPreviewUrl(resolveAssetUrl(result.bannerUrl));
+      setSelectedBannerFile(null);
+      toast.success("Banner atualizado.");
+    } catch (error) {
+      const message = error instanceof ApiError ? error.message : "Nao foi possivel enviar o banner.";
+      toast.error(message);
+    } finally {
+      setIsUploadingBanner(false);
+    }
+  }
+
   const ratio = contrastRatio(FOREGROUND_HEX, color);
   const passesAa = meetsAaContrast(FOREGROUND_HEX, color);
 
@@ -299,6 +357,45 @@ function BrandingForm({ profile, accessToken }: { profile: TenantProfile; access
                 )}
               </div>
               <p className="text-muted-foreground text-xs">PNG, JPEG ou WEBP, ate 2MB.</p>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">Banner</CardTitle>
+          <CardDescription>Imagem de capa exibida no topo da pagina publica do seu estabelecimento.</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="flex flex-col gap-4">
+            <div className="bg-muted flex h-32 w-full items-center justify-center overflow-hidden rounded-lg border sm:h-40">
+              {bannerPreviewUrl ? (
+                // eslint-disable-next-line @next/next/no-img-element -- preview de upload local/URL dinamica da API, nao um asset estatico do build.
+                <img src={bannerPreviewUrl} alt="Banner do estabelecimento" className="size-full object-cover" />
+              ) : (
+                <span className="text-muted-foreground text-xs">Sem banner</span>
+              )}
+            </div>
+            <div className="flex flex-col gap-2">
+              <input
+                ref={bannerInputRef}
+                type="file"
+                accept="image/png,image/jpeg,image/webp"
+                onChange={handleBannerFileChange}
+                className="hidden"
+              />
+              <div className="flex gap-2">
+                <Button type="button" variant="outline" onClick={() => bannerInputRef.current?.click()}>
+                  Escolher arquivo
+                </Button>
+                {selectedBannerFile && (
+                  <Button type="button" onClick={handleBannerUpload} disabled={isUploadingBanner}>
+                    {isUploadingBanner ? "Enviando..." : "Enviar"}
+                  </Button>
+                )}
+              </div>
+              <p className="text-muted-foreground text-xs">PNG, JPEG ou WEBP, ate 4MB.</p>
             </div>
           </div>
         </CardContent>

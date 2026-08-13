@@ -16,7 +16,7 @@ public sealed class PublicListResourcesQueryHandler(ResourcesDbContext dbContext
             .ToListAsync(cancellationToken);
 
         IReadOnlyList<PublicResourceSummary> items = resources
-            .Select(r => new PublicResourceSummary(r.Id.Value, r.Name, r.Type.ToString(), r.Description))
+            .Select(r => new PublicResourceSummary(r.Id.Value, r.Name, r.Type.ToString(), r.Description, r.PhotoUrl, r.Specialties))
             .ToList();
 
         return Result.Success(items);

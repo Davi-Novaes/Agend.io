@@ -89,6 +89,54 @@ public class TenantProfileTests(IntegrationTestFixture fixture)
     }
 
     [Fact]
+    public async Task Public_By_Slug_Endpoint_Exposes_The_Full_Public_Profile_Without_Authentication()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var client = fixture.CreateClient();
+        var (slug, accessToken) = await CreateTenantWithOwnerAndLoginAsyncWithSlug(client, cancellationToken);
+
+        await AuthorizedRequestHelpers.PutAuthorizedAsync(
+            client, accessToken, "/api/tenants/profile",
+            new
+            {
+                description = "Cortes classicos e modernos",
+                phone = "11999998888",
+                whatsApp = "11988887777",
+                email = "contato@barbearia.com",
+                address = "Rua das Flores, 100",
+                instagramUrl = "https://instagram.com/barbearia",
+                facebookUrl = "https://facebook.com/barbearia",
+            },
+            cancellationToken);
+        await AuthorizedRequestHelpers.PutAuthorizedAsync(
+            client, accessToken, "/api/tenants/business-hours",
+            new { entries = new[] { new { dayOfWeek = "Monday", startTime = "09:00:00", endTime = "18:00:00" } } },
+            cancellationToken);
+
+        var response = await client.GetAsync($"/api/tenants/by-slug/{slug}", cancellationToken);
+        response.StatusCode.ShouldBe(HttpStatusCode.OK);
+
+        var body = await response.Content.ReadFromJsonAsync<JsonElement>(cancellationToken);
+        body.GetProperty("description").GetString().ShouldBe("Cortes classicos e modernos");
+        body.GetProperty("phone").GetString().ShouldBe("+5511999998888");
+        body.GetProperty("whatsApp").GetString().ShouldBe("+5511988887777");
+        body.GetProperty("address").GetString().ShouldBe("Rua das Flores, 100");
+        body.GetProperty("instagramUrl").GetString().ShouldBe("https://instagram.com/barbearia");
+        body.GetProperty("businessHours").GetArrayLength().ShouldBe(1);
+    }
+
+    [Fact]
+    public async Task Public_By_Slug_Endpoint_For_An_Unknown_Slug_Should_Return_NotFound()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var client = fixture.CreateClient();
+
+        var response = await client.GetAsync($"/api/tenants/by-slug/nao-existe-{Guid.NewGuid():N}", cancellationToken);
+
+        response.StatusCode.ShouldBe(HttpStatusCode.NotFound);
+    }
+
+    [Fact]
     public async Task Anonymous_Request_To_Get_Or_Update_Profile_Should_Be_Unauthorized()
     {
         var cancellationToken = TestContext.Current.CancellationToken;
@@ -131,6 +179,33 @@ public class TenantProfileTests(IntegrationTestFixture fixture)
     {
         var (_, accessToken) = await CreateTenantWithOwnerAndLoginAsyncWithId(client, cancellationToken);
         return accessToken;
+    }
+
+    private static async Task<(string Slug, string AccessToken)> CreateTenantWithOwnerAndLoginAsyncWithSlug(
+        HttpClient client, CancellationToken cancellationToken)
+    {
+        var slug = $"tenant-{Guid.NewGuid():N}";
+
+        var tenantResponse = await client.PostAsJsonAsync("/api/tenants", new
+        {
+            name = $"Tenant {Guid.NewGuid():N}",
+            slug,
+            businessType = "Other",
+            timeZoneId = "America/Sao_Paulo",
+        }, cancellationToken);
+        tenantResponse.EnsureSuccessStatusCode();
+        var tenantBody = await tenantResponse.Content.ReadFromJsonAsync<JsonElement>(cancellationToken);
+        var tenantId = tenantBody.GetProperty("id").GetGuid();
+
+        var ownerEmail = $"owner-{Guid.NewGuid():N}@example.com";
+        await client.PostAsJsonAsync(
+            "/api/auth/register", new { tenantId, email = ownerEmail, password = Password, fullName = "Dono" }, cancellationToken);
+
+        var loginResponse = await client.PostAsJsonAsync(
+            "/api/auth/login", new { tenantId, email = ownerEmail, password = Password }, cancellationToken);
+        var loginBody = await loginResponse.Content.ReadFromJsonAsync<JsonElement>(cancellationToken);
+
+        return (slug, loginBody.GetProperty("accessToken").GetString()!);
     }
 
     private static async Task<(Guid TenantId, string AccessToken)> CreateTenantWithOwnerAndLoginAsyncWithId(

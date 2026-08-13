@@ -1,16 +1,17 @@
 using Agendio.Infrastructure.Endpoints;
 using Agendio.Modules.Tenancy.Application.CreateTenant;
 using Agendio.Modules.Tenancy.Application.CreateUnit;
+using Agendio.Modules.Tenancy.Application.GetPublicTenantProfile;
 using Agendio.Modules.Tenancy.Application.GetTenantProfile;
 using Agendio.Modules.Tenancy.Application.GetUnitById;
 using Agendio.Modules.Tenancy.Application.ListUnits;
 using Agendio.Modules.Tenancy.Application.SetTenantBusinessHours;
 using Agendio.Modules.Tenancy.Application.SetUnitActiveStatus;
+using Agendio.Modules.Tenancy.Application.UpdateTenantBanner;
 using Agendio.Modules.Tenancy.Application.UpdateTenantBranding;
 using Agendio.Modules.Tenancy.Application.UpdateTenantLogo;
 using Agendio.Modules.Tenancy.Application.UpdateTenantProfile;
 using Agendio.Modules.Tenancy.Application.UpdateUnit;
-using Agendio.Modules.Tenancy.Contracts;
 using Agendio.Modules.Tenancy.Domain;
 using Agendio.SharedKernel.Messaging;
 using Microsoft.AspNetCore.Builder;
@@ -47,27 +48,16 @@ public sealed class TenancyEndpoints : IEndpointModule
         .WithName("CreateTenant")
         .WithSummary("Cria um novo estabelecimento (tenant).");
 
-        group.MapGet("/by-slug/{slug}", async (string slug, ITenantLookupService lookupService, CancellationToken cancellationToken) =>
+        group.MapGet("/by-slug/{slug}", async (string slug, IDispatcher dispatcher, CancellationToken cancellationToken) =>
         {
-            var tenant = await lookupService.FindBySlugAsync(slug, cancellationToken);
-
-            return tenant is null
-                ? Results.NotFound()
-                : Results.Ok(new
-                {
-                    id = tenant.TenantId.Value,
-                    tenant.Name,
-                    tenant.Slug,
-                    tenant.IsActive,
-                    tenant.PrimaryColorHex,
-                    tenant.LogoUrl,
-                });
+            var result = await dispatcher.Query(new GetPublicTenantProfileQuery(slug), cancellationToken);
+            return result.IsSuccess ? Results.Ok(result.Value) : result.Error.ToProblemResult();
         })
-        // Publica de proposito: o portal do cliente (Sprint 4) precisa resolver
-        // o tenant pelo slug do subdominio ANTES de qualquer autenticacao.
+        // Publica de proposito: a pagina publica (Fase 2) e o portal do cliente
+        // precisam resolver o tenant pelo slug ANTES de qualquer autenticacao.
         .AllowAnonymous()
         .WithName("GetTenantBySlug")
-        .WithSummary("Resolve um estabelecimento pelo identificador publico (slug).");
+        .WithSummary("Resolve o perfil publico de um estabelecimento pelo identificador (slug): dados de vitrine, contato e horario de funcionamento.");
 
         group.MapPut("/branding", async (UpdateBrandingRequest request, IDispatcher dispatcher, CancellationToken cancellationToken) =>
         {
@@ -97,6 +87,21 @@ public sealed class TenancyEndpoints : IEndpointModule
         .RequireAuthorization(policy => policy.RequireRole("Owner"))
         .WithName("UpdateTenantLogo")
         .WithSummary("Faz upload do logo do estabelecimento (PNG/JPEG/WEBP, ate 2MB).");
+
+        group.MapPost("/banner", async (IFormFile file, IDispatcher dispatcher, CancellationToken cancellationToken) =>
+        {
+            await using var contentStream = new MemoryStream();
+            await file.CopyToAsync(contentStream, cancellationToken);
+
+            var command = new UpdateTenantBannerCommand(contentStream.ToArray(), file.ContentType);
+            var result = await dispatcher.Send(command, cancellationToken);
+
+            return result.IsSuccess ? Results.Ok(new { bannerUrl = result.Value }) : result.Error.ToProblemResult();
+        })
+        .DisableAntiforgery()
+        .RequireAuthorization(policy => policy.RequireRole("Owner"))
+        .WithName("UpdateTenantBanner")
+        .WithSummary("Faz upload do banner (capa) da pagina publica do estabelecimento (PNG/JPEG/WEBP, ate 4MB).");
 
         group.MapGet("/profile", async (IDispatcher dispatcher, CancellationToken cancellationToken) =>
         {
