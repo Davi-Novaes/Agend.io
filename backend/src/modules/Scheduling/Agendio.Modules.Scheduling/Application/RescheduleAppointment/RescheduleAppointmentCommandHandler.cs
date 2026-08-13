@@ -1,6 +1,9 @@
+using Agendio.Modules.Resources.Contracts;
+using Agendio.Modules.Scheduling.Application.Shared;
 using Agendio.Modules.Scheduling.Domain;
 using Agendio.Modules.Scheduling.Infrastructure.Notifications;
 using Agendio.Modules.Scheduling.Infrastructure.Persistence;
+using Agendio.Modules.Tenancy.Contracts;
 using Agendio.SharedKernel.Messaging;
 using Agendio.SharedKernel.Results;
 using Agendio.SharedKernel.Time;
@@ -11,8 +14,12 @@ using Npgsql;
 
 namespace Agendio.Modules.Scheduling.Application.RescheduleAppointment;
 
-public sealed class RescheduleAppointmentCommandHandler(SchedulingDbContext dbContext, IClock clock, IBackgroundJobClient jobClient)
-    : ICommandHandler<RescheduleAppointmentCommand>
+public sealed class RescheduleAppointmentCommandHandler(
+    SchedulingDbContext dbContext,
+    IClock clock,
+    IResourceLookupService resourceLookup,
+    ITenantLookupService tenantLookup,
+    IBackgroundJobClient jobClient) : ICommandHandler<RescheduleAppointmentCommand>
 {
     private const string ExclusionViolationSqlState = "23P01";
 
@@ -29,6 +36,13 @@ public sealed class RescheduleAppointmentCommandHandler(SchedulingDbContext dbCo
         if (request.NewStartAtUtc <= clock.UtcNow)
         {
             return Result.Failure(Error.Validation("Appointment.StartInThePast", "Nao e possivel remarcar para um horario que ja passou."));
+        }
+
+        var availabilityCheck = await AppointmentAvailabilityGuard.EnsureResourceIsAvailableAsync(
+            tenantLookup, resourceLookup, appointment.TenantId, appointment.ResourceId, request.NewStartAtUtc, cancellationToken);
+        if (availabilityCheck.IsFailure)
+        {
+            return availabilityCheck;
         }
 
         // Preserva a duracao original — remarcar muda O QUANDO, nao o quanto o

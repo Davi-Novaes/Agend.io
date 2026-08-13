@@ -12,4 +12,7 @@ public interface ITenantLookupService
     Task<TenantLookupResult?> FindByIdAsync(TenantId tenantId, CancellationToken cancellationToken = default);
 
     Task<TenantLookupResult?> FindBySlugAsync(string slug, CancellationToken cancellationToken = default);
+
+    /// <summary>Horario de funcionamento, datas fechadas e intervalo entre agendamentos — usado pelo motor de disponibilidade (Scheduling, Fase 4).</summary>
+    Task<TenantAvailabilityInfo?> GetAvailabilityInfoAsync(TenantId tenantId, CancellationToken cancellationToken = default);
 }

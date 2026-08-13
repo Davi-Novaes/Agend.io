@@ -272,6 +272,13 @@ export type TenantProfile = {
   showHoursSection: boolean;
   showContactSection: boolean;
   businessHours: WorkingHourEntry[];
+  closedDates: ClosedDate[];
+  appointmentBufferMinutes: number;
+};
+
+export type ClosedDate = {
+  date: string;
+  reason: string | null;
 };
 
 export type TenantProfileInput = {
@@ -294,6 +301,18 @@ export function updateTenantProfile(input: TenantProfileInput, accessToken: stri
 
 export function setTenantBusinessHours(entries: WorkingHourEntry[], accessToken: string): Promise<void> {
   return request("/api/tenants/business-hours", { method: "PUT", body: JSON.stringify({ entries }) }, accessToken);
+}
+
+export type UpdateTenantSchedulingSettingsInput = {
+  closedDates: ClosedDate[];
+  appointmentBufferMinutes: number;
+};
+
+export function updateTenantSchedulingSettings(
+  input: UpdateTenantSchedulingSettingsInput,
+  accessToken: string
+): Promise<void> {
+  return request("/api/tenants/scheduling-settings", { method: "PUT", body: JSON.stringify(input) }, accessToken);
 }
 
 export type TenantPageCustomizationInput = {

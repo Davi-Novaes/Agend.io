@@ -15,6 +15,7 @@ import {
   getTenantProfile,
   updateTenantProfile,
   setTenantBusinessHours,
+  updateTenantSchedulingSettings,
   updateTenantPageCustomization,
   resolveAssetUrl,
   ApiError,
@@ -99,6 +100,19 @@ const businessHoursSchema = z.object({
 });
 
 type BusinessHoursFormValues = z.infer<typeof businessHoursSchema>;
+
+const schedulingSettingsSchema = z.object({
+  closedDates: z.array(
+    z.object({
+      date: z.string().min(1, "Informe a data."),
+      reason: z.string(),
+    })
+  ),
+  appointmentBufferMinutes: z.coerce.number().int().min(0, "Minimo 0.").max(240, "Maximo 240."),
+});
+
+type SchedulingSettingsFormInput = z.input<typeof schedulingSettingsSchema>;
+type SchedulingSettingsFormValues = z.output<typeof schedulingSettingsSchema>;
 
 function toTimeInputValue(time: string): string {
   return time.slice(0, 5);
@@ -203,6 +217,16 @@ function BrandingForm({ profile, accessToken }: { profile: TenantProfile; access
 
   const hoursFieldArray = useFieldArray({ control: hoursForm.control, name: "entries" });
 
+  const schedulingSettingsForm = useForm<SchedulingSettingsFormInput, unknown, SchedulingSettingsFormValues>({
+    resolver: zodResolver(schedulingSettingsSchema),
+    defaultValues: {
+      closedDates: profile.closedDates.map((entry) => ({ date: entry.date, reason: entry.reason ?? "" })),
+      appointmentBufferMinutes: profile.appointmentBufferMinutes,
+    },
+  });
+
+  const closedDatesFieldArray = useFieldArray({ control: schedulingSettingsForm.control, name: "closedDates" });
+
   React.useEffect(() => {
     return () => {
       if (logoPreviewUrl?.startsWith("blob:")) {
@@ -254,6 +278,23 @@ function BrandingForm({ profile, accessToken }: { profile: TenantProfile; access
       queryClient.invalidateQueries({ queryKey: ["tenant", "profile"] });
     },
     onError: (error) => toast.error(error instanceof ApiError ? error.message : "Nao foi possivel salvar o horario."),
+  });
+
+  const schedulingSettingsMutation = useMutation({
+    mutationFn: (values: SchedulingSettingsFormValues) =>
+      updateTenantSchedulingSettings(
+        {
+          closedDates: values.closedDates.map((entry) => ({ date: entry.date, reason: toNullable(entry.reason) })),
+          appointmentBufferMinutes: values.appointmentBufferMinutes,
+        },
+        accessToken
+      ),
+    onSuccess: () => {
+      toast.success("Configuracoes de agendamento atualizadas.");
+      queryClient.invalidateQueries({ queryKey: ["tenant", "profile"] });
+    },
+    onError: (error) =>
+      toast.error(error instanceof ApiError ? error.message : "Nao foi possivel salvar as configuracoes de agendamento."),
   });
 
   function handleLogoFileChange(event: React.ChangeEvent<HTMLInputElement>) {
@@ -823,6 +864,96 @@ function BrandingForm({ profile, accessToken }: { profile: TenantProfile; access
               </Button>
               <Button type="submit" disabled={businessHoursMutation.isPending} className="w-fit">
                 {businessHoursMutation.isPending ? "Salvando..." : "Salvar horarios"}
+              </Button>
+            </form>
+          </Form>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">Datas fechadas e intervalo entre horarios</CardTitle>
+          <CardDescription>
+            Feriados e eventos em que o estabelecimento nao atende, e um intervalo minimo de descanso entre agendamentos (Fase 4).
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <Form {...schedulingSettingsForm}>
+            <form
+              onSubmit={schedulingSettingsForm.handleSubmit((values) => schedulingSettingsMutation.mutate(values))}
+              className="flex flex-col gap-6"
+            >
+              <div className="flex flex-col gap-3">
+                <Label>Datas fechadas (feriados e eventos)</Label>
+                {closedDatesFieldArray.fields.length === 0 && (
+                  <p className="text-muted-foreground text-sm">Nenhuma data fechada cadastrada ainda.</p>
+                )}
+                {closedDatesFieldArray.fields.map((field, index) => (
+                  <div key={field.id} className="flex items-end gap-2">
+                    <FormField
+                      control={schedulingSettingsForm.control}
+                      name={`closedDates.${index}.date`}
+                      render={({ field: dateField }) => (
+                        <FormItem>
+                          {index === 0 && <FormLabel>Data</FormLabel>}
+                          <FormControl>
+                            <Input type="date" {...dateField} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={schedulingSettingsForm.control}
+                      name={`closedDates.${index}.reason`}
+                      render={({ field: reasonField }) => (
+                        <FormItem className="flex-1">
+                          {index === 0 && <FormLabel>Motivo (opcional)</FormLabel>}
+                          <FormControl>
+                            <Input placeholder="Ex.: Natal, reforma" {...reasonField} />
+                          </FormControl>
+                        </FormItem>
+                      )}
+                    />
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      aria-label="Remover data fechada"
+                      onClick={() => closedDatesFieldArray.remove(index)}
+                    >
+                      <Trash2 className="size-4" />
+                    </Button>
+                  </div>
+                ))}
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="self-start"
+                  onClick={() => closedDatesFieldArray.append({ date: "", reason: "" })}
+                >
+                  <Plus className="size-4" />
+                  Adicionar data fechada
+                </Button>
+              </div>
+
+              <FormField
+                control={schedulingSettingsForm.control}
+                name="appointmentBufferMinutes"
+                render={({ field: bufferField }) => (
+                  <FormItem className="max-w-xs">
+                    <FormLabel>Intervalo minimo entre agendamentos (minutos)</FormLabel>
+                    <FormControl>
+                      <Input type="number" min={0} max={240} {...bufferField} value={bufferField.value as number} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <Button type="submit" disabled={schedulingSettingsMutation.isPending} className="w-fit">
+                {schedulingSettingsMutation.isPending ? "Salvando..." : "Salvar configuracoes de agendamento"}
               </Button>
             </form>
           </Form>

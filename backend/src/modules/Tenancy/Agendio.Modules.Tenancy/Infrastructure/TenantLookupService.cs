@@ -33,6 +33,24 @@ internal sealed class TenantLookupService(TenancyDbContext dbContext) : ITenantL
         return tenant is null ? null : Map(tenant);
     }
 
+    public async Task<TenantAvailabilityInfo?> GetAvailabilityInfoAsync(TenantId tenantId, CancellationToken cancellationToken = default)
+    {
+        var tenant = await dbContext.Tenants.AsNoTracking()
+            .SingleOrDefaultAsync(t => t.Id == tenantId, cancellationToken);
+
+        if (tenant is null)
+        {
+            return null;
+        }
+
+        var businessHours = tenant.BusinessHours
+            .Select(h => new BusinessHoursLookup(h.DayOfWeek, h.StartTime, h.EndTime))
+            .ToList();
+        var closedDates = tenant.ClosedDates.Select(d => d.Date).ToList();
+
+        return new TenantAvailabilityInfo(tenant.TimeZoneId, businessHours, closedDates, tenant.AppointmentBufferMinutes);
+    }
+
     private static TenantLookupResult Map(Tenant tenant) =>
         new(tenant.Id, tenant.Name, tenant.Slug.Value, tenant.TimeZoneId, tenant.IsActive, tenant.PrimaryColorHex, tenant.LogoUrl);
 }

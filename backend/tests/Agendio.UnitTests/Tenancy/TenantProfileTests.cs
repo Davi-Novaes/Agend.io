@@ -179,4 +179,49 @@ public class TenantProfileTests
 
         result.IsFailure.ShouldBeTrue();
     }
+
+    [Fact]
+    public void UpdateSchedulingSettings_Should_Set_ClosedDates_And_Buffer()
+    {
+        var tenant = CreateTenant();
+        var closedDates = new List<(DateOnly Date, string? Reason)>
+        {
+            (new DateOnly(2026, 12, 25), "Natal"),
+            (new DateOnly(2026, 1, 1), null),
+        };
+
+        var result = tenant.UpdateSchedulingSettings(closedDates, 30);
+
+        result.IsSuccess.ShouldBeTrue();
+        tenant.AppointmentBufferMinutes.ShouldBe(30);
+        tenant.ClosedDates.Count.ShouldBe(2);
+        tenant.ClosedDates.ShouldContain(d => d.Date == new DateOnly(2026, 12, 25) && d.Reason == "Natal");
+        tenant.ClosedDates.ShouldContain(d => d.Date == new DateOnly(2026, 1, 1) && d.Reason == null);
+    }
+
+    [Fact]
+    public void UpdateSchedulingSettings_Should_Replace_The_Whole_ClosedDates_List()
+    {
+        var tenant = CreateTenant();
+        tenant.UpdateSchedulingSettings([(new DateOnly(2026, 12, 25), "Natal")], 0);
+
+        var result = tenant.UpdateSchedulingSettings([(new DateOnly(2026, 1, 1), "Ano novo")], 0);
+
+        result.IsSuccess.ShouldBeTrue();
+        tenant.ClosedDates.Count.ShouldBe(1);
+        tenant.ClosedDates.Single().Date.ShouldBe(new DateOnly(2026, 1, 1));
+    }
+
+    [Theory]
+    [InlineData(-1)]
+    [InlineData(241)]
+    public void UpdateSchedulingSettings_Should_Fail_With_An_Out_Of_Range_Buffer(int invalidBuffer)
+    {
+        var tenant = CreateTenant();
+
+        var result = tenant.UpdateSchedulingSettings([], invalidBuffer);
+
+        result.IsFailure.ShouldBeTrue();
+        tenant.AppointmentBufferMinutes.ShouldBe(0);
+    }
 }

@@ -1,9 +1,11 @@
 using Agendio.Modules.Catalog.Contracts;
 using Agendio.Modules.Customers.Contracts;
 using Agendio.Modules.Resources.Contracts;
+using Agendio.Modules.Scheduling.Application.Shared;
 using Agendio.Modules.Scheduling.Domain;
 using Agendio.Modules.Scheduling.Infrastructure.Notifications;
 using Agendio.Modules.Scheduling.Infrastructure.Persistence;
+using Agendio.Modules.Tenancy.Contracts;
 using Agendio.SharedKernel.Messaging;
 using Agendio.SharedKernel.Multitenancy;
 using Agendio.SharedKernel.Results;
@@ -28,6 +30,7 @@ public sealed class PublicScheduleAppointmentCommandHandler(
     ICustomerRegistrationService customerRegistration,
     IResourceLookupService resourceLookup,
     IServiceLookupService serviceLookup,
+    ITenantLookupService tenantLookup,
     IBackgroundJobClient jobClient) : ICommandHandler<PublicScheduleAppointmentCommand, Guid>
 {
     private const string ExclusionViolationSqlState = "23P01";
@@ -49,6 +52,13 @@ public sealed class PublicScheduleAppointmentCommandHandler(
         if (request.StartAtUtc <= clock.UtcNow)
         {
             return Result.Failure<Guid>(Error.Validation("Appointment.StartInThePast", "Nao e possivel agendar em um horario que ja passou."));
+        }
+
+        var availabilityCheck = await AppointmentAvailabilityGuard.EnsureResourceIsAvailableAsync(
+            tenantLookup, resourceLookup, tenantContext.TenantId, request.ResourceId, request.StartAtUtc, cancellationToken);
+        if (availabilityCheck.IsFailure)
+        {
+            return Result.Failure<Guid>(availabilityCheck.Error);
         }
 
         var slotResult = TimeSlot.Create(request.StartAtUtc, request.StartAtUtc.AddMinutes(service.DurationMinutes));

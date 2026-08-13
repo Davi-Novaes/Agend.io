@@ -43,4 +43,16 @@ internal sealed class ResourceLookupService(ResourcesDbContext dbContext) : IRes
                 r.WorkingHours.Select(w => new WorkingHourLookup(w.DayOfWeek, w.StartTime, w.EndTime)).ToList(), r.UnitId))
             .ToList();
     }
+
+    public async Task<IReadOnlyList<TimeOffLookup>> ListTimeOffAsync(
+        Guid resourceId, DateOnly fromDate, DateOnly toDate, CancellationToken cancellationToken = default)
+    {
+        var resourceIdValue = ResourceId.From(resourceId);
+
+        var timeOffs = await dbContext.TimeOffs.AsNoTracking()
+            .Where(t => t.ResourceId == resourceIdValue && t.StartDate <= toDate && fromDate <= t.EndDate)
+            .ToListAsync(cancellationToken);
+
+        return timeOffs.Select(t => new TimeOffLookup(t.StartDate, t.EndDate)).ToList();
+    }
 }
