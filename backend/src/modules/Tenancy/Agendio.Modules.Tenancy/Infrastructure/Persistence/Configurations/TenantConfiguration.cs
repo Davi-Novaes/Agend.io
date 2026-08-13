@@ -39,6 +39,45 @@ public sealed class TenantConfiguration : IEntityTypeConfiguration<Tenant>
         builder.Property(t => t.PrimaryColorHex).HasMaxLength(7);
         builder.Property(t => t.LogoUrl).HasMaxLength(500);
 
+        builder.Property(t => t.Description).HasMaxLength(2000);
+
+        builder.Property(t => t.Phone)
+            .HasConversion(
+                phone => phone == null ? null : phone.Value,
+                value => value == null ? null : PhoneNumber.Create(value).Value)
+            .HasMaxLength(20);
+
+        builder.Property(t => t.WhatsApp)
+            .HasConversion(
+                phone => phone == null ? null : phone.Value,
+                value => value == null ? null : PhoneNumber.Create(value).Value)
+            .HasMaxLength(20);
+
+        builder.Property(t => t.Email)
+            .HasConversion(
+                email => email == null ? null : email.Value,
+                value => value == null ? null : Email.Create(value).Value)
+            .HasMaxLength(320);
+
+        builder.Property(t => t.Address).HasMaxLength(500);
+        builder.Property(t => t.InstagramUrl).HasMaxLength(500);
+        builder.Property(t => t.FacebookUrl).HasMaxLength(500);
+
+        // Colecao de Value Objects sem identidade propria — tabela filha, FK
+        // sombra gerada pelo EF, sem repositorio separado (mesmo padrao de
+        // Resource.WorkingHours no modulo Resources).
+        builder.OwnsMany(t => t.BusinessHours, businessHours =>
+        {
+            businessHours.ToTable("tenant_business_hours");
+            businessHours.WithOwner().HasForeignKey("tenant_id");
+            businessHours.Property<int>("id");
+            businessHours.HasKey("id");
+
+            businessHours.Property(h => h.DayOfWeek).HasConversion<string>().HasMaxLength(20).IsRequired();
+            businessHours.Property(h => h.StartTime).IsRequired();
+            businessHours.Property(h => h.EndTime).IsRequired();
+        });
+
         builder.Property(t => t.CreatedBy).HasMaxLength(256);
         builder.Property(t => t.UpdatedBy).HasMaxLength(256);
 

@@ -35,6 +35,26 @@ public sealed class Tenant : AggregateRoot<TenantId>, IAuditable, ISoftDeletable
     /// <summary>Caminho publico do arquivo salvo por IFileStorage. Null usa um placeholder generico na UI.</summary>
     public string? LogoUrl { get; private set; }
 
+    public string? Description { get; private set; }
+
+    public PhoneNumber? Phone { get; private set; }
+
+    /// <summary>Numero separado do Phone: nem todo estabelecimento atende WhatsApp no mesmo numero da recepcao.</summary>
+    public PhoneNumber? WhatsApp { get; private set; }
+
+    /// <summary>E-mail de contato do negocio — distinto do e-mail de login do dono (Identity.User).</summary>
+    public Email? Email { get; private set; }
+
+    public string? Address { get; private set; }
+
+    public string? InstagramUrl { get; private set; }
+
+    public string? FacebookUrl { get; private set; }
+
+    private readonly List<BusinessHoursEntry> _businessHours = [];
+
+    public IReadOnlyCollection<BusinessHoursEntry> BusinessHours => _businessHours;
+
     public DateTimeOffset CreatedAtUtc { get; set; }
 
     public string? CreatedBy { get; set; }
@@ -124,6 +144,102 @@ public sealed class Tenant : AggregateRoot<TenantId>, IAuditable, ISoftDeletable
 
         LogoUrl = logoUrl;
         return Result.Success();
+    }
+
+    public Result UpdateProfile(
+        string? description, string? phone, string? whatsApp, string? email, string? address, string? instagramUrl, string? facebookUrl)
+    {
+        var phoneResult = ParseOptionalPhone(phone);
+        if (phoneResult.IsFailure)
+        {
+            return Result.Failure(phoneResult.Error);
+        }
+
+        var whatsAppResult = ParseOptionalPhone(whatsApp);
+        if (whatsAppResult.IsFailure)
+        {
+            return Result.Failure(whatsAppResult.Error);
+        }
+
+        var emailResult = ParseOptionalEmail(email);
+        if (emailResult.IsFailure)
+        {
+            return Result.Failure(emailResult.Error);
+        }
+
+        if (!IsValidOptionalUrl(instagramUrl))
+        {
+            return Result.Failure(Error.Validation("Tenant.InvalidInstagramUrl", "O link do Instagram precisa ser uma URL valida (http/https)."));
+        }
+
+        if (!IsValidOptionalUrl(facebookUrl))
+        {
+            return Result.Failure(Error.Validation("Tenant.InvalidFacebookUrl", "O link do Facebook precisa ser uma URL valida (http/https)."));
+        }
+
+        Description = string.IsNullOrWhiteSpace(description) ? null : description.Trim();
+        Phone = phoneResult.Value;
+        WhatsApp = whatsAppResult.Value;
+        Email = emailResult.Value;
+        Address = string.IsNullOrWhiteSpace(address) ? null : address.Trim();
+        InstagramUrl = string.IsNullOrWhiteSpace(instagramUrl) ? null : instagramUrl.Trim();
+        FacebookUrl = string.IsNullOrWhiteSpace(facebookUrl) ? null : facebookUrl.Trim();
+
+        return Result.Success();
+    }
+
+    /// <summary>Substitui a semana inteira — o dono redefine tudo de uma vez, nao adiciona incrementalmente (mesmo padrao de Resource.SetWorkingHours).</summary>
+    public Result SetBusinessHours(IReadOnlyList<(DayOfWeek DayOfWeek, TimeOnly StartTime, TimeOnly EndTime)> entries)
+    {
+        var parsedEntries = new List<BusinessHoursEntry>(entries.Count);
+
+        foreach (var entry in entries)
+        {
+            var entryResult = BusinessHoursEntry.Create(entry.DayOfWeek, entry.StartTime, entry.EndTime);
+            if (entryResult.IsFailure)
+            {
+                return Result.Failure(entryResult.Error);
+            }
+
+            parsedEntries.Add(entryResult.Value);
+        }
+
+        _businessHours.Clear();
+        _businessHours.AddRange(parsedEntries);
+
+        return Result.Success();
+    }
+
+    private static Result<PhoneNumber?> ParseOptionalPhone(string? phone)
+    {
+        if (string.IsNullOrWhiteSpace(phone))
+        {
+            return Result.Success<PhoneNumber?>(null);
+        }
+
+        var result = PhoneNumber.Create(phone);
+        return result.IsSuccess ? Result.Success<PhoneNumber?>(result.Value) : Result.Failure<PhoneNumber?>(result.Error);
+    }
+
+    private static Result<Email?> ParseOptionalEmail(string? email)
+    {
+        if (string.IsNullOrWhiteSpace(email))
+        {
+            return Result.Success<Email?>(null);
+        }
+
+        var result = Email.Create(email);
+        return result.IsSuccess ? Result.Success<Email?>(result.Value) : Result.Failure<Email?>(result.Error);
+    }
+
+    private static bool IsValidOptionalUrl(string? url)
+    {
+        if (string.IsNullOrWhiteSpace(url))
+        {
+            return true;
+        }
+
+        return Uri.TryCreate(url, UriKind.Absolute, out var parsed) && (parsed.Scheme == Uri.UriSchemeHttp || parsed.Scheme == Uri.UriSchemeHttps);
     }
 
     private static bool IsValidTimeZone(string timeZoneId)

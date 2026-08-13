@@ -18,10 +18,14 @@ public sealed class ListServicesQueryHandler(CatalogDbContext dbContext) : IQuer
             query = query.Where(s => EF.Functions.ILike(s.Name, $"%{search}%"));
         }
 
-        var paged = await query.OrderBy(s => s.Name).ToPagedItemsAsync(request.Page, request.PageSize, cancellationToken);
+        var paged = await query
+            .OrderBy(s => s.DisplayOrder)
+            .ThenBy(s => s.Name)
+            .ToPagedItemsAsync(request.Page, request.PageSize, cancellationToken);
 
         var items = paged.Items
-            .Select(s => new ServiceSummary(s.Id.Value, s.Name, s.DurationMinutes, s.Price.Amount, s.Price.Currency, s.Category, s.IsActive))
+            .Select(s => new ServiceSummary(
+                s.Id.Value, s.Name, s.DurationMinutes, s.Price.Amount, s.Price.Currency, s.Category, s.DisplayOrder, s.ImageUrl, s.IsActive))
             .ToList();
 
         return Result.Success(new ListServicesResult(items, paged.TotalCount, paged.Page, paged.PageSize));

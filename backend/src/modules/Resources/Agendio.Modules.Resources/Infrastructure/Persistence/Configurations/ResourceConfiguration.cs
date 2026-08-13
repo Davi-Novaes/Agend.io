@@ -29,6 +29,8 @@ public sealed class ResourceConfiguration : IEntityTypeConfiguration<Resource>
         // Appointment.ResourceId nao ter FK para resources.resources).
         builder.Property(r => r.UnitId);
 
+        builder.Property(r => r.PhotoUrl).HasMaxLength(500);
+
         builder.Property(r => r.IsActive).IsRequired();
 
         // Colecao de Value Objects sem identidade propria — tabela filha, FK
@@ -45,6 +47,15 @@ public sealed class ResourceConfiguration : IEntityTypeConfiguration<Resource>
             workingHours.Property(w => w.StartTime).IsRequired();
             workingHours.Property(w => w.EndTime).IsRequired();
         });
+
+        // Colecao de string "pura" (sem estrutura propria como WorkingHoursEntry)
+        // — mapeada como coluna array nativa do Postgres (text[]) via
+        // PrimitiveCollection, em vez de tabela filha.
+        builder.PrimitiveCollection(r => r.Specialties).HasColumnName("specialties").ElementType(e => e.HasMaxLength(100));
+
+        // Ids de Service (outro modulo) — mesmo raciocinio de Specialties, coluna
+        // array nativa (uuid[]) em vez de tabela de vinculo.
+        builder.PrimitiveCollection(r => r.ServiceIds).HasColumnName("service_ids");
 
         builder.Property(r => r.CreatedBy).HasMaxLength(256);
         builder.Property(r => r.UpdatedBy).HasMaxLength(256);

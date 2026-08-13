@@ -162,6 +162,21 @@ namespace Agendio.Modules.Resources.Infrastructure.Persistence.Migrations
                         .HasColumnType("character varying(200)")
                         .HasColumnName("name");
 
+                    b.Property<string>("PhotoUrl")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("photo_url");
+
+                    b.PrimitiveCollection<Guid[]>("ServiceIds")
+                        .IsRequired()
+                        .HasColumnType("uuid[]")
+                        .HasColumnName("service_ids");
+
+                    b.PrimitiveCollection<string[]>("Specialties")
+                        .IsRequired()
+                        .HasColumnType("character varying(100)[]")
+                        .HasColumnName("specialties");
+
                     b.Property<Guid>("TenantId")
                         .HasColumnType("uuid")
                         .HasColumnName("tenant_id");
@@ -192,6 +207,60 @@ namespace Agendio.Modules.Resources.Infrastructure.Persistence.Migrations
                         .HasDatabaseName("ix_resources_tenant_id_name");
 
                     b.ToTable("resources", "resources");
+                });
+
+            modelBuilder.Entity("Agendio.Modules.Resources.Domain.TimeOff", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<DateTimeOffset>("CreatedAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at_utc");
+
+                    b.Property<string>("CreatedBy")
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)")
+                        .HasColumnName("created_by");
+
+                    b.Property<DateOnly>("EndDate")
+                        .HasColumnType("date")
+                        .HasColumnName("end_date");
+
+                    b.Property<string>("Reason")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("reason");
+
+                    b.Property<Guid>("ResourceId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("resource_id");
+
+                    b.Property<DateOnly>("StartDate")
+                        .HasColumnType("date")
+                        .HasColumnName("start_date");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("tenant_id");
+
+                    b.Property<DateTimeOffset?>("UpdatedAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at_utc");
+
+                    b.Property<string>("UpdatedBy")
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)")
+                        .HasColumnName("updated_by");
+
+                    b.HasKey("Id")
+                        .HasName("pk_time_off");
+
+                    b.HasIndex("TenantId", "ResourceId")
+                        .HasDatabaseName("ix_time_off_tenant_id_resource_id");
+
+                    b.ToTable("time_off", "resources");
                 });
 
             modelBuilder.Entity("Agendio.Modules.Resources.Domain.Resource", b =>

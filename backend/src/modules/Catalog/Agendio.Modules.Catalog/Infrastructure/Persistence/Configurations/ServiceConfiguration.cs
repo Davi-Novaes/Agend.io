@@ -24,6 +24,8 @@ public sealed class ServiceConfiguration : IEntityTypeConfiguration<Service>
         builder.Property(s => s.Description).HasMaxLength(2000);
         builder.Property(s => s.DurationMinutes).IsRequired();
         builder.Property(s => s.Category).HasMaxLength(100);
+        builder.Property(s => s.DisplayOrder).IsRequired().HasDefaultValue(0);
+        builder.Property(s => s.ImageUrl).HasMaxLength(500);
         builder.Property(s => s.IsActive).IsRequired();
 
         // Money e Value Object com dois campos — mapeado como owned type (duas

@@ -11,13 +11,6 @@ public sealed class UpdateTenantLogoCommandHandler(
     TenancyDbContext dbContext, ITenantContext tenantContext, IFileStorage fileStorage)
     : ICommandHandler<UpdateTenantLogoCommand, string>
 {
-    private static readonly Dictionary<string, string> ExtensionByContentType = new()
-    {
-        ["image/png"] = ".png",
-        ["image/jpeg"] = ".jpg",
-        ["image/webp"] = ".webp",
-    };
-
     public async Task<Result<string>> Handle(UpdateTenantLogoCommand request, CancellationToken cancellationToken)
     {
         var tenant = await dbContext.Tenants.SingleOrDefaultAsync(t => t.Id == tenantContext.TenantId, cancellationToken);
@@ -27,8 +20,9 @@ public sealed class UpdateTenantLogoCommandHandler(
         }
 
         // Nome fixo por tenant (nao por upload): reenviar SUBSTITUI o logo
-        // anterior em vez de acumular arquivo orfao a cada troca.
-        var extension = ExtensionByContentType[request.ContentType];
+        // anterior em vez de acumular arquivo orfao a cada troca. ContentType ja
+        // validado pelo pipeline (UpdateTenantLogoCommandValidator).
+        var extension = ImageContentTypes.ExtensionByContentType[request.ContentType];
         var relativePath = $"tenant-logos/{tenantContext.TenantId.Value}{extension}";
 
         using var contentStream = new MemoryStream(request.Content);

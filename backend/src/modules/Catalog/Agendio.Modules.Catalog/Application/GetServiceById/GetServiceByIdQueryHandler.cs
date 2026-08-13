@@ -20,7 +20,7 @@ public sealed class GetServiceByIdQueryHandler(CatalogDbContext dbContext) : IQu
 
         var details = new ServiceDetails(
             service.Id.Value, service.Name, service.Description, service.DurationMinutes,
-            service.Price.Amount, service.Price.Currency, service.Category, service.IsActive);
+            service.Price.Amount, service.Price.Currency, service.Category, service.DisplayOrder, service.ImageUrl, service.IsActive);
 
         return Result.Success(details);
     }

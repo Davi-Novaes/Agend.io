@@ -12,7 +12,7 @@ public sealed class CreateServiceCommandHandler(CatalogDbContext dbContext, ITen
     {
         var serviceResult = Domain.Service.Create(
             tenantContext.TenantId, request.Name, request.Description, request.DurationMinutes,
-            request.Price, request.Currency, request.Category);
+            request.Price, request.Currency, request.Category, request.DisplayOrder);
 
         if (serviceResult.IsFailure)
         {

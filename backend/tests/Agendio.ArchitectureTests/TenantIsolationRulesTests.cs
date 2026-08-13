@@ -91,7 +91,7 @@ public class TenantIsolationRulesTests
     }
 
     [Fact]
-    public void Resources_Module_Should_Have_Exactly_One_TenantOwned_Entity_With_A_Query_Filter()
+    public void Resources_Module_Should_Have_Exactly_Two_TenantOwned_Entities_All_With_A_Query_Filter()
     {
         using var dbContext = CreateResourcesDbContext();
 
@@ -99,7 +99,7 @@ public class TenantIsolationRulesTests
             .Where(entityType => typeof(ITenantOwned).IsAssignableFrom(entityType.ClrType))
             .ToList();
 
-        tenantOwnedEntityTypes.Select(e => e.ClrType).ShouldBe([typeof(Resource)]);
+        tenantOwnedEntityTypes.Select(e => e.ClrType).ShouldBe([typeof(Resource), typeof(TimeOff)], ignoreOrder: true);
 
         foreach (var entityType in tenantOwnedEntityTypes)
         {
