@@ -20,7 +20,9 @@ public sealed class StockMovementConfiguration : IEntityTypeConfiguration<StockM
             .HasConversion(id => id.Value, value => TenantId.From(value))
             .IsRequired();
 
-        builder.Property(m => m.ProductId).IsRequired();
+        builder.Property(m => m.ProductId)
+            .HasConversion(id => id.Value, value => ProductId.From(value))
+            .IsRequired();
         builder.Property(m => m.Type).HasConversion<string>().HasMaxLength(20).IsRequired();
         builder.Property(m => m.Quantity).IsRequired();
         builder.Property(m => m.Reason).HasConversion<string>().HasMaxLength(20).IsRequired();

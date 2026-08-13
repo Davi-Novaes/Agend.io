@@ -10,6 +10,8 @@ using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Routing;
 using Microsoft.Extensions.Options;
+using System.Security.Cryptography;
+using System.Text;
 
 namespace Agendio.Modules.Billing.Endpoints;
 
@@ -57,7 +59,11 @@ public sealed class BillingEndpoints : IEndpointModule
             IDispatcher dispatcher, CancellationToken cancellationToken) =>
         {
             var receivedToken = httpRequest.Headers["asaas-access-token"].ToString();
-            if (!string.Equals(receivedToken, asaasOptions.Value.WebhookSecret, StringComparison.Ordinal))
+            // Comparacao em tempo constante: um webhook e uma fronteira publica anonima,
+            // string.Equals vazaria timing suficiente pra um ataque de adivinhacao do segredo.
+            if (!CryptographicOperations.FixedTimeEquals(
+                    Encoding.UTF8.GetBytes(receivedToken),
+                    Encoding.UTF8.GetBytes(asaasOptions.Value.WebhookSecret)))
             {
                 return Results.Unauthorized();
             }

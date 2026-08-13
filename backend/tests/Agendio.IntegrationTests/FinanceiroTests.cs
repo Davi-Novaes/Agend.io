@@ -182,7 +182,7 @@ public class FinanceiroTests(IntegrationTestFixture fixture)
 
         var today = DateOnly.FromDateTime(DateTime.UtcNow);
         var summaryResponse = await AuthorizedRequestHelpers.GetAuthorizedAsync(
-            client, accessToken, $"/api/financeiro/fluxo-de-caixa?from={Iso(today.AddDays(-1))}&to={Iso(today.AddDays(1))}", cancellationToken);
+            client, accessToken, $"/api/financeiro/fluxo-de-caixa?from={AuthorizedRequestHelpers.Iso(today.AddDays(-1))}&to={AuthorizedRequestHelpers.Iso(today.AddDays(1))}", cancellationToken);
         summaryResponse.StatusCode.ShouldBe(HttpStatusCode.OK);
 
         var summary = await summaryResponse.Content.ReadFromJsonAsync<JsonElement>(cancellationToken);
@@ -215,6 +215,74 @@ public class FinanceiroTests(IntegrationTestFixture fixture)
             client, tenantBToken, "/api/financeiro/contas-a-receber", cancellationToken);
         var tenantBListBody = await tenantBList.Content.ReadFromJsonAsync<JsonElement>(cancellationToken);
         tenantBListBody.GetProperty("totalCount").GetInt32().ShouldBe(0);
+    }
+
+    [Fact]
+    public async Task A_Staff_Member_Should_Not_Be_Able_To_Manage_Sensitive_Financeiro_Actions()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var client = fixture.CreateClient();
+        var ownerToken = await CreateTenantWithOwnerAndLoginAsync(client, cancellationToken);
+        var (_, resourceId, appointmentId, tenantId) = await CreateAndCompleteAppointmentAsync(client, ownerToken, cancellationToken);
+
+        var receivable = await PollAsync(
+            tenantId, dbContext => dbContext.AccountsReceivable.SingleOrDefaultAsync(a => a.SourceAppointmentId == appointmentId, cancellationToken),
+            cancellationToken);
+        receivable.ShouldNotBeNull();
+
+        var createPayableResponse = await AuthorizedRequestHelpers.PostAuthorizedAsync(
+            client, ownerToken, "/api/financeiro/contas-a-pagar",
+            new { description = "Insumos", amount = 30m, dueDate = DateOnly.FromDateTime(DateTime.UtcNow), category = "Supplies" },
+            cancellationToken);
+        var payableId = (await createPayableResponse.Content.ReadFromJsonAsync<JsonElement>(cancellationToken)).GetProperty("id").GetGuid();
+
+        var staffToken = await InviteAndLoginStaffAsync(client, ownerToken, cancellationToken);
+
+        (await AuthorizedRequestHelpers.PatchAuthorizedAsync(
+            client, staffToken, $"/api/financeiro/contas-a-receber/{receivable.Id.Value}/receber", new { }, cancellationToken))
+            .StatusCode.ShouldBe(HttpStatusCode.Forbidden);
+
+        (await AuthorizedRequestHelpers.PatchAuthorizedAsync(
+            client, staffToken, $"/api/financeiro/contas-a-pagar/{payableId}/pagar", new { }, cancellationToken))
+            .StatusCode.ShouldBe(HttpStatusCode.Forbidden);
+
+        (await AuthorizedRequestHelpers.PatchAuthorizedAsync(
+            client, staffToken, $"/api/financeiro/contas-a-pagar/{payableId}/cancelar", new { }, cancellationToken))
+            .StatusCode.ShouldBe(HttpStatusCode.Forbidden);
+
+        (await AuthorizedRequestHelpers.PutAuthorizedAsync(
+            client, staffToken, $"/api/financeiro/comissoes/{resourceId}",
+            new { calculationType = "Percentage", value = 10m }, cancellationToken))
+            .StatusCode.ShouldBe(HttpStatusCode.Forbidden);
+
+        (await AuthorizedRequestHelpers.DeleteAuthorizedAsync(
+            client, staffToken, $"/api/financeiro/comissoes/{resourceId}", cancellationToken))
+            .StatusCode.ShouldBe(HttpStatusCode.Forbidden);
+
+        // Nada mudou: nenhuma tentativa de Staff teve efeito.
+        var receivableAfter = await AuthorizedRequestHelpers.GetAuthorizedAsync(
+            client, ownerToken, "/api/financeiro/contas-a-receber", cancellationToken);
+        var receivableAfterBody = await receivableAfter.Content.ReadFromJsonAsync<JsonElement>(cancellationToken);
+        receivableAfterBody.GetProperty("items")[0].GetProperty("status").GetString().ShouldBe("Pending");
+    }
+
+    private static async Task<string> InviteAndLoginStaffAsync(HttpClient client, string ownerAccessToken, CancellationToken cancellationToken)
+    {
+        var staffEmail = $"staff-{Guid.NewGuid():N}@example.com";
+        var inviteResponse = await AuthorizedRequestHelpers.PostAuthorizedAsync(
+            client, ownerAccessToken, "/api/team/invitations", new { email = staffEmail, role = "Staff" }, cancellationToken);
+        var inviteBody = await inviteResponse.Content.ReadFromJsonAsync<JsonElement>(cancellationToken);
+        var token = inviteBody.GetProperty("token").GetString()!;
+
+        await client.PostAsJsonAsync(
+            $"/api/team/invitations/{token}/accept", new { fullName = "Funcionario", password = Password }, cancellationToken);
+
+        var tenantId = await GetTenantIdFromTokenAsync(client, ownerAccessToken, cancellationToken);
+        var loginResponse = await client.PostAsJsonAsync(
+            "/api/auth/login", new { tenantId, email = staffEmail, password = Password }, cancellationToken);
+        var loginBody = await loginResponse.Content.ReadFromJsonAsync<JsonElement>(cancellationToken);
+
+        return loginBody.GetProperty("accessToken").GetString()!;
     }
 
     private async Task<(Guid CustomerId, Guid ResourceId, Guid AppointmentId, Guid TenantId)> CreateAndCompleteAppointmentAsync(
@@ -283,8 +351,6 @@ public class FinanceiroTests(IntegrationTestFixture fixture)
 
         return null;
     }
-
-    private static string Iso(DateOnly date) => date.ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture);
 
     private static async Task<Guid> GetTenantIdFromTokenAsync(HttpClient client, string accessToken, CancellationToken cancellationToken)
     {

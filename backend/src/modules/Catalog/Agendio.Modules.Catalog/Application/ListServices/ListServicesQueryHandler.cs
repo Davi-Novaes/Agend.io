@@ -1,3 +1,4 @@
+using Agendio.Infrastructure.Persistence;
 using Agendio.Modules.Catalog.Infrastructure.Persistence;
 using Agendio.SharedKernel.Messaging;
 using Agendio.SharedKernel.Results;
@@ -9,9 +10,6 @@ public sealed class ListServicesQueryHandler(CatalogDbContext dbContext) : IQuer
 {
     public async Task<Result<ListServicesResult>> Handle(ListServicesQuery request, CancellationToken cancellationToken)
     {
-        var page = Math.Max(request.Page, 1);
-        var pageSize = Math.Clamp(request.PageSize, 1, 100);
-
         var query = dbContext.Services.AsNoTracking().AsQueryable();
 
         if (!string.IsNullOrWhiteSpace(request.Search))
@@ -20,18 +18,12 @@ public sealed class ListServicesQueryHandler(CatalogDbContext dbContext) : IQuer
             query = query.Where(s => EF.Functions.ILike(s.Name, $"%{search}%"));
         }
 
-        var totalCount = await query.CountAsync(cancellationToken);
+        var paged = await query.OrderBy(s => s.Name).ToPagedItemsAsync(request.Page, request.PageSize, cancellationToken);
 
-        var services = await query
-            .OrderBy(s => s.Name)
-            .Skip((page - 1) * pageSize)
-            .Take(pageSize)
-            .ToListAsync(cancellationToken);
-
-        var items = services
+        var items = paged.Items
             .Select(s => new ServiceSummary(s.Id.Value, s.Name, s.DurationMinutes, s.Price.Amount, s.Price.Currency, s.Category, s.IsActive))
             .ToList();
 
-        return Result.Success(new ListServicesResult(items, totalCount, page, pageSize));
+        return Result.Success(new ListServicesResult(items, paged.TotalCount, paged.Page, paged.PageSize));
     }
 }

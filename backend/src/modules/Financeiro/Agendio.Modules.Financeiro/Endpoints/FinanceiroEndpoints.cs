@@ -38,6 +38,10 @@ public sealed class FinanceiroEndpoints : IEndpointModule
             var result = await dispatcher.Send(new MarkAccountReceivableReceivedCommand(id), cancellationToken);
             return result.IsSuccess ? Results.NoContent() : result.Error.ToProblemResult();
         })
+        // "Owner" e um literal (nao Identity.Domain.UserRole) de proposito: um
+        // modulo nunca referencia outro, so .Contracts — e nao vale a pena
+        // criar um contrato so por causa de uma string de role.
+        .RequireAuthorization(policy => policy.RequireRole("Owner"))
         .WithName("MarkAccountReceivableReceived")
         .WithSummary("Confirma o recebimento de uma conta a receber.");
 
@@ -68,6 +72,7 @@ public sealed class FinanceiroEndpoints : IEndpointModule
             var result = await dispatcher.Send(new MarkAccountPayablePaidCommand(id), cancellationToken);
             return result.IsSuccess ? Results.NoContent() : result.Error.ToProblemResult();
         })
+        .RequireAuthorization(policy => policy.RequireRole("Owner"))
         .WithName("MarkAccountPayablePaid")
         .WithSummary("Confirma o pagamento de uma conta a pagar.");
 
@@ -76,6 +81,7 @@ public sealed class FinanceiroEndpoints : IEndpointModule
             var result = await dispatcher.Send(new CancelAccountPayableCommand(id), cancellationToken);
             return result.IsSuccess ? Results.NoContent() : result.Error.ToProblemResult();
         })
+        .RequireAuthorization(policy => policy.RequireRole("Owner"))
         .WithName("CancelAccountPayable")
         .WithSummary("Cancela uma conta a pagar pendente.");
 
@@ -94,6 +100,7 @@ public sealed class FinanceiroEndpoints : IEndpointModule
             var result = await dispatcher.Send(command, cancellationToken);
             return result.IsSuccess ? Results.NoContent() : result.Error.ToProblemResult();
         })
+        .RequireAuthorization(policy => policy.RequireRole("Owner"))
         .WithName("UpsertCommissionRule")
         .WithSummary("Cria ou atualiza a regra de comissao de um profissional.");
 
@@ -102,6 +109,7 @@ public sealed class FinanceiroEndpoints : IEndpointModule
             var result = await dispatcher.Send(new DeactivateCommissionRuleCommand(resourceId), cancellationToken);
             return result.IsSuccess ? Results.NoContent() : result.Error.ToProblemResult();
         })
+        .RequireAuthorization(policy => policy.RequireRole("Owner"))
         .WithName("DeactivateCommissionRule")
         .WithSummary("Remove a comissao configurada de um profissional.");
 

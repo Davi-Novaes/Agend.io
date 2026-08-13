@@ -155,13 +155,13 @@ public class EstoqueTests(IntegrationTestFixture fixture)
         var today = DateOnly.FromDateTime(DateTime.UtcNow);
         var byPeriod = await AuthorizedRequestHelpers.GetAuthorizedAsync(
             client, accessToken,
-            $"/api/estoque/movimentacoes?productId={productId}&from={Iso(today.AddDays(-1))}&to={Iso(today.AddDays(1))}", cancellationToken);
+            $"/api/estoque/movimentacoes?productId={productId}&from={AuthorizedRequestHelpers.Iso(today.AddDays(-1))}&to={AuthorizedRequestHelpers.Iso(today.AddDays(1))}", cancellationToken);
         var byPeriodBody = await byPeriod.Content.ReadFromJsonAsync<JsonElement>(cancellationToken);
         byPeriodBody.GetProperty("totalCount").GetInt32().ShouldBe(2);
 
         var outsidePeriod = await AuthorizedRequestHelpers.GetAuthorizedAsync(
             client, accessToken,
-            $"/api/estoque/movimentacoes?productId={productId}&from={Iso(today.AddDays(-30))}&to={Iso(today.AddDays(-10))}",
+            $"/api/estoque/movimentacoes?productId={productId}&from={AuthorizedRequestHelpers.Iso(today.AddDays(-30))}&to={AuthorizedRequestHelpers.Iso(today.AddDays(-10))}",
             cancellationToken);
         var outsidePeriodBody = await outsidePeriod.Content.ReadFromJsonAsync<JsonElement>(cancellationToken);
         outsidePeriodBody.GetProperty("totalCount").GetInt32().ShouldBe(0);
@@ -255,8 +255,6 @@ public class EstoqueTests(IntegrationTestFixture fixture)
         var tenantBListBody = await tenantBList.Content.ReadFromJsonAsync<JsonElement>(cancellationToken);
         tenantBListBody.GetProperty("totalCount").GetInt32().ShouldBe(0);
     }
-
-    private static string Iso(DateOnly date) => date.ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture);
 
     private static async Task<Guid> CreateProductAsync(
         HttpClient client, string accessToken, int quantityInStock, int minimumStock, CancellationToken cancellationToken) =>

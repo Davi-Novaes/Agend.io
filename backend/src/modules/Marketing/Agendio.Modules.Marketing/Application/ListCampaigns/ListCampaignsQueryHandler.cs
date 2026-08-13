@@ -1,3 +1,4 @@
+using Agendio.Infrastructure.Persistence;
 using Agendio.Modules.Marketing.Infrastructure.Persistence;
 using Agendio.SharedKernel.Messaging;
 using Agendio.SharedKernel.Results;
@@ -9,20 +10,11 @@ public sealed class ListCampaignsQueryHandler(MarketingDbContext dbContext) : IQ
 {
     public async Task<Result<ListCampaignsResult>> Handle(ListCampaignsQuery request, CancellationToken cancellationToken)
     {
-        var page = Math.Max(request.Page, 1);
-        var pageSize = Math.Clamp(request.PageSize, 1, 100);
-
-        var query = dbContext.Campaigns.AsNoTracking().AsQueryable();
-
-        var totalCount = await query.CountAsync(cancellationToken);
-
-        var items = await query
+        var paged = await dbContext.Campaigns.AsNoTracking()
             .OrderByDescending(c => c.SentAtUtc)
-            .Skip((page - 1) * pageSize)
-            .Take(pageSize)
             .Select(c => new CampaignSummary(c.Id.Value, c.Subject, c.RecipientCount, c.SentAtUtc))
-            .ToListAsync(cancellationToken);
+            .ToPagedItemsAsync(request.Page, request.PageSize, cancellationToken);
 
-        return Result.Success(new ListCampaignsResult(items, totalCount, page, pageSize));
+        return Result.Success(new ListCampaignsResult(paged.Items, paged.TotalCount, paged.Page, paged.PageSize));
     }
 }

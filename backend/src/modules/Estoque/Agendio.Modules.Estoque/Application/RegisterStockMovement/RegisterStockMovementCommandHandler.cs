@@ -28,7 +28,7 @@ public sealed class RegisterStockMovementCommandHandler(EstoqueDbContext dbConte
         }
 
         var movementResult = Domain.StockMovement.Create(
-            tenantContext.TenantId, request.ProductId, request.Type, request.Quantity, request.Reason, request.Notes,
+            tenantContext.TenantId, ProductId.From(request.ProductId), request.Type, request.Quantity, request.Reason, request.Notes,
             request.OccurredAtUtc ?? clock.UtcNow);
 
         if (movementResult.IsFailure)

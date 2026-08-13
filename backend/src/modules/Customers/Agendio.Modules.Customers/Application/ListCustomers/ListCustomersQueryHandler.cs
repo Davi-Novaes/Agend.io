@@ -1,3 +1,4 @@
+using Agendio.Infrastructure.Persistence;
 using Agendio.Modules.Customers.Infrastructure.Persistence;
 using Agendio.SharedKernel.Messaging;
 using Agendio.SharedKernel.Results;
@@ -9,9 +10,6 @@ public sealed class ListCustomersQueryHandler(CustomersDbContext dbContext) : IQ
 {
     public async Task<Result<ListCustomersResult>> Handle(ListCustomersQuery request, CancellationToken cancellationToken)
     {
-        var page = Math.Max(request.Page, 1);
-        var pageSize = Math.Clamp(request.PageSize, 1, 100);
-
         // O Global Query Filter ja restringe isto ao tenant do JWT do chamador.
         var query = dbContext.Customers.AsNoTracking().AsQueryable();
 
@@ -25,18 +23,12 @@ public sealed class ListCustomersQueryHandler(CustomersDbContext dbContext) : IQ
             query = query.Where(c => EF.Functions.ILike(c.FullName, $"%{search}%"));
         }
 
-        var totalCount = await query.CountAsync(cancellationToken);
+        var paged = await query.OrderBy(c => c.FullName).ToPagedItemsAsync(request.Page, request.PageSize, cancellationToken);
 
-        var customers = await query
-            .OrderBy(c => c.FullName)
-            .Skip((page - 1) * pageSize)
-            .Take(pageSize)
-            .ToListAsync(cancellationToken);
-
-        var items = customers
+        var items = paged.Items
             .Select(c => new CustomerSummary(c.Id.Value, c.FullName, c.Email?.Value, c.Phone?.Value, c.IsActive, c.CreatedAtUtc))
             .ToList();
 
-        return Result.Success(new ListCustomersResult(items, totalCount, page, pageSize));
+        return Result.Success(new ListCustomersResult(items, paged.TotalCount, paged.Page, paged.PageSize));
     }
 }

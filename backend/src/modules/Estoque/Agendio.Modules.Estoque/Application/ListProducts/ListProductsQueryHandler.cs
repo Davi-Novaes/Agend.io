@@ -1,3 +1,4 @@
+using Agendio.Infrastructure.Persistence;
 using Agendio.Modules.Estoque.Infrastructure.Persistence;
 using Agendio.SharedKernel.Messaging;
 using Agendio.SharedKernel.Results;
@@ -9,9 +10,6 @@ public sealed class ListProductsQueryHandler(EstoqueDbContext dbContext) : IQuer
 {
     public async Task<Result<ListProductsResult>> Handle(ListProductsQuery request, CancellationToken cancellationToken)
     {
-        var page = Math.Max(request.Page, 1);
-        var pageSize = Math.Clamp(request.PageSize, 1, 100);
-
         var query = dbContext.Products.AsNoTracking().AsQueryable();
 
         if (!string.IsNullOrWhiteSpace(request.Search))
@@ -30,19 +28,15 @@ public sealed class ListProductsQueryHandler(EstoqueDbContext dbContext) : IQuer
             query = query.Where(p => p.QuantityInStock <= p.MinimumStock);
         }
 
-        var totalCount = await query.CountAsync(cancellationToken);
-
-        var items = await query
+        var paged = await query
             .OrderBy(p => p.Name)
-            .Skip((page - 1) * pageSize)
-            .Take(pageSize)
             .Select(p => new ProductSummary(
                 p.Id.Value, p.Name, p.Sku, p.QuantityInStock, p.MinimumStock,
                 p.SalePrice == null ? null : p.SalePrice.Amount,
                 p.SalePrice == null ? null : p.SalePrice.Currency,
                 p.IsActive, p.QuantityInStock <= p.MinimumStock))
-            .ToListAsync(cancellationToken);
+            .ToPagedItemsAsync(request.Page, request.PageSize, cancellationToken);
 
-        return Result.Success(new ListProductsResult(items, totalCount, page, pageSize));
+        return Result.Success(new ListProductsResult(paged.Items, paged.TotalCount, paged.Page, paged.PageSize));
     }
 }

@@ -1,3 +1,4 @@
+using Agendio.Infrastructure.Persistence;
 using Agendio.Modules.Financeiro.Infrastructure.Persistence;
 using Agendio.SharedKernel.Messaging;
 using Agendio.SharedKernel.Results;
@@ -10,9 +11,6 @@ public sealed class ListAccountsReceivableQueryHandler(FinanceiroDbContext dbCon
 {
     public async Task<Result<ListAccountsReceivableResult>> Handle(ListAccountsReceivableQuery request, CancellationToken cancellationToken)
     {
-        var page = Math.Max(request.Page, 1);
-        var pageSize = Math.Clamp(request.PageSize, 1, 100);
-
         // O Global Query Filter ja restringe isto ao tenant do JWT do chamador.
         var query = dbContext.AccountsReceivable.AsNoTracking().AsQueryable();
 
@@ -31,16 +29,12 @@ public sealed class ListAccountsReceivableQueryHandler(FinanceiroDbContext dbCon
             query = query.Where(a => a.DueDate <= request.To);
         }
 
-        var totalCount = await query.CountAsync(cancellationToken);
-
-        var items = await query
+        var paged = await query
             .OrderBy(a => a.DueDate)
-            .Skip((page - 1) * pageSize)
-            .Take(pageSize)
             .Select(a => new AccountReceivableSummary(
                 a.Id.Value, a.Description, a.Amount.Amount, a.Amount.Currency, a.DueDate, a.Status, a.ReceivedAtUtc, a.SourceAppointmentId))
-            .ToListAsync(cancellationToken);
+            .ToPagedItemsAsync(request.Page, request.PageSize, cancellationToken);
 
-        return Result.Success(new ListAccountsReceivableResult(items, totalCount, page, pageSize));
+        return Result.Success(new ListAccountsReceivableResult(paged.Items, paged.TotalCount, paged.Page, paged.PageSize));
     }
 }

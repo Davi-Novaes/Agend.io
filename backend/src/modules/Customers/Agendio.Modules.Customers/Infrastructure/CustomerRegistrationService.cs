@@ -2,6 +2,7 @@ using Agendio.Modules.Customers.Contracts;
 using Agendio.Modules.Customers.Domain;
 using Agendio.Modules.Customers.Infrastructure.Persistence;
 using Agendio.SharedKernel.Multitenancy;
+using Agendio.SharedKernel.Results;
 using Agendio.SharedKernel.ValueObjects;
 using Microsoft.EntityFrameworkCore;
 
@@ -9,13 +10,13 @@ namespace Agendio.Modules.Customers.Infrastructure;
 
 internal sealed class CustomerRegistrationService(CustomersDbContext dbContext, ITenantContext tenantContext) : ICustomerRegistrationService
 {
-    public async Task<Guid> FindOrRegisterByEmailAsync(
+    public async Task<Result<Guid>> FindOrRegisterByEmailAsync(
         string fullName, string email, string? phone, CancellationToken cancellationToken = default)
     {
         var emailResult = Email.Create(email);
         if (emailResult.IsFailure)
         {
-            throw new ArgumentException(emailResult.Error.Message, nameof(email));
+            return Result.Failure<Guid>(emailResult.Error);
         }
 
         // Compara o Value Object inteiro (ja normalizado para minusculo por
@@ -32,7 +33,7 @@ internal sealed class CustomerRegistrationService(CustomersDbContext dbContext, 
         var customerResult = Customer.Create(tenantContext.TenantId, fullName, email, phone, notes: null, dateOfBirth: null);
         if (customerResult.IsFailure)
         {
-            throw new ArgumentException(customerResult.Error.Message, nameof(fullName));
+            return Result.Failure<Guid>(customerResult.Error);
         }
 
         dbContext.Customers.Add(customerResult.Value);
