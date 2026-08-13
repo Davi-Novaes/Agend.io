@@ -1,3 +1,5 @@
+using Agendio.SharedKernel.Results;
+
 namespace Agendio.Modules.Customers.Contracts;
 
 /// <summary>
@@ -11,6 +13,6 @@ namespace Agendio.Modules.Customers.Contracts;
 public interface ICustomerRegistrationService
 {
     /// <summary>Reaproveita um cliente existente pelo e-mail (case-insensitive) ou cria um novo.</summary>
-    Task<Guid> FindOrRegisterByEmailAsync(
+    Task<Result<Guid>> FindOrRegisterByEmailAsync(
         string fullName, string email, string? phone, CancellationToken cancellationToken = default);
 }

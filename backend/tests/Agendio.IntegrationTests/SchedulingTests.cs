@@ -265,7 +265,7 @@ public class SchedulingTests(IntegrationTestFixture fixture)
         var to = from.AddDays(3);
 
         var statsResponse = await AuthorizedRequestHelpers.GetAuthorizedAsync(
-            client, accessToken, $"/api/appointments/stats?from={Iso(from)}&to={Iso(to)}", cancellationToken);
+            client, accessToken, $"/api/appointments/stats?from={AuthorizedRequestHelpers.Iso(from)}&to={AuthorizedRequestHelpers.Iso(to)}", cancellationToken);
         statsResponse.StatusCode.ShouldBe(HttpStatusCode.OK);
 
         var stats = await statsResponse.Content.ReadFromJsonAsync<JsonElement>(cancellationToken);
@@ -300,7 +300,7 @@ public class SchedulingTests(IntegrationTestFixture fixture)
 
         var today = DateOnly.FromDateTime(DateTime.UtcNow);
         var response = await AuthorizedRequestHelpers.GetAuthorizedAsync(
-            client, accessToken, $"/api/appointments/stats?from={Iso(today)}&to={Iso(today.AddDays(7))}", cancellationToken);
+            client, accessToken, $"/api/appointments/stats?from={AuthorizedRequestHelpers.Iso(today)}&to={AuthorizedRequestHelpers.Iso(today.AddDays(7))}", cancellationToken);
         response.StatusCode.ShouldBe(HttpStatusCode.OK);
 
         var stats = await response.Content.ReadFromJsonAsync<JsonElement>(cancellationToken);
@@ -391,8 +391,6 @@ public class SchedulingTests(IntegrationTestFixture fixture)
 
         response.StatusCode.ShouldBe(HttpStatusCode.Unauthorized);
     }
-
-    private static string Iso(DateOnly date) => date.ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture);
 
     private static async Task<Guid> CreateCustomerAsync(HttpClient client, string accessToken, CancellationToken cancellationToken)
     {

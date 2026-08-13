@@ -1,3 +1,4 @@
+using Agendio.Infrastructure.Persistence;
 using Agendio.Modules.Customers.Domain;
 using Agendio.Modules.Customers.Infrastructure.Persistence;
 using Agendio.SharedKernel.Messaging;
@@ -29,24 +30,17 @@ public sealed class GetCustomerAuditLogQueryHandler(CustomersDbContext dbContext
             return Result.Failure<GetCustomerAuditLogResult>(Error.NotFound("Customer.NotFound", "Cliente nao encontrado."));
         }
 
-        var page = Math.Max(request.Page, 1);
-        var pageSize = Math.Clamp(request.PageSize, 1, 100);
-
         var query = dbContext.AuditLogEntries
             .AsNoTracking()
             .Where(e => e.TenantId == tenantContext.TenantId.Value
                 && e.EntityType == nameof(Customer)
                 && e.EntityId == request.CustomerId);
 
-        var totalCount = await query.CountAsync(cancellationToken);
-
-        var entries = await query
+        var paged = await query
             .OrderByDescending(e => e.OccurredAtUtc)
-            .Skip((page - 1) * pageSize)
-            .Take(pageSize)
             .Select(e => new AuditLogEntrySummary(e.Id, e.Action, e.Before, e.After, e.PerformedBy, e.OccurredAtUtc))
-            .ToListAsync(cancellationToken);
+            .ToPagedItemsAsync(request.Page, request.PageSize, cancellationToken);
 
-        return Result.Success(new GetCustomerAuditLogResult(entries, totalCount, page, pageSize));
+        return Result.Success(new GetCustomerAuditLogResult(paged.Items, paged.TotalCount, paged.Page, paged.PageSize));
     }
 }

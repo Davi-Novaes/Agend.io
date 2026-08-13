@@ -63,16 +63,14 @@ public sealed class PublicScheduleAppointmentCommandHandler(
             return Result.Failure<Guid>(priceResult.Error);
         }
 
-        Guid customerId;
-        try
+        var customerResult = await customerRegistration.FindOrRegisterByEmailAsync(
+            request.CustomerFullName, request.CustomerEmail, request.CustomerPhone, cancellationToken);
+        if (customerResult.IsFailure)
         {
-            customerId = await customerRegistration.FindOrRegisterByEmailAsync(
-                request.CustomerFullName, request.CustomerEmail, request.CustomerPhone, cancellationToken);
+            return Result.Failure<Guid>(customerResult.Error);
         }
-        catch (ArgumentException ex)
-        {
-            return Result.Failure<Guid>(Error.Validation("Appointment.InvalidCustomerData", ex.Message));
-        }
+
+        var customerId = customerResult.Value;
 
         // Mesma tecnica de advisory lock usada em ScheduleAppointmentCommandHandler
         // — evita deadlock (40P01) entre transacoes concorrentes disputando o

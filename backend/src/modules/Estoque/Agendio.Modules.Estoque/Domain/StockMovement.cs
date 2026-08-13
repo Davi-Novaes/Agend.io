@@ -15,7 +15,7 @@ public sealed class StockMovement : AggregateRoot<StockMovementId>, ITenantOwned
 {
     public TenantId TenantId { get; private set; } = null!;
 
-    public Guid ProductId { get; private set; }
+    public ProductId ProductId { get; private set; } = null!;
 
     public StockMovementType Type { get; private set; }
 
@@ -40,7 +40,7 @@ public sealed class StockMovement : AggregateRoot<StockMovementId>, ITenantOwned
     }
 
     private StockMovement(
-        TenantId tenantId, Guid productId, StockMovementType type, int quantity, StockMovementReason reason, string? notes,
+        TenantId tenantId, ProductId productId, StockMovementType type, int quantity, StockMovementReason reason, string? notes,
         DateTimeOffset occurredAtUtc)
         : base(StockMovementId.New())
     {
@@ -54,7 +54,7 @@ public sealed class StockMovement : AggregateRoot<StockMovementId>, ITenantOwned
     }
 
     public static Result<StockMovement> Create(
-        TenantId tenantId, Guid productId, StockMovementType type, int quantity, StockMovementReason reason, string? notes,
+        TenantId tenantId, ProductId productId, StockMovementType type, int quantity, StockMovementReason reason, string? notes,
         DateTimeOffset occurredAtUtc)
     {
         if (quantity <= 0)

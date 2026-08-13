@@ -6,7 +6,7 @@ namespace Agendio.UnitTests.Estoque;
 public class StockMovementTests
 {
     private static readonly TenantId Tenant = TenantId.From(Guid.NewGuid());
-    private static readonly Guid ProductId = Guid.NewGuid();
+    private static readonly ProductId Product = ProductId.New();
 
     [Theory]
     [InlineData(0)]
@@ -14,7 +14,7 @@ public class StockMovementTests
     public void Create_Should_Fail_When_Quantity_Is_Zero_Or_Negative(int quantity)
     {
         var result = StockMovement.Create(
-            Tenant, ProductId, StockMovementType.Entry, quantity, StockMovementReason.Purchase, null, DateTimeOffset.UtcNow);
+            Tenant, Product, StockMovementType.Entry, quantity, StockMovementReason.Purchase, null, DateTimeOffset.UtcNow);
 
         result.IsFailure.ShouldBeTrue();
     }
@@ -25,7 +25,7 @@ public class StockMovementTests
         var occurredAtUtc = DateTimeOffset.UtcNow;
 
         var result = StockMovement.Create(
-            Tenant, ProductId, StockMovementType.Exit, 3, StockMovementReason.Sale, "Venda avulsa", occurredAtUtc);
+            Tenant, Product, StockMovementType.Exit, 3, StockMovementReason.Sale, "Venda avulsa", occurredAtUtc);
 
         result.IsSuccess.ShouldBeTrue();
         result.Value.Quantity.ShouldBe(3);
@@ -39,7 +39,7 @@ public class StockMovementTests
     public void Create_Should_Store_Null_Notes_When_Blank()
     {
         var result = StockMovement.Create(
-            Tenant, ProductId, StockMovementType.Entry, 1, StockMovementReason.Adjustment, "   ", DateTimeOffset.UtcNow);
+            Tenant, Product, StockMovementType.Entry, 1, StockMovementReason.Adjustment, "   ", DateTimeOffset.UtcNow);
 
         result.IsSuccess.ShouldBeTrue();
         result.Value.Notes.ShouldBeNull();

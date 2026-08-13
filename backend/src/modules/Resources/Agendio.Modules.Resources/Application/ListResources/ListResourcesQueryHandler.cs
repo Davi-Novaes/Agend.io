@@ -1,3 +1,4 @@
+using Agendio.Infrastructure.Persistence;
 using Agendio.Modules.Resources.Infrastructure.Persistence;
 using Agendio.SharedKernel.Messaging;
 using Agendio.SharedKernel.Results;
@@ -9,9 +10,6 @@ public sealed class ListResourcesQueryHandler(ResourcesDbContext dbContext) : IQ
 {
     public async Task<Result<ListResourcesResult>> Handle(ListResourcesQuery request, CancellationToken cancellationToken)
     {
-        var page = Math.Max(request.Page, 1);
-        var pageSize = Math.Clamp(request.PageSize, 1, 100);
-
         var query = dbContext.Resources.AsNoTracking().AsQueryable();
 
         if (!string.IsNullOrWhiteSpace(request.Search))
@@ -20,18 +18,12 @@ public sealed class ListResourcesQueryHandler(ResourcesDbContext dbContext) : IQ
             query = query.Where(r => EF.Functions.ILike(r.Name, $"%{search}%"));
         }
 
-        var totalCount = await query.CountAsync(cancellationToken);
+        var paged = await query.OrderBy(r => r.Name).ToPagedItemsAsync(request.Page, request.PageSize, cancellationToken);
 
-        var resources = await query
-            .OrderBy(r => r.Name)
-            .Skip((page - 1) * pageSize)
-            .Take(pageSize)
-            .ToListAsync(cancellationToken);
-
-        var items = resources
+        var items = paged.Items
             .Select(r => new ResourceSummary(r.Id.Value, r.Name, r.Type, r.Capacity, r.Description, r.IsActive, r.UnitId))
             .ToList();
 
-        return Result.Success(new ListResourcesResult(items, totalCount, page, pageSize));
+        return Result.Success(new ListResourcesResult(items, paged.TotalCount, paged.Page, paged.PageSize));
     }
 }
