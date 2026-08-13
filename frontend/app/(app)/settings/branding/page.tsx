@@ -15,10 +15,13 @@ import {
   getTenantProfile,
   updateTenantProfile,
   setTenantBusinessHours,
+  updateTenantPageCustomization,
   resolveAssetUrl,
   ApiError,
   type TenantProfile,
   type DayOfWeekName,
+  type PublicPageFont,
+  type PublicPageButtonStyle,
 } from "@/lib/api/client";
 import { meetsAaContrast, contrastRatio } from "@/lib/tenant/contrast";
 import { useSession } from "@/lib/auth/session-context";
@@ -30,6 +33,7 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Switch } from "@/components/ui/switch";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 
 const ALLOWED_LOGO_TYPES = ["image/png", "image/jpeg", "image/webp"];
@@ -48,6 +52,19 @@ function toHex(oklchOrHex: string): string {
 function toNullable(value: string): string | null {
   return value.trim() === "" ? null : value.trim();
 }
+
+const FONT_OPTIONS: { value: PublicPageFont; label: string }[] = [
+  { value: "Default", label: "Padrao do sistema" },
+  { value: "Poppins", label: "Poppins" },
+  { value: "PlayfairDisplay", label: "Playfair Display" },
+  { value: "Merriweather", label: "Merriweather" },
+];
+
+const BUTTON_STYLE_OPTIONS: { value: PublicPageButtonStyle; label: string }[] = [
+  { value: "Rounded", label: "Arredondado" },
+  { value: "Square", label: "Reto" },
+  { value: "Pill", label: "Pilula" },
+];
 
 const DAY_OPTIONS: { value: DayOfWeekName; label: string }[] = [
   { value: "Monday", label: "Segunda" },
@@ -117,6 +134,8 @@ export default function BrandingSettingsPage() {
           <Skeleton className="h-40 w-full" />
           <Skeleton className="h-56 w-full" />
           <Skeleton className="h-72 w-full" />
+          <Skeleton className="h-56 w-full" />
+          <Skeleton className="h-72 w-full" />
         </div>
       ) : (
         // Sem key dinamica de proposito: os forms internos (useForm/useState) so usam
@@ -147,6 +166,16 @@ function BrandingForm({ profile, accessToken }: { profile: TenantProfile; access
   const [selectedBannerFile, setSelectedBannerFile] = React.useState<File | null>(null);
   const [isUploadingBanner, setIsUploadingBanner] = React.useState(false);
   const bannerInputRef = React.useRef<HTMLInputElement>(null);
+
+  const [secondaryColor, setSecondaryColor] = React.useState(profile.secondaryColorHex ?? "");
+  const [font, setFont] = React.useState<PublicPageFont>(profile.font);
+  const [buttonStyle, setButtonStyle] = React.useState<PublicPageButtonStyle>(profile.buttonStyle);
+  const [showAboutSection, setShowAboutSection] = React.useState(profile.showAboutSection);
+  const [showServicesSection, setShowServicesSection] = React.useState(profile.showServicesSection);
+  const [showTeamSection, setShowTeamSection] = React.useState(profile.showTeamSection);
+  const [showHoursSection, setShowHoursSection] = React.useState(profile.showHoursSection);
+  const [showContactSection, setShowContactSection] = React.useState(profile.showContactSection);
+  const [isSavingCustomization, setIsSavingCustomization] = React.useState(false);
 
   const profileForm = useForm<ProfileFormValues>({
     resolver: zodResolver(profileSchema),
@@ -321,6 +350,42 @@ function BrandingForm({ profile, accessToken }: { profile: TenantProfile; access
     }
   }
 
+  const hasSecondaryColor = secondaryColor.trim() !== "";
+  const secondaryRatio = hasSecondaryColor ? contrastRatio(FOREGROUND_HEX, secondaryColor) : null;
+  const secondaryPassesAa = !hasSecondaryColor || meetsAaContrast(FOREGROUND_HEX, secondaryColor);
+
+  function currentCustomizationInput() {
+    return {
+      secondaryColorHex: hasSecondaryColor ? secondaryColor : null,
+      font,
+      buttonStyle,
+      showAboutSection,
+      showServicesSection,
+      showTeamSection,
+      showHoursSection,
+      showContactSection,
+    };
+  }
+
+  async function handleSaveCustomization() {
+    setIsSavingCustomization(true);
+    try {
+      await updateTenantPageCustomization(currentCustomizationInput(), accessToken);
+      toast.success("Personalizacao da pagina atualizada.");
+      queryClient.invalidateQueries({ queryKey: ["tenant", "profile"] });
+    } catch (error) {
+      const message = error instanceof ApiError ? error.message : "Nao foi possivel salvar a personalizacao.";
+      toast.error(message);
+    } finally {
+      setIsSavingCustomization(false);
+    }
+  }
+
+  function handlePreview() {
+    const encoded = btoa(JSON.stringify(currentCustomizationInput()));
+    window.open(`/${profile.slug}?preview=${encoded}`, "_blank", "noopener,noreferrer");
+  }
+
   return (
     <>
       <Card>
@@ -445,6 +510,122 @@ function BrandingForm({ profile, accessToken }: { profile: TenantProfile; access
           <Button onClick={handleSaveColor} disabled={isSavingColor || !passesAa} className="mt-2 w-fit">
             {isSavingColor ? "Salvando..." : "Salvar cor de marca"}
           </Button>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">Personalizar pagina</CardTitle>
+          <CardDescription>Cor de apoio, fonte, estilo de botao e o que aparece na sua pagina publica.</CardDescription>
+        </CardHeader>
+        <CardContent className="grid gap-4">
+          <div className="flex items-center gap-3">
+            <input
+              type="color"
+              value={hasSecondaryColor ? secondaryColor : "#64748B"}
+              onChange={(event) => setSecondaryColor(event.target.value.toUpperCase())}
+              className="h-10 w-14 cursor-pointer rounded-md border border-input"
+              aria-label="Selecionar cor secundaria"
+            />
+            <div className="grid gap-1">
+              <Label htmlFor="secondary-color-hex">Cor secundaria (opcional)</Label>
+              <div className="flex items-center gap-2">
+                <input
+                  id="secondary-color-hex"
+                  value={secondaryColor}
+                  onChange={(event) => setSecondaryColor(event.target.value.toUpperCase())}
+                  placeholder="Sem cor de apoio"
+                  maxLength={7}
+                  className="border-input bg-background h-8 w-32 rounded-md border px-2 font-mono text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
+                />
+                {hasSecondaryColor && (
+                  <Button type="button" variant="ghost" size="sm" onClick={() => setSecondaryColor("")}>
+                    Remover
+                  </Button>
+                )}
+              </div>
+            </div>
+          </div>
+
+          {hasSecondaryColor && (
+            <p
+              className={secondaryPassesAa ? "text-sm text-emerald-700 dark:text-emerald-400" : "text-destructive text-sm"}
+              role="status"
+            >
+              Contraste com o texto branco: {secondaryRatio!.toFixed(1)}:1 —{" "}
+              {secondaryPassesAa ? "atende ao padrao de acessibilidade (AA)." : "insuficiente. Escolha um tom mais escuro."}
+            </p>
+          )}
+
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div className="grid gap-1">
+              <Label>Fonte</Label>
+              <Select value={font} onValueChange={(value) => setFont(value as PublicPageFont)}>
+                <SelectTrigger className="w-full">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {FONT_OPTIONS.map((option) => (
+                    <SelectItem key={option.value} value={option.value}>
+                      {option.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="grid gap-1">
+              <Label>Estilo de botao</Label>
+              <Select value={buttonStyle} onValueChange={(value) => setButtonStyle(value as PublicPageButtonStyle)}>
+                <SelectTrigger className="w-full">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {BUTTON_STYLE_OPTIONS.map((option) => (
+                    <SelectItem key={option.value} value={option.value}>
+                      {option.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+
+          <div className="grid gap-3">
+            <Label>O que aparece na pagina publica</Label>
+            <div className="flex items-center justify-between gap-4">
+              <span className="text-sm">Sobre (descricao no topo)</span>
+              <Switch checked={showAboutSection} onCheckedChange={setShowAboutSection} aria-label="Mostrar secao Sobre" />
+            </div>
+            <div className="flex items-center justify-between gap-4">
+              <span className="text-sm">Servicos</span>
+              <Switch checked={showServicesSection} onCheckedChange={setShowServicesSection} aria-label="Mostrar secao Servicos" />
+            </div>
+            <div className="flex items-center justify-between gap-4">
+              <span className="text-sm">Equipe</span>
+              <Switch checked={showTeamSection} onCheckedChange={setShowTeamSection} aria-label="Mostrar secao Equipe" />
+            </div>
+            <div className="flex items-center justify-between gap-4">
+              <span className="text-sm">Horario de funcionamento</span>
+              <Switch checked={showHoursSection} onCheckedChange={setShowHoursSection} aria-label="Mostrar secao Horario" />
+            </div>
+            <div className="flex items-center justify-between gap-4">
+              <span className="text-sm">Contato e redes sociais</span>
+              <Switch checked={showContactSection} onCheckedChange={setShowContactSection} aria-label="Mostrar secao Contato" />
+            </div>
+          </div>
+
+          <div className="mt-2 flex flex-wrap gap-2">
+            <Button
+              onClick={handleSaveCustomization}
+              disabled={isSavingCustomization || !secondaryPassesAa}
+              className="w-fit"
+            >
+              {isSavingCustomization ? "Salvando..." : "Salvar personalizacao"}
+            </Button>
+            <Button type="button" variant="outline" onClick={handlePreview} className="w-fit">
+              Visualizar antes de salvar
+            </Button>
+          </div>
         </CardContent>
       </Card>
 

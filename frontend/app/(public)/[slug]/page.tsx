@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Image from "next/image";
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { Merriweather, Playfair_Display, Poppins } from "next/font/google";
 import {
   Clock,
   ExternalLink,
@@ -21,6 +22,8 @@ import {
   type TenantPublicProfile,
   type PublicServiceSummary,
   type PublicResourceSummary,
+  type PublicPageFont,
+  type PublicPageButtonStyle,
   type WorkingHourEntry,
 } from "@/lib/api/client";
 import { TenantThemeProvider } from "@/lib/tenant/tenant-theme-provider";
@@ -33,7 +36,54 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 
 type PageProps = {
   params: Promise<{ slug: string }>;
+  searchParams: Promise<{ preview?: string }>;
 };
+
+// Lista curada de fontes (Fase 3 — Personalizacao da pagina). Aplicada so
+// nesta rota publica, nunca no painel autenticado.
+const poppins = Poppins({ weight: ["400", "600", "700"], subsets: ["latin"], variable: "--font-tenant-poppins" });
+const playfairDisplay = Playfair_Display({ subsets: ["latin"], variable: "--font-tenant-playfair" });
+const merriweather = Merriweather({ weight: ["400", "700"], subsets: ["latin"], variable: "--font-tenant-merriweather" });
+
+const FONT_CLASS_NAME: Record<PublicPageFont, string> = {
+  Default: "",
+  Poppins: poppins.className,
+  PlayfairDisplay: playfairDisplay.className,
+  Merriweather: merriweather.className,
+};
+
+const BUTTON_RADIUS: Record<PublicPageButtonStyle, string> = {
+  Rounded: "var(--radius-lg)",
+  Square: "0.125rem",
+  Pill: "9999px",
+};
+
+// Campos que o dono pode pre-visualizar antes de salvar (settings/branding)
+// — ver PageCustomizationOverride no card "Personalizar pagina". Conteudo
+// (descricao, servicos, etc.) sempre vem do dado real ja salvo.
+type PreviewOverride = {
+  secondaryColorHex: string | null;
+  font: PublicPageFont;
+  buttonStyle: PublicPageButtonStyle;
+  showAboutSection: boolean;
+  showServicesSection: boolean;
+  showTeamSection: boolean;
+  showHoursSection: boolean;
+  showContactSection: boolean;
+};
+
+function decodePreviewOverride(encoded: string | undefined): PreviewOverride | null {
+  if (!encoded) {
+    return null;
+  }
+
+  try {
+    const json = Buffer.from(encoded, "base64").toString("utf-8");
+    return JSON.parse(json) as PreviewOverride;
+  } catch {
+    return null;
+  }
+}
 
 const DAY_ORDER: WorkingHourEntry["dayOfWeek"][] = [
   "Monday",
@@ -90,8 +140,9 @@ function whatsAppLink(whatsApp: string): string {
 // SSR de proposito (nao 'use client'): esta e a pagina publica indexavel do
 // tenant — precisa de HTML pronto no primeiro request para SEO. A parte
 // interativa (fluxo de agendamento) vive num Client Component a parte.
-export default async function TenantPortalPage({ params }: PageProps) {
+export default async function TenantPortalPage({ params, searchParams }: PageProps) {
   const { slug } = await params;
+  const { preview } = await searchParams;
   const tenant = await loadTenant(slug);
 
   if (!tenant || !tenant.isActive) {
@@ -102,6 +153,21 @@ export default async function TenantPortalPage({ params }: PageProps) {
     publicListServices(tenant.id).catch(() => [] as PublicServiceSummary[]),
     publicListResources(tenant.id).catch(() => [] as PublicResourceSummary[]),
   ]);
+
+  // Preview antes de salvar (Fase 3): so os campos de personalizacao sao
+  // sobrepostos com valores ainda nao salvos — conteudo continua vindo do
+  // dado real, coerente com o resto do produto (edicao sempre salva na hora).
+  const previewOverride = decodePreviewOverride(preview);
+  const customization: PreviewOverride = previewOverride ?? {
+    secondaryColorHex: tenant.secondaryColorHex,
+    font: tenant.font,
+    buttonStyle: tenant.buttonStyle,
+    showAboutSection: tenant.showAboutSection,
+    showServicesSection: tenant.showServicesSection,
+    showTeamSection: tenant.showTeamSection,
+    showHoursSection: tenant.showHoursSection,
+    showContactSection: tenant.showContactSection,
+  };
 
   const orderedBusinessHours = [...tenant.businessHours].sort(
     (a, b) => DAY_ORDER.indexOf(a.dayOfWeek) - DAY_ORDER.indexOf(b.dayOfWeek)
@@ -114,13 +180,21 @@ export default async function TenantPortalPage({ params }: PageProps) {
   // A cor customizada so foi aceita ao salvar (settings/branding) se tivesse
   // contraste AA suficiente contra branco — por isso o texto sobre ela pode
   // ser sempre branco aqui, sem recalcular nada.
-  const theme = tenant.primaryColorHex
-    ? { primary: tenant.primaryColorHex, primaryForeground: "#ffffff" }
-    : DEFAULT_TENANT_THEME;
+  const theme = {
+    ...(tenant.primaryColorHex
+      ? { primary: tenant.primaryColorHex, primaryForeground: "#ffffff" }
+      : DEFAULT_TENANT_THEME),
+    ...(customization.secondaryColorHex
+      ? { secondary: customization.secondaryColorHex, secondaryForeground: "#ffffff" }
+      : {}),
+    buttonRadius: BUTTON_RADIUS[customization.buttonStyle],
+  };
+
+  const buttonRadiusClassName = "rounded-[var(--tenant-button-radius)]";
 
   return (
     <TenantThemeProvider theme={theme}>
-      <div className="flex min-h-full flex-1 flex-col">
+      <div className={`flex min-h-full flex-1 flex-col ${FONT_CLASS_NAME[customization.font]}`}>
         <header className="relative isolate flex min-h-64 flex-col items-center justify-end overflow-hidden bg-primary px-4 py-10 text-center sm:min-h-80 sm:py-14">
           {tenant.bannerUrl && (
             <>
@@ -155,19 +229,19 @@ export default async function TenantPortalPage({ params }: PageProps) {
             <h1 className="text-3xl font-semibold tracking-tight text-white text-balance drop-shadow-sm sm:text-4xl">
               {tenant.name}
             </h1>
-            {tenant.description && (
+            {customization.showAboutSection && tenant.description && (
               <p className="max-w-xl text-sm text-white/90 text-balance drop-shadow-sm sm:text-base">
                 {tenant.description}
               </p>
             )}
-            <Button size="lg" className="mt-2 shadow-md" asChild>
+            <Button size="lg" className={`mt-2 shadow-md ${buttonRadiusClassName}`} asChild>
               <Link href="#agendar">Agendar horario</Link>
             </Button>
           </div>
         </header>
 
         <main className="mx-auto flex w-full max-w-5xl flex-1 flex-col gap-16 px-4 py-14 sm:px-6 sm:py-20">
-          {services.length > 0 && (
+          {customization.showServicesSection && services.length > 0 && (
             <section aria-labelledby="servicos-heading" className="flex flex-col gap-6">
               <div className="text-center">
                 <h2 id="servicos-heading" className="text-2xl font-semibold tracking-tight sm:text-3xl">
@@ -213,7 +287,7 @@ export default async function TenantPortalPage({ params }: PageProps) {
             </section>
           )}
 
-          {resources.length > 0 && (
+          {customization.showTeamSection && resources.length > 0 && (
             <section aria-labelledby="profissionais-heading" className="flex flex-col gap-6">
               <div className="text-center">
                 <h2 id="profissionais-heading" className="text-2xl font-semibold tracking-tight sm:text-3xl">
@@ -250,7 +324,7 @@ export default async function TenantPortalPage({ params }: PageProps) {
             </section>
           )}
 
-          {orderedBusinessHours.length > 0 && (
+          {customization.showHoursSection && orderedBusinessHours.length > 0 && (
             <section aria-labelledby="horarios-heading" className="mx-auto flex w-full max-w-md flex-col gap-6">
               <div className="text-center">
                 <h2 id="horarios-heading" className="text-2xl font-semibold tracking-tight sm:text-3xl">
@@ -283,13 +357,13 @@ export default async function TenantPortalPage({ params }: PageProps) {
             </div>
             <Card className="mx-auto w-full max-w-lg">
               <CardContent>
-                <BookingFlow tenantId={tenant.id} />
+                <BookingFlow tenantId={tenant.id} buttonRadiusClassName={buttonRadiusClassName} />
               </CardContent>
             </Card>
           </section>
         </main>
 
-        {hasContactInfo && (
+        {customization.showContactSection && hasContactInfo && (
           <footer className="border-t">
             <div className="mx-auto flex w-full max-w-5xl flex-col items-center gap-4 px-4 py-10 text-center sm:px-6">
               {tenant.address && (
@@ -300,7 +374,7 @@ export default async function TenantPortalPage({ params }: PageProps) {
               )}
               <div className="flex flex-wrap items-center justify-center gap-3">
                 {tenant.phone && (
-                  <Button variant="outline" size="sm" asChild>
+                  <Button variant="outline" size="sm" className={buttonRadiusClassName} asChild>
                     <a href={`tel:${tenant.phone}`}>
                       <Phone className="size-4" />
                       {tenant.phone}
@@ -308,7 +382,7 @@ export default async function TenantPortalPage({ params }: PageProps) {
                   </Button>
                 )}
                 {tenant.whatsApp && (
-                  <Button variant="outline" size="sm" asChild>
+                  <Button variant="outline" size="sm" className={buttonRadiusClassName} asChild>
                     <a href={whatsAppLink(tenant.whatsApp)} target="_blank" rel="noopener noreferrer">
                       <MessageCircle className="size-4" />
                       WhatsApp
@@ -316,7 +390,7 @@ export default async function TenantPortalPage({ params }: PageProps) {
                   </Button>
                 )}
                 {tenant.instagramUrl && (
-                  <Button variant="outline" size="sm" asChild>
+                  <Button variant="outline" size="sm" className={buttonRadiusClassName} asChild>
                     <a href={tenant.instagramUrl} target="_blank" rel="noopener noreferrer">
                       Instagram
                       <ExternalLink className="size-3.5" />
@@ -324,7 +398,7 @@ export default async function TenantPortalPage({ params }: PageProps) {
                   </Button>
                 )}
                 {tenant.facebookUrl && (
-                  <Button variant="outline" size="sm" asChild>
+                  <Button variant="outline" size="sm" className={buttonRadiusClassName} asChild>
                     <a href={tenant.facebookUrl} target="_blank" rel="noopener noreferrer">
                       Facebook
                       <ExternalLink className="size-3.5" />

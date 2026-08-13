@@ -20,9 +20,21 @@ export function TenantThemeProvider({
     root.style.setProperty("--primary", theme.primary);
     root.style.setProperty("--primary-foreground", theme.primaryForeground);
 
+    if (theme.secondary) {
+      root.style.setProperty("--secondary", theme.secondary);
+      root.style.setProperty("--secondary-foreground", theme.secondaryForeground ?? "#ffffff");
+    }
+
+    if (theme.buttonRadius) {
+      root.style.setProperty("--tenant-button-radius", theme.buttonRadius);
+    }
+
     return () => {
       root.style.removeProperty("--primary");
       root.style.removeProperty("--primary-foreground");
+      root.style.removeProperty("--secondary");
+      root.style.removeProperty("--secondary-foreground");
+      root.style.removeProperty("--tenant-button-radius");
     };
   }, [theme]);
 

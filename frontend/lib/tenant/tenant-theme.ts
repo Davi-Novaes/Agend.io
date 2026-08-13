@@ -3,6 +3,11 @@
 export type TenantTheme = {
   primary: string;
   primaryForeground: string;
+  /** Cor de apoio (badges/acentos, Fase 3) — undefined usa o --secondary padrao do design system. */
+  secondary?: string;
+  secondaryForeground?: string;
+  /** Raio dos botoes da pagina publica (Fase 3) — undefined usa o --radius-lg padrao. */
+  buttonRadius?: string;
 };
 
 // Reaproveita o --primary/--primary-foreground padrao do design system (ver

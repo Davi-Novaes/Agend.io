@@ -144,6 +144,14 @@ namespace Agendio.Modules.Tenancy.Infrastructure.Persistence.Migrations
                         .HasDefaultValue("Other")
                         .HasColumnName("business_type");
 
+                    b.Property<string>("ButtonStyle")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasDefaultValue("Rounded")
+                        .HasColumnName("button_style");
+
                     b.Property<DateTimeOffset>("CreatedAtUtc")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("created_at_utc");
@@ -171,6 +179,14 @@ namespace Agendio.Modules.Tenancy.Infrastructure.Persistence.Migrations
                         .HasMaxLength(500)
                         .HasColumnType("character varying(500)")
                         .HasColumnName("facebook_url");
+
+                    b.Property<string>("Font")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)")
+                        .HasDefaultValue("Default")
+                        .HasColumnName("font");
 
                     b.Property<string>("InstagramUrl")
                         .HasMaxLength(500)
@@ -205,6 +221,41 @@ namespace Agendio.Modules.Tenancy.Infrastructure.Persistence.Migrations
                         .HasMaxLength(7)
                         .HasColumnType("character varying(7)")
                         .HasColumnName("primary_color_hex");
+
+                    b.Property<string>("SecondaryColorHex")
+                        .HasMaxLength(7)
+                        .HasColumnType("character varying(7)")
+                        .HasColumnName("secondary_color_hex");
+
+                    b.Property<bool>("ShowAboutSection")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(true)
+                        .HasColumnName("show_about_section");
+
+                    b.Property<bool>("ShowContactSection")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(true)
+                        .HasColumnName("show_contact_section");
+
+                    b.Property<bool>("ShowHoursSection")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(true)
+                        .HasColumnName("show_hours_section");
+
+                    b.Property<bool>("ShowServicesSection")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(true)
+                        .HasColumnName("show_services_section");
+
+                    b.Property<bool>("ShowTeamSection")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(true)
+                        .HasColumnName("show_team_section");
 
                     b.Property<string>("Slug")
                         .IsRequired()

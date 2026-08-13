@@ -43,6 +43,14 @@ public sealed class GetPublicTenantProfileQueryHandler(TenancyDbContext dbContex
             tenant.Address,
             tenant.InstagramUrl,
             tenant.FacebookUrl,
+            tenant.SecondaryColorHex,
+            tenant.Font,
+            tenant.ButtonStyle,
+            tenant.ShowAboutSection,
+            tenant.ShowServicesSection,
+            tenant.ShowTeamSection,
+            tenant.ShowHoursSection,
+            tenant.ShowContactSection,
             businessHours);
 
         return Result.Success(profile);
