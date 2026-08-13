@@ -5,4 +5,5 @@ namespace Agendio.Modules.Catalog.Application.GetServiceById;
 public sealed record GetServiceByIdQuery(Guid ServiceId) : IQuery<ServiceDetails>;
 
 public sealed record ServiceDetails(
-    Guid Id, string Name, string? Description, int DurationMinutes, decimal Price, string Currency, string? Category, bool IsActive);
+    Guid Id, string Name, string? Description, int DurationMinutes, decimal Price, string Currency, string? Category, int DisplayOrder,
+    string? ImageUrl, bool IsActive);

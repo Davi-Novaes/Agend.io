@@ -4,6 +4,7 @@ using Agendio.Modules.Catalog.Application.DeactivateService;
 using Agendio.Modules.Catalog.Application.GetServiceById;
 using Agendio.Modules.Catalog.Application.ListServices;
 using Agendio.Modules.Catalog.Application.UpdateService;
+using Agendio.Modules.Catalog.Application.UploadServiceImage;
 using Agendio.SharedKernel.Messaging;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
@@ -39,7 +40,7 @@ public sealed class ServiceEndpoints : IEndpointModule
         {
             var command = new CreateServiceCommand(
                 request.Name, request.Description, request.DurationMinutes, request.Price,
-                request.Currency ?? "BRL", request.Category);
+                request.Currency ?? "BRL", request.Category, request.DisplayOrder);
             var result = await dispatcher.Send(command, cancellationToken);
 
             return result.IsSuccess
@@ -53,7 +54,7 @@ public sealed class ServiceEndpoints : IEndpointModule
         {
             var command = new UpdateServiceCommand(
                 id, request.Name, request.Description, request.DurationMinutes,
-                request.Price, request.Currency ?? "BRL", request.Category);
+                request.Price, request.Currency ?? "BRL", request.Category, request.DisplayOrder);
             var result = await dispatcher.Send(command, cancellationToken);
 
             return result.IsSuccess ? Results.NoContent() : result.Error.ToProblemResult();
@@ -68,11 +69,27 @@ public sealed class ServiceEndpoints : IEndpointModule
         })
         .WithName("SetServiceActiveStatus")
         .WithSummary("Ativa ou desativa um servico.");
+
+        group.MapPost("/{id:guid}/image", async (Guid id, IFormFile file, IDispatcher dispatcher, CancellationToken cancellationToken) =>
+        {
+            await using var contentStream = new MemoryStream();
+            await file.CopyToAsync(contentStream, cancellationToken);
+
+            var command = new UploadServiceImageCommand(id, contentStream.ToArray(), file.ContentType);
+            var result = await dispatcher.Send(command, cancellationToken);
+
+            return result.IsSuccess ? Results.Ok(new { imageUrl = result.Value }) : result.Error.ToProblemResult();
+        })
+        .DisableAntiforgery()
+        .WithName("UploadServiceImage")
+        .WithSummary("Faz upload da imagem do servico (PNG/JPEG/WEBP).");
     }
 
-    private sealed record CreateServiceRequest(string Name, string? Description, int DurationMinutes, decimal Price, string? Currency, string? Category);
+    private sealed record CreateServiceRequest(
+        string Name, string? Description, int DurationMinutes, decimal Price, string? Currency, string? Category, int DisplayOrder = 0);
 
-    private sealed record UpdateServiceRequest(string Name, string? Description, int DurationMinutes, decimal Price, string? Currency, string? Category);
+    private sealed record UpdateServiceRequest(
+        string Name, string? Description, int DurationMinutes, decimal Price, string? Currency, string? Category, int DisplayOrder);
 
     private sealed record SetActiveStatusRequest(bool IsActive);
 }

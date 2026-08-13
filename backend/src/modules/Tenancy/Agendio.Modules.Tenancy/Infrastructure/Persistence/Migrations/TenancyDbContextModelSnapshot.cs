@@ -126,6 +126,11 @@ namespace Agendio.Modules.Tenancy.Infrastructure.Persistence.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("id");
 
+                    b.Property<string>("Address")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("address");
+
                     b.Property<string>("BusinessType")
                         .IsRequired()
                         .ValueGeneratedOnAdd()
@@ -147,6 +152,26 @@ namespace Agendio.Modules.Tenancy.Infrastructure.Persistence.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("deleted_at_utc");
 
+                    b.Property<string>("Description")
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)")
+                        .HasColumnName("description");
+
+                    b.Property<string>("Email")
+                        .HasMaxLength(320)
+                        .HasColumnType("character varying(320)")
+                        .HasColumnName("email");
+
+                    b.Property<string>("FacebookUrl")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("facebook_url");
+
+                    b.Property<string>("InstagramUrl")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("instagram_url");
+
                     b.Property<bool>("IsActive")
                         .HasColumnType("boolean")
                         .HasColumnName("is_active");
@@ -165,6 +190,11 @@ namespace Agendio.Modules.Tenancy.Infrastructure.Persistence.Migrations
                         .HasMaxLength(200)
                         .HasColumnType("character varying(200)")
                         .HasColumnName("name");
+
+                    b.Property<string>("Phone")
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("phone");
 
                     b.Property<string>("PrimaryColorHex")
                         .HasMaxLength(7)
@@ -191,6 +221,11 @@ namespace Agendio.Modules.Tenancy.Infrastructure.Persistence.Migrations
                         .HasMaxLength(256)
                         .HasColumnType("character varying(256)")
                         .HasColumnName("updated_by");
+
+                    b.Property<string>("WhatsApp")
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("whats_app");
 
                     b.HasKey("Id")
                         .HasName("pk_tenants");
@@ -260,6 +295,51 @@ namespace Agendio.Modules.Tenancy.Infrastructure.Persistence.Migrations
                         .HasDatabaseName("ix_units_tenant_id_name");
 
                     b.ToTable("units", "tenancy");
+                });
+
+            modelBuilder.Entity("Agendio.Modules.Tenancy.Domain.Tenant", b =>
+                {
+                    b.OwnsMany("Agendio.Modules.Tenancy.Domain.BusinessHoursEntry", "BusinessHours", b1 =>
+                        {
+                            b1.Property<int>("id")
+                                .ValueGeneratedOnAdd()
+                                .HasColumnType("integer")
+                                .HasColumnName("id");
+
+                            NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b1.Property<int>("id"));
+
+                            b1.Property<string>("DayOfWeek")
+                                .IsRequired()
+                                .HasMaxLength(20)
+                                .HasColumnType("character varying(20)")
+                                .HasColumnName("day_of_week");
+
+                            b1.Property<TimeOnly>("EndTime")
+                                .HasColumnType("time without time zone")
+                                .HasColumnName("end_time");
+
+                            b1.Property<TimeOnly>("StartTime")
+                                .HasColumnType("time without time zone")
+                                .HasColumnName("start_time");
+
+                            b1.Property<Guid>("tenant_id")
+                                .HasColumnType("uuid")
+                                .HasColumnName("tenant_id");
+
+                            b1.HasKey("id")
+                                .HasName("pk_tenant_business_hours");
+
+                            b1.HasIndex("tenant_id")
+                                .HasDatabaseName("ix_tenant_business_hours_tenant_id");
+
+                            b1.ToTable("tenant_business_hours", "tenancy");
+
+                            b1.WithOwner()
+                                .HasForeignKey("tenant_id")
+                                .HasConstraintName("fk_tenant_business_hours_tenants_tenant_id");
+                        });
+
+                    b.Navigation("BusinessHours");
                 });
 #pragma warning restore 612, 618
         }

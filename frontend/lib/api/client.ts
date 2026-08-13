@@ -206,6 +206,43 @@ export async function uploadTenantLogo(file: File, accessToken: string): Promise
   return response.json();
 }
 
+export type TenantProfile = {
+  name: string;
+  slug: string;
+  primaryColorHex: string | null;
+  logoUrl: string | null;
+  description: string | null;
+  phone: string | null;
+  whatsApp: string | null;
+  email: string | null;
+  address: string | null;
+  instagramUrl: string | null;
+  facebookUrl: string | null;
+  businessHours: WorkingHourEntry[];
+};
+
+export type TenantProfileInput = {
+  description?: string | null;
+  phone?: string | null;
+  whatsApp?: string | null;
+  email?: string | null;
+  address?: string | null;
+  instagramUrl?: string | null;
+  facebookUrl?: string | null;
+};
+
+export function getTenantProfile(accessToken: string): Promise<TenantProfile> {
+  return request("/api/tenants/profile", {}, accessToken);
+}
+
+export function updateTenantProfile(input: TenantProfileInput, accessToken: string): Promise<void> {
+  return request("/api/tenants/profile", { method: "PUT", body: JSON.stringify(input) }, accessToken);
+}
+
+export function setTenantBusinessHours(entries: WorkingHourEntry[], accessToken: string): Promise<void> {
+  return request("/api/tenants/business-hours", { method: "PUT", body: JSON.stringify({ entries }) }, accessToken);
+}
+
 export type TeamMember = {
   id: string;
   email: string;
@@ -363,6 +400,8 @@ export type ServiceSummary = {
   price: number;
   currency: string;
   category: string | null;
+  displayOrder: number;
+  imageUrl: string | null;
   isActive: boolean;
 };
 
@@ -377,6 +416,7 @@ export type ServiceInput = {
   price: number;
   currency?: string;
   category?: string | null;
+  displayOrder?: number;
 };
 
 export function listServices(
@@ -400,6 +440,25 @@ export function updateService(id: string, input: ServiceInput, accessToken: stri
 
 export function setServiceActiveStatus(id: string, isActive: boolean, accessToken: string): Promise<void> {
   return request(`/api/services/${id}/status`, { method: "PATCH", body: JSON.stringify({ isActive }) }, accessToken);
+}
+
+export async function uploadServiceImage(id: string, file: File, accessToken: string): Promise<{ imageUrl: string }> {
+  const formData = new FormData();
+  formData.append("file", file);
+
+  const response = await fetch(`${API_BASE_URL}/api/services/${id}/image`, {
+    method: "POST",
+    credentials: "include",
+    headers: { Authorization: `Bearer ${accessToken}` },
+    body: formData,
+  });
+
+  if (!response.ok) {
+    const problem = (await response.json().catch(() => null)) as ProblemDetails | null;
+    throw new ApiError(problem?.detail ?? problem?.title ?? "Nao foi possivel enviar a imagem.", response.status, problem?.code);
+  }
+
+  return (await response.json()) as { imageUrl: string };
 }
 
 // ---------- Resources ----------
@@ -429,10 +488,20 @@ export type ResourceSummary = {
   description: string | null;
   isActive: boolean;
   unitId: string | null;
+  photoUrl: string | null;
+  specialties: string[];
 };
 
 export type ResourceDetails = ResourceSummary & {
+  serviceIds: string[];
   workingHours: WorkingHourEntry[];
+};
+
+export type TimeOffSummary = {
+  id: string;
+  startDate: string;
+  endDate: string;
+  reason: string | null;
 };
 
 export type ResourceInput = {
@@ -472,6 +541,49 @@ export function setResourceWorkingHours(
   accessToken: string
 ): Promise<void> {
   return request(`/api/resources/${id}/working-hours`, { method: "PUT", body: JSON.stringify({ entries }) }, accessToken);
+}
+
+export async function uploadResourcePhoto(id: string, file: File, accessToken: string): Promise<{ photoUrl: string }> {
+  const formData = new FormData();
+  formData.append("file", file);
+
+  const response = await fetch(`${API_BASE_URL}/api/resources/${id}/photo`, {
+    method: "POST",
+    credentials: "include",
+    headers: { Authorization: `Bearer ${accessToken}` },
+    body: formData,
+  });
+
+  if (!response.ok) {
+    const problem = (await response.json().catch(() => null)) as ProblemDetails | null;
+    throw new ApiError(problem?.detail ?? problem?.title ?? "Nao foi possivel enviar a foto.", response.status, problem?.code);
+  }
+
+  return (await response.json()) as { photoUrl: string };
+}
+
+export function setResourceSpecialties(id: string, specialties: string[], accessToken: string): Promise<void> {
+  return request(`/api/resources/${id}/specialties`, { method: "PUT", body: JSON.stringify({ specialties }) }, accessToken);
+}
+
+export function setResourceServices(id: string, serviceIds: string[], accessToken: string): Promise<void> {
+  return request(`/api/resources/${id}/services`, { method: "PUT", body: JSON.stringify({ serviceIds }) }, accessToken);
+}
+
+export function listTimeOffs(resourceId: string, accessToken: string): Promise<TimeOffSummary[]> {
+  return request(`/api/resources/${resourceId}/time-off`, {}, accessToken);
+}
+
+export function createTimeOff(
+  resourceId: string,
+  input: { startDate: string; endDate: string; reason?: string | null },
+  accessToken: string
+): Promise<{ id: string }> {
+  return request(`/api/resources/${resourceId}/time-off`, { method: "POST", body: JSON.stringify(input) }, accessToken);
+}
+
+export function deleteTimeOff(timeOffId: string, accessToken: string): Promise<void> {
+  return request(`/api/resources/time-off/${timeOffId}`, { method: "DELETE" }, accessToken);
 }
 
 // ---------- Units ----------

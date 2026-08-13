@@ -1,4 +1,5 @@
 using System.Net;
+using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Text.Json;
 
@@ -88,6 +89,73 @@ public class ServiceTests(IntegrationTestFixture fixture)
             client, tenantBToken, $"/api/services/{serviceId}", cancellationToken);
         crossTenantGet.StatusCode.ShouldBe(HttpStatusCode.NotFound);
     }
+
+    [Fact]
+    public async Task Listing_Services_Should_Order_By_DisplayOrder_Then_Name()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var client = fixture.CreateClient();
+        var accessToken = await CreateTenantWithOwnerAndLoginAsync(client, cancellationToken);
+
+        await AuthorizedRequestHelpers.PostAuthorizedAsync(
+            client, accessToken, "/api/services",
+            new { name = "Barba", durationMinutes = 20, price = 25m, currency = "BRL", displayOrder = 2 }, cancellationToken);
+        await AuthorizedRequestHelpers.PostAuthorizedAsync(
+            client, accessToken, "/api/services",
+            new { name = "Corte", durationMinutes = 30, price = 45m, currency = "BRL", displayOrder = 1 }, cancellationToken);
+        await AuthorizedRequestHelpers.PostAuthorizedAsync(
+            client, accessToken, "/api/services",
+            new { name = "Sobrancelha", durationMinutes = 10, price = 15m, currency = "BRL", displayOrder = 1 }, cancellationToken);
+
+        var listResponse = await AuthorizedRequestHelpers.GetAuthorizedAsync(client, accessToken, "/api/services", cancellationToken);
+        var listBody = await listResponse.Content.ReadFromJsonAsync<JsonElement>(cancellationToken);
+        var names = listBody.GetProperty("items").EnumerateArray().Select(i => i.GetProperty("name").GetString()).ToList();
+
+        // displayOrder 1 antes de 2; dentro do mesmo displayOrder, por nome.
+        names.ShouldBe(["Corte", "Sobrancelha", "Barba"]);
+    }
+
+    [Fact]
+    public async Task Owner_Can_Upload_A_Service_Image_And_Then_Fetch_It_Back()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var client = fixture.CreateClient();
+        var accessToken = await CreateTenantWithOwnerAndLoginAsync(client, cancellationToken);
+
+        var createResponse = await AuthorizedRequestHelpers.PostAuthorizedAsync(
+            client, accessToken, "/api/services",
+            new { name = "Corte", durationMinutes = 30, price = 45m, currency = "BRL" }, cancellationToken);
+        var createBody = await createResponse.Content.ReadFromJsonAsync<JsonElement>(cancellationToken);
+        var serviceId = createBody.GetProperty("id").GetGuid();
+
+        using var content = new MultipartFormDataContent();
+        var fileContent = new ByteArrayContent(TinyPng);
+        fileContent.Headers.ContentType = new MediaTypeHeaderValue("image/png");
+        content.Add(fileContent, "file", "imagem.png");
+
+        var request = new HttpRequestMessage(HttpMethod.Post, $"/api/services/{serviceId}/image") { Content = content };
+        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", accessToken);
+        var uploadResponse = await client.SendAsync(request, cancellationToken);
+
+        uploadResponse.StatusCode.ShouldBe(HttpStatusCode.OK);
+        var uploadBody = await uploadResponse.Content.ReadFromJsonAsync<JsonElement>(cancellationToken);
+        var imageUrl = uploadBody.GetProperty("imageUrl").GetString()!;
+        imageUrl.ShouldStartWith("/uploads/service-images/");
+
+        var getResponse = await AuthorizedRequestHelpers.GetAuthorizedAsync(client, accessToken, $"/api/services/{serviceId}", cancellationToken);
+        var getBody = await getResponse.Content.ReadFromJsonAsync<JsonElement>(cancellationToken);
+        getBody.GetProperty("imageUrl").GetString().ShouldBe(imageUrl);
+    }
+
+    // Menor PNG valido possivel (1x1 transparente) — bytes reais, nao um mock.
+    private static readonly byte[] TinyPng =
+    [
+        0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 0x00, 0x00, 0x00, 0x0D, 0x49, 0x48, 0x44, 0x52,
+        0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x01, 0x08, 0x06, 0x00, 0x00, 0x00, 0x1F, 0x15, 0xC4,
+        0x89, 0x00, 0x00, 0x00, 0x0A, 0x49, 0x44, 0x41, 0x54, 0x78, 0x9C, 0x63, 0x00, 0x01, 0x00, 0x00,
+        0x05, 0x00, 0x01, 0x0D, 0x0A, 0x2D, 0xB4, 0x00, 0x00, 0x00, 0x00, 0x49, 0x45, 0x4E, 0x44, 0xAE,
+        0x42, 0x60, 0x82,
+    ];
 
     private static async Task<string> CreateTenantWithOwnerAndLoginAsync(HttpClient client, CancellationToken cancellationToken)
     {

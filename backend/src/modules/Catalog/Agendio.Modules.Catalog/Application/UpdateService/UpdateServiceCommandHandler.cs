@@ -19,7 +19,8 @@ public sealed class UpdateServiceCommandHandler(CatalogDbContext dbContext) : IC
         }
 
         var updateResult = service.Update(
-            request.Name, request.Description, request.DurationMinutes, request.Price, request.Currency, request.Category);
+            request.Name, request.Description, request.DurationMinutes, request.Price, request.Currency, request.Category,
+            request.DisplayOrder);
 
         if (updateResult.IsFailure)
         {

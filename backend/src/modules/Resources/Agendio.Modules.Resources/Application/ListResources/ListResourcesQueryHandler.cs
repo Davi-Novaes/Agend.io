@@ -21,7 +21,8 @@ public sealed class ListResourcesQueryHandler(ResourcesDbContext dbContext) : IQ
         var paged = await query.OrderBy(r => r.Name).ToPagedItemsAsync(request.Page, request.PageSize, cancellationToken);
 
         var items = paged.Items
-            .Select(r => new ResourceSummary(r.Id.Value, r.Name, r.Type, r.Capacity, r.Description, r.IsActive, r.UnitId))
+            .Select(r => new ResourceSummary(
+                r.Id.Value, r.Name, r.Type, r.Capacity, r.Description, r.IsActive, r.UnitId, r.PhotoUrl, r.Specialties.ToList()))
             .ToList();
 
         return Result.Success(new ListResourcesResult(items, paged.TotalCount, paged.Page, paged.PageSize));

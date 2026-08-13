@@ -1,11 +1,14 @@
 using Agendio.Infrastructure.Endpoints;
 using Agendio.Modules.Tenancy.Application.CreateTenant;
 using Agendio.Modules.Tenancy.Application.CreateUnit;
+using Agendio.Modules.Tenancy.Application.GetTenantProfile;
 using Agendio.Modules.Tenancy.Application.GetUnitById;
 using Agendio.Modules.Tenancy.Application.ListUnits;
+using Agendio.Modules.Tenancy.Application.SetTenantBusinessHours;
 using Agendio.Modules.Tenancy.Application.SetUnitActiveStatus;
 using Agendio.Modules.Tenancy.Application.UpdateTenantBranding;
 using Agendio.Modules.Tenancy.Application.UpdateTenantLogo;
+using Agendio.Modules.Tenancy.Application.UpdateTenantProfile;
 using Agendio.Modules.Tenancy.Application.UpdateUnit;
 using Agendio.Modules.Tenancy.Contracts;
 using Agendio.Modules.Tenancy.Domain;
@@ -95,6 +98,39 @@ public sealed class TenancyEndpoints : IEndpointModule
         .WithName("UpdateTenantLogo")
         .WithSummary("Faz upload do logo do estabelecimento (PNG/JPEG/WEBP, ate 2MB).");
 
+        group.MapGet("/profile", async (IDispatcher dispatcher, CancellationToken cancellationToken) =>
+        {
+            var result = await dispatcher.Query(new GetTenantProfileQuery(), cancellationToken);
+            return result.IsSuccess ? Results.Ok(result.Value) : result.Error.ToProblemResult();
+        })
+        .RequireAuthorization(policy => policy.RequireRole("Owner"))
+        .WithName("GetTenantProfile")
+        .WithSummary("Retorna os dados completos de perfil do estabelecimento (para preencher o formulario de edicao).");
+
+        group.MapPut("/profile", async (UpdateProfileRequest request, IDispatcher dispatcher, CancellationToken cancellationToken) =>
+        {
+            var command = new UpdateTenantProfileCommand(
+                request.Description, request.Phone, request.WhatsApp, request.Email, request.Address, request.InstagramUrl,
+                request.FacebookUrl);
+            var result = await dispatcher.Send(command, cancellationToken);
+
+            return result.IsSuccess ? Results.NoContent() : result.Error.ToProblemResult();
+        })
+        .RequireAuthorization(policy => policy.RequireRole("Owner"))
+        .WithName("UpdateTenantProfile")
+        .WithSummary("Atualiza descricao, contato, endereco e redes sociais do estabelecimento.");
+
+        group.MapPut("/business-hours", async (SetBusinessHoursRequest request, IDispatcher dispatcher, CancellationToken cancellationToken) =>
+        {
+            var entries = request.Entries.Select(e => new BusinessHoursEntryDto(e.DayOfWeek, e.StartTime, e.EndTime)).ToList();
+            var result = await dispatcher.Send(new SetTenantBusinessHoursCommand(entries), cancellationToken);
+
+            return result.IsSuccess ? Results.NoContent() : result.Error.ToProblemResult();
+        })
+        .RequireAuthorization(policy => policy.RequireRole("Owner"))
+        .WithName("SetTenantBusinessHours")
+        .WithSummary("Substitui o horario de funcionamento do estabelecimento (semana inteira de uma vez).");
+
         var units = endpoints.MapGroup("/api/units").WithTags("Units").RequireAuthorization(policy => policy.RequireRole("Owner"));
 
         units.MapGet("/", async (IDispatcher dispatcher, CancellationToken cancellationToken) =>
@@ -160,4 +196,11 @@ public sealed class TenancyEndpoints : IEndpointModule
     private sealed record CreateTenantRequest(string Name, string Slug, BusinessType BusinessType, string TimeZoneId);
 
     private sealed record UpdateBrandingRequest(string PrimaryColorHex);
+
+    private sealed record UpdateProfileRequest(
+        string? Description, string? Phone, string? WhatsApp, string? Email, string? Address, string? InstagramUrl, string? FacebookUrl);
+
+    private sealed record BusinessHoursEntryRequest(DayOfWeek DayOfWeek, TimeOnly StartTime, TimeOnly EndTime);
+
+    private sealed record SetBusinessHoursRequest(IReadOnlyList<BusinessHoursEntryRequest> Entries);
 }

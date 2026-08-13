@@ -14,6 +14,10 @@ public sealed class Resource : AggregateRoot<ResourceId>, ITenantOwned, IAuditab
 {
     private readonly List<WorkingHoursEntry> _workingHours = [];
 
+    private readonly List<string> _specialties = [];
+
+    private readonly List<Guid> _serviceIds = [];
+
     public TenantId TenantId { get; private set; } = null!;
 
     public string Name { get; private set; } = string.Empty;
@@ -26,9 +30,24 @@ public sealed class Resource : AggregateRoot<ResourceId>, ITenantOwned, IAuditab
 
     public Guid? UnitId { get; private set; }
 
+    /// <summary>Caminho publico do arquivo salvo por IFileStorage. Null usa um placeholder generico na UI. So faz sentido para Type == Person, mas nao e validado — nada impede uma sala de ter uma foto ilustrativa.</summary>
+    public string? PhotoUrl { get; private set; }
+
     public bool IsActive { get; private set; }
 
     public IReadOnlyCollection<WorkingHoursEntry> WorkingHours => _workingHours;
+
+    /// <summary>Tags livres (ex.: "Corte", "Coloracao") — usadas para o cliente entender o que o profissional faz. So faz sentido para Type == Person, mas nao e validado.</summary>
+    public IReadOnlyCollection<string> Specialties => _specialties;
+
+    /// <summary>
+    /// Ids de Service (modulo Catalog, por isso Guid cru) que este recurso pode
+    /// realizar. Lista vazia = SEM restricao, o recurso pode ser escalado para
+    /// qualquer servico (default permissivo — tenant nao configurado nao perde
+    /// funcionalidade). Ainda NAO usado como validacao bloqueante no
+    /// agendamento — isso e responsabilidade da Fase 4.
+    /// </summary>
+    public IReadOnlyCollection<Guid> ServiceIds => _serviceIds;
 
     public DateTimeOffset CreatedAtUtc { get; set; }
 
@@ -101,6 +120,42 @@ public sealed class Resource : AggregateRoot<ResourceId>, ITenantOwned, IAuditab
     public void Deactivate() => IsActive = false;
 
     public void Activate() => IsActive = true;
+
+    public Result SetPhoto(string photoUrl)
+    {
+        if (string.IsNullOrWhiteSpace(photoUrl))
+        {
+            return Result.Failure(Error.Validation("Resource.InvalidPhotoUrl", "URL da foto invalida."));
+        }
+
+        PhotoUrl = photoUrl;
+        return Result.Success();
+    }
+
+    /// <summary>Substitui a lista inteira — o dono redefine tudo de uma vez, nao adiciona incrementalmente (mesmo padrao de SetWorkingHours).</summary>
+    public void SetSpecialties(IReadOnlyList<string> specialties)
+    {
+        var normalized = specialties
+            .Select(s => s.Trim())
+            .Where(s => s.Length > 0)
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
+
+        _specialties.Clear();
+        _specialties.AddRange(normalized);
+    }
+
+    /// <summary>
+    /// Substitui a lista inteira — o dono redefine tudo de uma vez (mesmo padrao
+    /// de SetWorkingHours/SetSpecialties). Existencia/tenant de cada Id ja foi
+    /// validada pelo handler via IServiceLookupService antes de chegar aqui —
+    /// dominio nao tem acesso a lookup de outro modulo.
+    /// </summary>
+    public void SetServiceIds(IReadOnlyList<Guid> serviceIds)
+    {
+        _serviceIds.Clear();
+        _serviceIds.AddRange(serviceIds.Distinct());
+    }
 
     /// <summary>Substitui a semana inteira — o dono redefine tudo de uma vez, nao adiciona incrementalmente.</summary>
     public Result SetWorkingHours(IReadOnlyList<(DayOfWeek DayOfWeek, TimeOnly StartTime, TimeOnly EndTime)> entries)

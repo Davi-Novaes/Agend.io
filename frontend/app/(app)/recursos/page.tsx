@@ -6,7 +6,7 @@ import { useForm, useFieldArray } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { toast } from "sonner";
-import { Armchair, Clock, Plus, Search, Trash2 } from "lucide-react";
+import { Armchair, Briefcase, CalendarOff, Clock, Plus, Search, Trash2 } from "lucide-react";
 
 import {
   listResources,
@@ -15,17 +15,27 @@ import {
   updateResource,
   setResourceActiveStatus,
   setResourceWorkingHours,
+  uploadResourcePhoto,
+  setResourceSpecialties,
+  setResourceServices,
+  listTimeOffs,
+  createTimeOff,
+  deleteTimeOff,
   listUnits,
+  listServices,
+  resolveAssetUrl,
   ApiError,
   type ResourceSummary,
   type ResourceType,
   type DayOfWeekName,
+  type TimeOffSummary,
 } from "@/lib/api/client";
 import { useSession } from "@/lib/auth/session-context";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Card, CardContent } from "@/components/ui/card";
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from "@/components/ui/table";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -81,6 +91,16 @@ function toNullable(value: string): string | null {
   return value.trim() === "" ? null : value.trim();
 }
 
+const ALLOWED_PHOTO_TYPES = ["image/png", "image/jpeg", "image/webp"];
+const MAX_PHOTO_SIZE_BYTES = 2 * 1024 * 1024;
+
+function parseSpecialties(value: string): string[] {
+  return value
+    .split(",")
+    .map((s) => s.trim())
+    .filter((s) => s.length > 0);
+}
+
 const workingHoursSchema = z.object({
   entries: z.array(
     z.object({
@@ -112,6 +132,19 @@ export default function ResourcesPage() {
   const [editingResource, setEditingResource] = React.useState<ResourceSummary | null>(null);
   const [hoursDialogOpen, setHoursDialogOpen] = React.useState(false);
   const [hoursResource, setHoursResource] = React.useState<ResourceSummary | null>(null);
+  const [photoPreviewUrl, setPhotoPreviewUrl] = React.useState<string | null>(null);
+  const [selectedPhotoFile, setSelectedPhotoFile] = React.useState<File | null>(null);
+  const [isUploadingPhoto, setIsUploadingPhoto] = React.useState(false);
+  const [specialtiesInput, setSpecialtiesInput] = React.useState("");
+  const photoInputRef = React.useRef<HTMLInputElement>(null);
+  const [servicesDialogOpen, setServicesDialogOpen] = React.useState(false);
+  const [servicesResource, setServicesResource] = React.useState<ResourceSummary | null>(null);
+  const [selectedServiceIds, setSelectedServiceIds] = React.useState<string[]>([]);
+  const [timeOffDialogOpen, setTimeOffDialogOpen] = React.useState(false);
+  const [timeOffResource, setTimeOffResource] = React.useState<ResourceSummary | null>(null);
+  const [newTimeOffStart, setNewTimeOffStart] = React.useState("");
+  const [newTimeOffEnd, setNewTimeOffEnd] = React.useState("");
+  const [newTimeOffReason, setNewTimeOffReason] = React.useState("");
 
   const accessToken = session?.accessToken ?? "";
 
@@ -126,6 +159,18 @@ export default function ResourcesPage() {
     queryKey: ["units"],
     queryFn: () => listUnits(accessToken),
     enabled: Boolean(session),
+  });
+
+  const allServicesQuery = useQuery({
+    queryKey: ["services", "all-for-resource-link"],
+    queryFn: () => listServices({ pageSize: 100 }, accessToken),
+    enabled: Boolean(session) && servicesDialogOpen,
+  });
+
+  const timeOffsQuery = useQuery({
+    queryKey: ["time-off", timeOffResource?.id],
+    queryFn: () => listTimeOffs(timeOffResource!.id, accessToken),
+    enabled: Boolean(session) && timeOffDialogOpen && Boolean(timeOffResource),
   });
 
   const form = useForm<ResourceFormInput, unknown, ResourceFormValues>({
@@ -215,11 +260,68 @@ export default function ResourcesPage() {
     onError: (error) => toast.error(error instanceof ApiError ? error.message : "Nao foi possivel salvar os horarios."),
   });
 
+  const specialtiesMutation = useMutation({
+    mutationFn: (specialties: string[]) => {
+      if (!editingResource) {
+        throw new Error("Nenhum recurso selecionado.");
+      }
+      return setResourceSpecialties(editingResource.id, specialties, accessToken);
+    },
+    onSuccess: () => {
+      toast.success("Especialidades atualizadas.");
+      invalidateList();
+    },
+    onError: (error) => toast.error(error instanceof ApiError ? error.message : "Nao foi possivel salvar as especialidades."),
+  });
+
+  const servicesMutation = useMutation({
+    mutationFn: (serviceIds: string[]) => {
+      if (!servicesResource) {
+        throw new Error("Nenhum recurso selecionado.");
+      }
+      return setResourceServices(servicesResource.id, serviceIds, accessToken);
+    },
+    onSuccess: () => {
+      toast.success("Servicos vinculados atualizados.");
+      setServicesDialogOpen(false);
+    },
+    onError: (error) => toast.error(error instanceof ApiError ? error.message : "Nao foi possivel salvar os servicos vinculados."),
+  });
+
+  const createTimeOffMutation = useMutation({
+    mutationFn: (input: { startDate: string; endDate: string; reason: string | null }) => {
+      if (!timeOffResource) {
+        throw new Error("Nenhum recurso selecionado.");
+      }
+      return createTimeOff(timeOffResource.id, input, accessToken);
+    },
+    onSuccess: () => {
+      toast.success("Folga cadastrada.");
+      setNewTimeOffStart("");
+      setNewTimeOffEnd("");
+      setNewTimeOffReason("");
+      queryClient.invalidateQueries({ queryKey: ["time-off", timeOffResource?.id] });
+    },
+    onError: (error) => toast.error(error instanceof ApiError ? error.message : "Nao foi possivel cadastrar a folga."),
+  });
+
+  const deleteTimeOffMutation = useMutation({
+    mutationFn: (timeOffId: string) => deleteTimeOff(timeOffId, accessToken),
+    onSuccess: () => {
+      toast.success("Folga removida.");
+      queryClient.invalidateQueries({ queryKey: ["time-off", timeOffResource?.id] });
+    },
+    onError: (error) => toast.error(error instanceof ApiError ? error.message : "Nao foi possivel remover a folga."),
+  });
+
   const totalPages = Math.max(1, Math.ceil((resourcesQuery.data?.totalCount ?? 0) / PAGE_SIZE));
 
   function openCreateDialog() {
     setEditingResource(null);
     form.reset(emptyResourceForm);
+    setPhotoPreviewUrl(null);
+    setSelectedPhotoFile(null);
+    setSpecialtiesInput("");
     setDialogOpen(true);
   }
 
@@ -234,10 +336,77 @@ export default function ResourcesPage() {
         description: details.description ?? "",
         unitId: details.unitId ?? NO_UNIT_VALUE,
       });
+      setPhotoPreviewUrl(details.photoUrl ? resolveAssetUrl(details.photoUrl) : null);
+      setSelectedPhotoFile(null);
+      setSpecialtiesInput(details.specialties.join(", "));
       setDialogOpen(true);
     } catch (error) {
       toast.error(error instanceof ApiError ? error.message : "Nao foi possivel carregar o recurso.");
     }
+  }
+
+  function handlePhotoFileChange(event: React.ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+    if (!file) {
+      return;
+    }
+
+    if (!ALLOWED_PHOTO_TYPES.includes(file.type)) {
+      toast.error("Formato invalido. Envie um arquivo PNG, JPEG ou WEBP.");
+      return;
+    }
+
+    if (file.size > MAX_PHOTO_SIZE_BYTES) {
+      toast.error("O arquivo nao pode ter mais que 2MB.");
+      return;
+    }
+
+    setSelectedPhotoFile(file);
+    setPhotoPreviewUrl(URL.createObjectURL(file));
+  }
+
+  async function handlePhotoUpload() {
+    if (!selectedPhotoFile || !editingResource) {
+      return;
+    }
+
+    setIsUploadingPhoto(true);
+    try {
+      const result = await uploadResourcePhoto(editingResource.id, selectedPhotoFile, accessToken);
+      setPhotoPreviewUrl(resolveAssetUrl(result.photoUrl));
+      setSelectedPhotoFile(null);
+      invalidateList();
+      toast.success("Foto atualizada.");
+    } catch (error) {
+      toast.error(error instanceof ApiError ? error.message : "Nao foi possivel enviar a foto.");
+    } finally {
+      setIsUploadingPhoto(false);
+    }
+  }
+
+  async function openServicesDialog(resource: ResourceSummary) {
+    try {
+      const details = await getResourceById(resource.id, accessToken);
+      setServicesResource(resource);
+      setSelectedServiceIds(details.serviceIds);
+      setServicesDialogOpen(true);
+    } catch (error) {
+      toast.error(error instanceof ApiError ? error.message : "Nao foi possivel carregar os servicos do recurso.");
+    }
+  }
+
+  function toggleServiceId(serviceId: string) {
+    setSelectedServiceIds((current) =>
+      current.includes(serviceId) ? current.filter((id) => id !== serviceId) : [...current, serviceId]
+    );
+  }
+
+  function openTimeOffDialog(resource: ResourceSummary) {
+    setTimeOffResource(resource);
+    setNewTimeOffStart("");
+    setNewTimeOffEnd("");
+    setNewTimeOffReason("");
+    setTimeOffDialogOpen(true);
   }
 
   async function openHoursDialog(resource: ResourceSummary) {
@@ -355,7 +524,28 @@ export default function ResourcesPage() {
               ) : (
                 resourcesQuery.data?.items.map((resource) => (
                   <TableRow key={resource.id}>
-                    <TableCell className="font-medium">{resource.name}</TableCell>
+                    <TableCell className="font-medium">
+                      <div className="flex items-center gap-2">
+                        {resource.photoUrl ? (
+                          // eslint-disable-next-line @next/next/no-img-element -- miniatura de URL dinamica da API, nao um asset estatico do build.
+                          <img
+                            src={resolveAssetUrl(resource.photoUrl)}
+                            alt=""
+                            className="bg-muted size-8 shrink-0 rounded-full object-cover"
+                          />
+                        ) : (
+                          <div className="bg-muted flex size-8 shrink-0 items-center justify-center rounded-full">
+                            <Armchair className="text-muted-foreground size-4" />
+                          </div>
+                        )}
+                        <div>
+                          {resource.name}
+                          {resource.specialties.length > 0 && (
+                            <p className="text-muted-foreground text-xs">{resource.specialties.join(", ")}</p>
+                          )}
+                        </div>
+                      </div>
+                    </TableCell>
                     <TableCell>{RESOURCE_TYPE_LABELS[resource.type]}</TableCell>
                     <TableCell>{resource.capacity}</TableCell>
                     <TableCell>
@@ -364,10 +554,18 @@ export default function ResourcesPage() {
                       </Badge>
                     </TableCell>
                     <TableCell className="text-right">
-                      <div className="flex justify-end gap-2">
+                      <div className="flex flex-wrap justify-end gap-2">
                         <Button variant="ghost" size="sm" onClick={() => openHoursDialog(resource)}>
                           <Clock className="size-4" />
                           Horarios
+                        </Button>
+                        <Button variant="ghost" size="sm" onClick={() => openServicesDialog(resource)}>
+                          <Briefcase className="size-4" />
+                          Servicos
+                        </Button>
+                        <Button variant="ghost" size="sm" onClick={() => openTimeOffDialog(resource)}>
+                          <CalendarOff className="size-4" />
+                          Folgas
                         </Button>
                         <Button variant="ghost" size="sm" onClick={() => openEditDialog(resource)}>
                           Editar
@@ -514,6 +712,182 @@ export default function ResourcesPage() {
               </DialogFooter>
             </form>
           </Form>
+
+          {editingResource && (
+            <div className="border-t pt-4">
+              <p className="mb-2 text-sm font-medium">Foto</p>
+              <div className="flex items-center gap-4">
+                <div className="bg-muted flex size-16 shrink-0 items-center justify-center overflow-hidden rounded-full border">
+                  {photoPreviewUrl ? (
+                    // eslint-disable-next-line @next/next/no-img-element -- preview de upload local/URL dinamica da API, nao um asset estatico do build.
+                    <img src={photoPreviewUrl} alt="" className="size-full object-cover" />
+                  ) : (
+                    <span className="text-muted-foreground text-xs">Sem foto</span>
+                  )}
+                </div>
+                <div className="flex flex-col gap-2">
+                  <input
+                    ref={photoInputRef}
+                    type="file"
+                    accept="image/png,image/jpeg,image/webp"
+                    onChange={handlePhotoFileChange}
+                    className="hidden"
+                  />
+                  <div className="flex gap-2">
+                    <Button type="button" variant="outline" size="sm" onClick={() => photoInputRef.current?.click()}>
+                      Escolher arquivo
+                    </Button>
+                    {selectedPhotoFile && (
+                      <Button type="button" size="sm" onClick={handlePhotoUpload} disabled={isUploadingPhoto}>
+                        {isUploadingPhoto ? "Enviando..." : "Enviar"}
+                      </Button>
+                    )}
+                  </div>
+                  <p className="text-muted-foreground text-xs">PNG, JPEG ou WEBP, ate 2MB.</p>
+                </div>
+              </div>
+
+              <p className="mt-4 mb-2 text-sm font-medium">Especialidades</p>
+              <div className="flex gap-2">
+                <Input
+                  placeholder="Corte, Barba, Coloracao"
+                  value={specialtiesInput}
+                  onChange={(event) => setSpecialtiesInput(event.target.value)}
+                />
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => specialtiesMutation.mutate(parseSpecialties(specialtiesInput))}
+                  disabled={specialtiesMutation.isPending}
+                >
+                  {specialtiesMutation.isPending ? "Salvando..." : "Salvar"}
+                </Button>
+              </div>
+              <p className="text-muted-foreground mt-1 text-xs">Separe por virgula.</p>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={servicesDialogOpen} onOpenChange={setServicesDialogOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Servicos de {servicesResource?.name}</DialogTitle>
+          </DialogHeader>
+          <p className="text-muted-foreground text-sm">
+            Marque os servicos que este recurso pode realizar. Sem nenhum marcado, o recurso pode ser escalado para
+            qualquer servico.
+          </p>
+          <div className="flex max-h-80 flex-col gap-2 overflow-y-auto">
+            {allServicesQuery.isLoading ? (
+              <Skeleton className="h-32 w-full" />
+            ) : allServicesQuery.data?.items.length === 0 ? (
+              <p className="text-muted-foreground text-sm">Nenhum servico cadastrado ainda.</p>
+            ) : (
+              allServicesQuery.data?.items.map((service) => (
+                <label key={service.id} className="flex items-center gap-2 text-sm">
+                  <Checkbox
+                    checked={selectedServiceIds.includes(service.id)}
+                    onCheckedChange={() => toggleServiceId(service.id)}
+                  />
+                  {service.name}
+                </label>
+              ))
+            )}
+          </div>
+          <DialogFooter>
+            <Button
+              onClick={() => servicesMutation.mutate(selectedServiceIds)}
+              disabled={servicesMutation.isPending}
+            >
+              {servicesMutation.isPending ? "Salvando..." : "Salvar"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={timeOffDialogOpen} onOpenChange={setTimeOffDialogOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Folgas de {timeOffResource?.name}</DialogTitle>
+          </DialogHeader>
+          <div className="flex flex-col gap-2">
+            {timeOffsQuery.isLoading ? (
+              <Skeleton className="h-16 w-full" />
+            ) : timeOffsQuery.data?.length === 0 ? (
+              <p className="text-muted-foreground text-sm">Nenhuma folga cadastrada ainda.</p>
+            ) : (
+              timeOffsQuery.data?.map((timeOff: TimeOffSummary) => (
+                <div key={timeOff.id} className="flex items-center justify-between gap-2 rounded-md border p-2 text-sm">
+                  <div>
+                    <p>
+                      {timeOff.startDate === timeOff.endDate
+                        ? timeOff.startDate
+                        : `${timeOff.startDate} a ${timeOff.endDate}`}
+                    </p>
+                    {timeOff.reason && <p className="text-muted-foreground text-xs">{timeOff.reason}</p>}
+                  </div>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    aria-label="Remover folga"
+                    onClick={() => deleteTimeOffMutation.mutate(timeOff.id)}
+                  >
+                    <Trash2 className="size-4" />
+                  </Button>
+                </div>
+              ))
+            )}
+          </div>
+
+          <div className="flex flex-col gap-2 border-t pt-4">
+            <div className="grid grid-cols-2 gap-2">
+              <div className="grid gap-1">
+                <label className="text-sm font-medium" htmlFor="time-off-start">
+                  Inicio
+                </label>
+                <Input
+                  id="time-off-start"
+                  type="date"
+                  value={newTimeOffStart}
+                  onChange={(event) => setNewTimeOffStart(event.target.value)}
+                />
+              </div>
+              <div className="grid gap-1">
+                <label className="text-sm font-medium" htmlFor="time-off-end">
+                  Fim
+                </label>
+                <Input
+                  id="time-off-end"
+                  type="date"
+                  value={newTimeOffEnd}
+                  onChange={(event) => setNewTimeOffEnd(event.target.value)}
+                />
+              </div>
+            </div>
+            <Input
+              placeholder="Motivo (opcional)"
+              value={newTimeOffReason}
+              onChange={(event) => setNewTimeOffReason(event.target.value)}
+            />
+            <Button
+              type="button"
+              variant="outline"
+              className="self-start"
+              disabled={!newTimeOffStart || !newTimeOffEnd || createTimeOffMutation.isPending}
+              onClick={() =>
+                createTimeOffMutation.mutate({
+                  startDate: newTimeOffStart,
+                  endDate: newTimeOffEnd,
+                  reason: toNullable(newTimeOffReason),
+                })
+              }
+            >
+              <Plus className="size-4" />
+              {createTimeOffMutation.isPending ? "Salvando..." : "Adicionar folga"}
+            </Button>
+          </div>
         </DialogContent>
       </Dialog>
 

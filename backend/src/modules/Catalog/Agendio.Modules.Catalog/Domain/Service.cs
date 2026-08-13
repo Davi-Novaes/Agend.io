@@ -22,6 +22,12 @@ public sealed class Service : AggregateRoot<ServiceId>, ITenantOwned, IAuditable
 
     public string? Category { get; private set; }
 
+    /// <summary>Ordem de exibicao no portal publico e na listagem do painel — menor primeiro. Servicos com a mesma ordem desempatam por nome.</summary>
+    public int DisplayOrder { get; private set; }
+
+    /// <summary>Caminho publico do arquivo salvo por IFileStorage. Null usa um placeholder generico na UI.</summary>
+    public string? ImageUrl { get; private set; }
+
     public bool IsActive { get; private set; }
 
     public DateTimeOffset CreatedAtUtc { get; set; }
@@ -40,7 +46,8 @@ public sealed class Service : AggregateRoot<ServiceId>, ITenantOwned, IAuditable
     {
     }
 
-    private Service(TenantId tenantId, string name, string? description, int durationMinutes, Money price, string? category)
+    private Service(
+        TenantId tenantId, string name, string? description, int durationMinutes, Money price, string? category, int displayOrder)
         : base(ServiceId.New())
     {
         TenantId = tenantId;
@@ -49,11 +56,13 @@ public sealed class Service : AggregateRoot<ServiceId>, ITenantOwned, IAuditable
         DurationMinutes = durationMinutes;
         Price = price;
         Category = category;
+        DisplayOrder = displayOrder;
         IsActive = true;
     }
 
     public static Result<Service> Create(
-        TenantId tenantId, string? name, string? description, int durationMinutes, decimal price, string currency, string? category)
+        TenantId tenantId, string? name, string? description, int durationMinutes, decimal price, string currency, string? category,
+        int displayOrder = 0)
     {
         if (string.IsNullOrWhiteSpace(name))
         {
@@ -71,13 +80,15 @@ public sealed class Service : AggregateRoot<ServiceId>, ITenantOwned, IAuditable
             return Result.Failure<Service>(priceResult.Error);
         }
 
-        var service = new Service(tenantId, name.Trim(), description?.Trim(), durationMinutes, priceResult.Value, category?.Trim());
+        var service = new Service(
+            tenantId, name.Trim(), description?.Trim(), durationMinutes, priceResult.Value, category?.Trim(), displayOrder);
         service.Raise(new ServiceCreatedDomainEvent(service.Id, tenantId, service.Name));
 
         return Result.Success(service);
     }
 
-    public Result Update(string? name, string? description, int durationMinutes, decimal price, string currency, string? category)
+    public Result Update(
+        string? name, string? description, int durationMinutes, decimal price, string currency, string? category, int displayOrder)
     {
         if (string.IsNullOrWhiteSpace(name))
         {
@@ -100,7 +111,19 @@ public sealed class Service : AggregateRoot<ServiceId>, ITenantOwned, IAuditable
         DurationMinutes = durationMinutes;
         Price = priceResult.Value;
         Category = category?.Trim();
+        DisplayOrder = displayOrder;
 
+        return Result.Success();
+    }
+
+    public Result SetImage(string imageUrl)
+    {
+        if (string.IsNullOrWhiteSpace(imageUrl))
+        {
+            return Result.Failure(Error.Validation("Service.InvalidImageUrl", "URL da imagem invalida."));
+        }
+
+        ImageUrl = imageUrl;
         return Result.Success();
     }
 

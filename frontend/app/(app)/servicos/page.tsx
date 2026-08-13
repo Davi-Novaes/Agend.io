@@ -14,6 +14,8 @@ import {
   createService,
   updateService,
   setServiceActiveStatus,
+  uploadServiceImage,
+  resolveAssetUrl,
   ApiError,
   type ServiceSummary,
 } from "@/lib/api/client";
@@ -38,12 +40,16 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "
 const PAGE_SIZE = 20;
 const CURRENCY = "BRL";
 
+const ALLOWED_IMAGE_TYPES = ["image/png", "image/jpeg", "image/webp"];
+const MAX_IMAGE_SIZE_BYTES = 2 * 1024 * 1024;
+
 const serviceSchema = z.object({
   name: z.string().min(1, "Informe o nome."),
   description: z.string(),
   durationMinutes: z.coerce.number().int("Use um numero inteiro.").min(1, "A duracao precisa ser maior que zero."),
   price: z.coerce.number().min(0, "O preco nao pode ser negativo."),
   category: z.string(),
+  displayOrder: z.coerce.number().int("Use um numero inteiro.").min(0, "A ordem nao pode ser negativa."),
 });
 
 // z.coerce faz o tipo de entrada (antes da validacao) divergir do de saida
@@ -52,7 +58,14 @@ const serviceSchema = z.object({
 type ServiceFormValues = z.output<typeof serviceSchema>;
 type ServiceFormInput = z.input<typeof serviceSchema>;
 
-const emptyServiceForm: ServiceFormInput = { name: "", description: "", durationMinutes: 30, price: 0, category: "" };
+const emptyServiceForm: ServiceFormInput = {
+  name: "",
+  description: "",
+  durationMinutes: 30,
+  price: 0,
+  category: "",
+  displayOrder: 0,
+};
 
 function toNullable(value: string): string | null {
   return value.trim() === "" ? null : value.trim();
@@ -71,6 +84,10 @@ export default function ServicesPage() {
   const [search, setSearch] = React.useState("");
   const [dialogOpen, setDialogOpen] = React.useState(false);
   const [editingService, setEditingService] = React.useState<ServiceSummary | null>(null);
+  const [imagePreviewUrl, setImagePreviewUrl] = React.useState<string | null>(null);
+  const [selectedImageFile, setSelectedImageFile] = React.useState<File | null>(null);
+  const [isUploadingImage, setIsUploadingImage] = React.useState(false);
+  const imageInputRef = React.useRef<HTMLInputElement>(null);
 
   const accessToken = session?.accessToken ?? "";
 
@@ -98,6 +115,7 @@ export default function ServicesPage() {
           price: values.price,
           currency: CURRENCY,
           category: toNullable(values.category),
+          displayOrder: values.displayOrder,
         },
         accessToken
       ),
@@ -123,6 +141,7 @@ export default function ServicesPage() {
           price: values.price,
           currency: CURRENCY,
           category: toNullable(values.category),
+          displayOrder: values.displayOrder,
         },
         accessToken
       );
@@ -146,6 +165,8 @@ export default function ServicesPage() {
   function openCreateDialog() {
     setEditingService(null);
     form.reset(emptyServiceForm);
+    setImagePreviewUrl(null);
+    setSelectedImageFile(null);
     setDialogOpen(true);
   }
 
@@ -159,10 +180,52 @@ export default function ServicesPage() {
         durationMinutes: details.durationMinutes,
         price: details.price,
         category: details.category ?? "",
+        displayOrder: details.displayOrder,
       });
+      setImagePreviewUrl(details.imageUrl ? resolveAssetUrl(details.imageUrl) : null);
+      setSelectedImageFile(null);
       setDialogOpen(true);
     } catch (error) {
       toast.error(error instanceof ApiError ? error.message : "Nao foi possivel carregar o servico.");
+    }
+  }
+
+  function handleImageFileChange(event: React.ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+    if (!file) {
+      return;
+    }
+
+    if (!ALLOWED_IMAGE_TYPES.includes(file.type)) {
+      toast.error("Formato invalido. Envie um arquivo PNG, JPEG ou WEBP.");
+      return;
+    }
+
+    if (file.size > MAX_IMAGE_SIZE_BYTES) {
+      toast.error("O arquivo nao pode ter mais que 2MB.");
+      return;
+    }
+
+    setSelectedImageFile(file);
+    setImagePreviewUrl(URL.createObjectURL(file));
+  }
+
+  async function handleImageUpload() {
+    if (!selectedImageFile || !editingService) {
+      return;
+    }
+
+    setIsUploadingImage(true);
+    try {
+      const result = await uploadServiceImage(editingService.id, selectedImageFile, accessToken);
+      setImagePreviewUrl(resolveAssetUrl(result.imageUrl));
+      setSelectedImageFile(null);
+      invalidateList();
+      toast.success("Imagem atualizada.");
+    } catch (error) {
+      toast.error(error instanceof ApiError ? error.message : "Nao foi possivel enviar a imagem.");
+    } finally {
+      setIsUploadingImage(false);
     }
   }
 
@@ -210,6 +273,7 @@ export default function ServicesPage() {
                 <TableHead>Categoria</TableHead>
                 <TableHead>Duracao</TableHead>
                 <TableHead>Preco</TableHead>
+                <TableHead>Ordem</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead className="text-right">Acoes</TableHead>
               </TableRow>
@@ -222,13 +286,14 @@ export default function ServicesPage() {
                     <TableCell><Skeleton className="h-4 w-24" /></TableCell>
                     <TableCell><Skeleton className="h-4 w-16" /></TableCell>
                     <TableCell><Skeleton className="h-4 w-20" /></TableCell>
+                    <TableCell><Skeleton className="h-4 w-10" /></TableCell>
                     <TableCell><Skeleton className="h-5 w-14 rounded-full" /></TableCell>
                     <TableCell className="text-right"><Skeleton className="ml-auto h-4 w-20" /></TableCell>
                   </TableRow>
                 ))
               ) : servicesQuery.data?.items.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={6} className="p-0">
+                  <TableCell colSpan={7} className="p-0">
                     {search ? (
                       <EmptyState
                         icon={Search}
@@ -266,10 +331,27 @@ export default function ServicesPage() {
               ) : (
                 servicesQuery.data?.items.map((service) => (
                   <TableRow key={service.id}>
-                    <TableCell className="font-medium">{service.name}</TableCell>
+                    <TableCell className="font-medium">
+                      <div className="flex items-center gap-2">
+                        {service.imageUrl ? (
+                          // eslint-disable-next-line @next/next/no-img-element -- miniatura de URL dinamica da API, nao um asset estatico do build.
+                          <img
+                            src={resolveAssetUrl(service.imageUrl)}
+                            alt=""
+                            className="bg-muted size-8 shrink-0 rounded-md object-cover"
+                          />
+                        ) : (
+                          <div className="bg-muted flex size-8 shrink-0 items-center justify-center rounded-md">
+                            <Sparkles className="text-muted-foreground size-4" />
+                          </div>
+                        )}
+                        {service.name}
+                      </div>
+                    </TableCell>
                     <TableCell>{service.category ?? "—"}</TableCell>
                     <TableCell>{service.durationMinutes} min</TableCell>
                     <TableCell>{formatPrice(service.price, service.currency)}</TableCell>
+                    <TableCell>{service.displayOrder}</TableCell>
                     <TableCell>
                       <Badge variant={service.isActive ? "default" : "outline"}>
                         {service.isActive ? "Ativo" : "Inativo"}
@@ -349,7 +431,7 @@ export default function ServicesPage() {
                   </FormItem>
                 )}
               />
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-3 gap-3">
                 <FormField
                   control={form.control}
                   name="durationMinutes"
@@ -376,6 +458,19 @@ export default function ServicesPage() {
                     </FormItem>
                   )}
                 />
+                <FormField
+                  control={form.control}
+                  name="displayOrder"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Ordem</FormLabel>
+                      <FormControl>
+                        <Input type="number" min={0} {...field} value={field.value as number} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
               </div>
               <FormField
                 control={form.control}
@@ -390,6 +485,41 @@ export default function ServicesPage() {
                   </FormItem>
                 )}
               />
+              {editingService && (
+                <div className="grid gap-2">
+                  <FormLabel>Imagem</FormLabel>
+                  <div className="flex items-center gap-4">
+                    <div className="bg-muted flex size-16 shrink-0 items-center justify-center overflow-hidden rounded-lg border">
+                      {imagePreviewUrl ? (
+                        // eslint-disable-next-line @next/next/no-img-element -- preview de upload local/URL dinamica da API, nao um asset estatico do build.
+                        <img src={imagePreviewUrl} alt="" className="size-full object-cover" />
+                      ) : (
+                        <span className="text-muted-foreground text-xs">Sem imagem</span>
+                      )}
+                    </div>
+                    <div className="flex flex-col gap-2">
+                      <input
+                        ref={imageInputRef}
+                        type="file"
+                        accept="image/png,image/jpeg,image/webp"
+                        onChange={handleImageFileChange}
+                        className="hidden"
+                      />
+                      <div className="flex gap-2">
+                        <Button type="button" variant="outline" size="sm" onClick={() => imageInputRef.current?.click()}>
+                          Escolher arquivo
+                        </Button>
+                        {selectedImageFile && (
+                          <Button type="button" size="sm" onClick={handleImageUpload} disabled={isUploadingImage}>
+                            {isUploadingImage ? "Enviando..." : "Enviar"}
+                          </Button>
+                        )}
+                      </div>
+                      <p className="text-muted-foreground text-xs">PNG, JPEG ou WEBP, ate 2MB.</p>
+                    </div>
+                  </div>
+                </div>
+              )}
               <DialogFooter>
                 <Button type="submit" disabled={createMutation.isPending || updateMutation.isPending}>
                   {createMutation.isPending || updateMutation.isPending ? "Salvando..." : "Salvar"}

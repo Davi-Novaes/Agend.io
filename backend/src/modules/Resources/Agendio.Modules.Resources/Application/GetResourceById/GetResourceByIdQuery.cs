@@ -15,4 +15,7 @@ public sealed record ResourceDetails(
     string? Description,
     bool IsActive,
     Guid? UnitId,
+    string? PhotoUrl,
+    IReadOnlyList<string> Specialties,
+    IReadOnlyList<Guid> ServiceIds,
     IReadOnlyList<WorkingHourEntryDetails> WorkingHours);
