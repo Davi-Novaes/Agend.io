@@ -64,6 +64,26 @@ public sealed class TenantConfiguration : IEntityTypeConfiguration<Tenant>
         builder.Property(t => t.InstagramUrl).HasMaxLength(500);
         builder.Property(t => t.FacebookUrl).HasMaxLength(500);
 
+        builder.Property(t => t.SecondaryColorHex).HasMaxLength(7);
+
+        builder.Property(t => t.Font)
+            .HasConversion<string>()
+            .HasMaxLength(30)
+            .IsRequired()
+            .HasDefaultValue(PublicPageFont.Default);
+
+        builder.Property(t => t.ButtonStyle)
+            .HasConversion<string>()
+            .HasMaxLength(20)
+            .IsRequired()
+            .HasDefaultValue(PublicPageButtonStyle.Rounded);
+
+        builder.Property(t => t.ShowAboutSection).IsRequired().HasDefaultValue(true);
+        builder.Property(t => t.ShowServicesSection).IsRequired().HasDefaultValue(true);
+        builder.Property(t => t.ShowTeamSection).IsRequired().HasDefaultValue(true);
+        builder.Property(t => t.ShowHoursSection).IsRequired().HasDefaultValue(true);
+        builder.Property(t => t.ShowContactSection).IsRequired().HasDefaultValue(true);
+
         // Colecao de Value Objects sem identidade propria — tabela filha, FK
         // sombra gerada pelo EF, sem repositorio separado (mesmo padrao de
         // Resource.WorkingHours no modulo Resources).

@@ -15,6 +15,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import { cn } from "@/lib/utils";
 
 type Step = "service" | "resource" | "datetime" | "details" | "confirmed";
 
@@ -42,7 +43,14 @@ function formatDate(iso: string): string {
   return new Date(iso).toLocaleDateString("pt-BR", { weekday: "long", day: "2-digit", month: "long" });
 }
 
-export function BookingFlow({ tenantId }: { tenantId: string }) {
+export function BookingFlow({
+  tenantId,
+  buttonRadiusClassName,
+}: {
+  tenantId: string;
+  /** Estilo de botao do estabelecimento (Fase 3 — Personalizacao da pagina). */
+  buttonRadiusClassName?: string;
+}) {
   const [step, setStep] = React.useState<Step>("service");
   const [selectedService, setSelectedService] = React.useState<PublicServiceSummary | null>(null);
   const [selectedResource, setSelectedResource] = React.useState<PublicResourceSummary | null>(null);
@@ -154,7 +162,10 @@ export function BookingFlow({ tenantId }: { tenantId: string }) {
                 <button
                   type="button"
                   onClick={() => selectService(service)}
-                  className="hover:border-primary focus-visible:outline-primary w-full rounded-lg border p-4 text-left focus-visible:outline-2"
+                  className={cn(
+                    "hover:border-primary focus-visible:outline-primary w-full rounded-lg border p-4 text-left focus-visible:outline-2",
+                    buttonRadiusClassName
+                  )}
                 >
                   <p className="font-medium">{service.name}</p>
                   <p className="text-muted-foreground text-sm">
@@ -182,7 +193,10 @@ export function BookingFlow({ tenantId }: { tenantId: string }) {
                 <button
                   type="button"
                   onClick={() => selectResource(resource)}
-                  className="hover:border-primary focus-visible:outline-primary w-full rounded-lg border p-4 text-left focus-visible:outline-2"
+                  className={cn(
+                    "hover:border-primary focus-visible:outline-primary w-full rounded-lg border p-4 text-left focus-visible:outline-2",
+                    buttonRadiusClassName
+                  )}
                 >
                   <p className="font-medium">{resource.name}</p>
                 </button>
@@ -226,7 +240,10 @@ export function BookingFlow({ tenantId }: { tenantId: string }) {
                 key={slot.startUtc}
                 type="button"
                 onClick={() => selectSlot(slot)}
-                className="hover:border-primary focus-visible:outline-primary rounded-lg border p-2 text-sm focus-visible:outline-2"
+                className={cn(
+                  "hover:border-primary focus-visible:outline-primary rounded-lg border p-2 text-sm focus-visible:outline-2",
+                  buttonRadiusClassName
+                )}
               >
                 {formatTime(slot.startUtc)}
               </button>
@@ -283,7 +300,7 @@ export function BookingFlow({ tenantId }: { tenantId: string }) {
                 {formError}
               </p>
             )}
-            <Button type="submit" disabled={scheduleMutation.isPending}>
+            <Button type="submit" className={buttonRadiusClassName} disabled={scheduleMutation.isPending}>
               {scheduleMutation.isPending ? "Confirmando..." : "Confirmar agendamento"}
             </Button>
           </form>

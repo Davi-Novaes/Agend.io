@@ -124,4 +124,59 @@ public class TenantProfileTests
         result.IsFailure.ShouldBeTrue();
         tenant.BannerUrl.ShouldBeNull();
     }
+
+    [Fact]
+    public void UpdatePageCustomization_Should_Set_All_Fields_With_Valid_Data()
+    {
+        var tenant = CreateTenant();
+
+        var result = tenant.UpdatePageCustomization(
+            "#0F172A", PublicPageFont.Poppins, PublicPageButtonStyle.Pill, false, true, false, true, false);
+
+        result.IsSuccess.ShouldBeTrue();
+        tenant.SecondaryColorHex.ShouldBe("#0F172A");
+        tenant.Font.ShouldBe(PublicPageFont.Poppins);
+        tenant.ButtonStyle.ShouldBe(PublicPageButtonStyle.Pill);
+        tenant.ShowAboutSection.ShouldBeFalse();
+        tenant.ShowServicesSection.ShouldBeTrue();
+        tenant.ShowTeamSection.ShouldBeFalse();
+        tenant.ShowHoursSection.ShouldBeTrue();
+        tenant.ShowContactSection.ShouldBeFalse();
+    }
+
+    [Fact]
+    public void UpdatePageCustomization_Should_Accept_A_Null_Secondary_Color()
+    {
+        var tenant = CreateTenant();
+
+        var result = tenant.UpdatePageCustomization(
+            null, PublicPageFont.Default, PublicPageButtonStyle.Rounded, true, true, true, true, true);
+
+        result.IsSuccess.ShouldBeTrue();
+        tenant.SecondaryColorHex.ShouldBeNull();
+    }
+
+    [Fact]
+    public void UpdatePageCustomization_Should_Reject_A_Secondary_Color_Without_Enough_Contrast()
+    {
+        var tenant = CreateTenant();
+
+        // Amarelo claro: falha o minimo AA de 4.5:1 contra texto branco.
+        var result = tenant.UpdatePageCustomization(
+            "#FFFF00", PublicPageFont.Default, PublicPageButtonStyle.Rounded, true, true, true, true, true);
+
+        result.IsFailure.ShouldBeTrue();
+        tenant.SecondaryColorHex.ShouldBeNull();
+    }
+
+    [Fact]
+    public void UpdatePageCustomization_Should_Reject_An_Invalid_Hex_Format()
+    {
+        var tenant = CreateTenant();
+
+        var result = tenant.UpdatePageCustomization(
+            "azul", PublicPageFont.Default, PublicPageButtonStyle.Rounded, true, true, true, true, true);
+
+        result.IsFailure.ShouldBeTrue();
+    }
 }

@@ -10,6 +10,7 @@ using Agendio.Modules.Tenancy.Application.SetUnitActiveStatus;
 using Agendio.Modules.Tenancy.Application.UpdateTenantBanner;
 using Agendio.Modules.Tenancy.Application.UpdateTenantBranding;
 using Agendio.Modules.Tenancy.Application.UpdateTenantLogo;
+using Agendio.Modules.Tenancy.Application.UpdateTenantPageCustomization;
 using Agendio.Modules.Tenancy.Application.UpdateTenantProfile;
 using Agendio.Modules.Tenancy.Application.UpdateUnit;
 using Agendio.Modules.Tenancy.Domain;
@@ -125,6 +126,19 @@ public sealed class TenancyEndpoints : IEndpointModule
         .WithName("UpdateTenantProfile")
         .WithSummary("Atualiza descricao, contato, endereco e redes sociais do estabelecimento.");
 
+        group.MapPut("/page-customization", async (UpdatePageCustomizationRequest request, IDispatcher dispatcher, CancellationToken cancellationToken) =>
+        {
+            var command = new UpdateTenantPageCustomizationCommand(
+                request.SecondaryColorHex, request.Font, request.ButtonStyle, request.ShowAboutSection, request.ShowServicesSection,
+                request.ShowTeamSection, request.ShowHoursSection, request.ShowContactSection);
+            var result = await dispatcher.Send(command, cancellationToken);
+
+            return result.IsSuccess ? Results.NoContent() : result.Error.ToProblemResult();
+        })
+        .RequireAuthorization(policy => policy.RequireRole("Owner"))
+        .WithName("UpdateTenantPageCustomization")
+        .WithSummary("Atualiza a personalizacao da pagina publica: cor secundaria, fonte, estilo de botao e visibilidade de secoes.");
+
         group.MapPut("/business-hours", async (SetBusinessHoursRequest request, IDispatcher dispatcher, CancellationToken cancellationToken) =>
         {
             var entries = request.Entries.Select(e => new BusinessHoursEntryDto(e.DayOfWeek, e.StartTime, e.EndTime)).ToList();
@@ -204,6 +218,16 @@ public sealed class TenancyEndpoints : IEndpointModule
 
     private sealed record UpdateProfileRequest(
         string? Description, string? Phone, string? WhatsApp, string? Email, string? Address, string? InstagramUrl, string? FacebookUrl);
+
+    private sealed record UpdatePageCustomizationRequest(
+        string? SecondaryColorHex,
+        PublicPageFont Font,
+        PublicPageButtonStyle ButtonStyle,
+        bool ShowAboutSection,
+        bool ShowServicesSection,
+        bool ShowTeamSection,
+        bool ShowHoursSection,
+        bool ShowContactSection);
 
     private sealed record BusinessHoursEntryRequest(DayOfWeek DayOfWeek, TimeOnly StartTime, TimeOnly EndTime);
 

@@ -1,3 +1,4 @@
+using Agendio.Modules.Tenancy.Domain;
 using Agendio.SharedKernel.Messaging;
 
 namespace Agendio.Modules.Tenancy.Application.GetTenantProfile;
@@ -19,4 +20,12 @@ public sealed record TenantProfile(
     string? Address,
     string? InstagramUrl,
     string? FacebookUrl,
+    string? SecondaryColorHex,
+    PublicPageFont Font,
+    PublicPageButtonStyle ButtonStyle,
+    bool ShowAboutSection,
+    bool ShowServicesSection,
+    bool ShowTeamSection,
+    bool ShowHoursSection,
+    bool ShowContactSection,
     IReadOnlyList<BusinessHoursEntryResult> BusinessHours);

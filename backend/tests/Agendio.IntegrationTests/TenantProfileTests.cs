@@ -137,6 +137,96 @@ public class TenantProfileTests(IntegrationTestFixture fixture)
     }
 
     [Fact]
+    public async Task Owner_Can_Update_And_Read_Back_The_Page_Customization()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var client = fixture.CreateClient();
+        var (slug, accessToken) = await CreateTenantWithOwnerAndLoginAsyncWithSlug(client, cancellationToken);
+
+        var updateResponse = await AuthorizedRequestHelpers.PutAuthorizedAsync(
+            client, accessToken, "/api/tenants/page-customization",
+            new
+            {
+                secondaryColorHex = "#0F172A",
+                font = "Poppins",
+                buttonStyle = "Pill",
+                showAboutSection = false,
+                showServicesSection = true,
+                showTeamSection = false,
+                showHoursSection = true,
+                showContactSection = false,
+            },
+            cancellationToken);
+        updateResponse.StatusCode.ShouldBe(HttpStatusCode.NoContent);
+
+        var profileResponse = await AuthorizedRequestHelpers.GetAuthorizedAsync(client, accessToken, "/api/tenants/profile", cancellationToken);
+        var profile = await profileResponse.Content.ReadFromJsonAsync<JsonElement>(cancellationToken);
+        profile.GetProperty("secondaryColorHex").GetString().ShouldBe("#0F172A");
+        profile.GetProperty("font").GetString().ShouldBe("Poppins");
+        profile.GetProperty("buttonStyle").GetString().ShouldBe("Pill");
+        profile.GetProperty("showAboutSection").GetBoolean().ShouldBeFalse();
+        profile.GetProperty("showServicesSection").GetBoolean().ShouldBeTrue();
+        profile.GetProperty("showTeamSection").GetBoolean().ShouldBeFalse();
+
+        // Precisa refletir tambem no perfil publico (sem autenticacao) — e a
+        // pagina publica quem consome esses campos de fato.
+        var publicResponse = await client.GetAsync($"/api/tenants/by-slug/{slug}", cancellationToken);
+        var publicProfile = await publicResponse.Content.ReadFromJsonAsync<JsonElement>(cancellationToken);
+        publicProfile.GetProperty("secondaryColorHex").GetString().ShouldBe("#0F172A");
+        publicProfile.GetProperty("font").GetString().ShouldBe("Poppins");
+        publicProfile.GetProperty("showAboutSection").GetBoolean().ShouldBeFalse();
+    }
+
+    [Fact]
+    public async Task Updating_Page_Customization_With_An_Insufficient_Contrast_Color_Should_Be_Rejected()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var client = fixture.CreateClient();
+        var accessToken = await CreateTenantWithOwnerAndLoginAsync(client, cancellationToken);
+
+        var response = await AuthorizedRequestHelpers.PutAuthorizedAsync(
+            client, accessToken, "/api/tenants/page-customization",
+            new
+            {
+                secondaryColorHex = "#FFFF00",
+                font = "Default",
+                buttonStyle = "Rounded",
+                showAboutSection = true,
+                showServicesSection = true,
+                showTeamSection = true,
+                showHoursSection = true,
+                showContactSection = true,
+            },
+            cancellationToken);
+
+        response.StatusCode.ShouldBe(HttpStatusCode.BadRequest);
+    }
+
+    [Fact]
+    public async Task Anonymous_Request_To_Update_Page_Customization_Should_Be_Unauthorized()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var client = fixture.CreateClient();
+
+        var response = await client.PutAsJsonAsync(
+            "/api/tenants/page-customization",
+            new
+            {
+                secondaryColorHex = (string?)null,
+                font = "Default",
+                buttonStyle = "Rounded",
+                showAboutSection = true,
+                showServicesSection = true,
+                showTeamSection = true,
+                showHoursSection = true,
+                showContactSection = true,
+            },
+            cancellationToken);
+
+        response.StatusCode.ShouldBe(HttpStatusCode.Unauthorized);
+    }
+
+    [Fact]
     public async Task Anonymous_Request_To_Get_Or_Update_Profile_Should_Be_Unauthorized()
     {
         var cancellationToken = TestContext.Current.CancellationToken;

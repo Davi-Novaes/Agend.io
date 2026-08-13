@@ -66,6 +66,14 @@ export type TenantPublicProfile = {
   address: string | null;
   instagramUrl: string | null;
   facebookUrl: string | null;
+  secondaryColorHex: string | null;
+  font: PublicPageFont;
+  buttonStyle: PublicPageButtonStyle;
+  showAboutSection: boolean;
+  showServicesSection: boolean;
+  showTeamSection: boolean;
+  showHoursSection: boolean;
+  showContactSection: boolean;
   businessHours: WorkingHourEntry[];
 };
 
@@ -238,6 +246,10 @@ export async function uploadTenantBanner(file: File, accessToken: string): Promi
   return response.json();
 }
 
+export type PublicPageFont = "Default" | "Poppins" | "PlayfairDisplay" | "Merriweather";
+
+export type PublicPageButtonStyle = "Rounded" | "Square" | "Pill";
+
 export type TenantProfile = {
   name: string;
   slug: string;
@@ -251,6 +263,14 @@ export type TenantProfile = {
   address: string | null;
   instagramUrl: string | null;
   facebookUrl: string | null;
+  secondaryColorHex: string | null;
+  font: PublicPageFont;
+  buttonStyle: PublicPageButtonStyle;
+  showAboutSection: boolean;
+  showServicesSection: boolean;
+  showTeamSection: boolean;
+  showHoursSection: boolean;
+  showContactSection: boolean;
   businessHours: WorkingHourEntry[];
 };
 
@@ -274,6 +294,21 @@ export function updateTenantProfile(input: TenantProfileInput, accessToken: stri
 
 export function setTenantBusinessHours(entries: WorkingHourEntry[], accessToken: string): Promise<void> {
   return request("/api/tenants/business-hours", { method: "PUT", body: JSON.stringify({ entries }) }, accessToken);
+}
+
+export type TenantPageCustomizationInput = {
+  secondaryColorHex: string | null;
+  font: PublicPageFont;
+  buttonStyle: PublicPageButtonStyle;
+  showAboutSection: boolean;
+  showServicesSection: boolean;
+  showTeamSection: boolean;
+  showHoursSection: boolean;
+  showContactSection: boolean;
+};
+
+export function updateTenantPageCustomization(input: TenantPageCustomizationInput, accessToken: string): Promise<void> {
+  return request("/api/tenants/page-customization", { method: "PUT", body: JSON.stringify(input) }, accessToken);
 }
 
 export type TeamMember = {

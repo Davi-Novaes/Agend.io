@@ -54,6 +54,31 @@ public sealed class Tenant : AggregateRoot<TenantId>, IAuditable, ISoftDeletable
 
     public string? FacebookUrl { get; private set; }
 
+    /// <summary>
+    /// Cor de apoio da pagina publica (badges, acentos). Mesma regra de
+    /// contraste AA do PrimaryColorHex, pareada com texto branco.
+    /// </summary>
+    public string? SecondaryColorHex { get; private set; }
+
+    public PublicPageFont Font { get; private set; } = PublicPageFont.Default;
+
+    public PublicPageButtonStyle ButtonStyle { get; private set; } = PublicPageButtonStyle.Rounded;
+
+    /// <summary>
+    /// Visibilidade de cada secao da pagina publica. Default true em todas —
+    /// a pagina ja funciona sem o dono configurar nada (a secao so aparece de
+    /// fato quando ha dado para mostrar, ver Fase 2).
+    /// </summary>
+    public bool ShowAboutSection { get; private set; } = true;
+
+    public bool ShowServicesSection { get; private set; } = true;
+
+    public bool ShowTeamSection { get; private set; } = true;
+
+    public bool ShowHoursSection { get; private set; } = true;
+
+    public bool ShowContactSection { get; private set; } = true;
+
     private readonly List<BusinessHoursEntry> _businessHours = [];
 
     public IReadOnlyCollection<BusinessHoursEntry> BusinessHours => _businessHours;
@@ -198,6 +223,53 @@ public sealed class Tenant : AggregateRoot<TenantId>, IAuditable, ISoftDeletable
         Address = string.IsNullOrWhiteSpace(address) ? null : address.Trim();
         InstagramUrl = string.IsNullOrWhiteSpace(instagramUrl) ? null : instagramUrl.Trim();
         FacebookUrl = string.IsNullOrWhiteSpace(facebookUrl) ? null : facebookUrl.Trim();
+
+        return Result.Success();
+    }
+
+    public Result UpdatePageCustomization(
+        string? secondaryColorHex,
+        PublicPageFont font,
+        PublicPageButtonStyle buttonStyle,
+        bool showAboutSection,
+        bool showServicesSection,
+        bool showTeamSection,
+        bool showHoursSection,
+        bool showContactSection)
+    {
+        if (secondaryColorHex is not null)
+        {
+            if (!ContrastValidator.IsValidHexColor(secondaryColorHex))
+            {
+                return Result.Failure(Error.Validation("Tenant.InvalidColorFormat", "Informe uma cor no formato #RRGGBB."));
+            }
+
+            if (!ContrastValidator.MeetsAaContrast(BrandForegroundHex, secondaryColorHex))
+            {
+                return Result.Failure(Error.Validation(
+                    "Tenant.InsufficientContrast",
+                    "Essa cor nao tem contraste suficiente com o texto branco (minimo AA: 4.5:1). Escolha um tom mais escuro."));
+            }
+        }
+
+        if (!Enum.IsDefined(font))
+        {
+            return Result.Failure(Error.Validation("Tenant.InvalidFont", "A fonte informada e invalida."));
+        }
+
+        if (!Enum.IsDefined(buttonStyle))
+        {
+            return Result.Failure(Error.Validation("Tenant.InvalidButtonStyle", "O estilo de botao informado e invalido."));
+        }
+
+        SecondaryColorHex = secondaryColorHex;
+        Font = font;
+        ButtonStyle = buttonStyle;
+        ShowAboutSection = showAboutSection;
+        ShowServicesSection = showServicesSection;
+        ShowTeamSection = showTeamSection;
+        ShowHoursSection = showHoursSection;
+        ShowContactSection = showContactSection;
 
         return Result.Success();
     }
