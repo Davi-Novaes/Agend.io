@@ -20,6 +20,10 @@ public sealed class GetTenantProfileQueryHandler(TenancyDbContext dbContext, ITe
         var businessHours = tenant.BusinessHours
             .Select(h => new BusinessHoursEntryResult(h.DayOfWeek, h.StartTime, h.EndTime))
             .ToList();
+        var closedDates = tenant.ClosedDates
+            .Select(d => new ClosedDateResult(d.Date, d.Reason))
+            .OrderBy(d => d.Date)
+            .ToList();
 
         var profile = new TenantProfile(
             tenant.Name,
@@ -42,7 +46,9 @@ public sealed class GetTenantProfileQueryHandler(TenancyDbContext dbContext, ITe
             tenant.ShowTeamSection,
             tenant.ShowHoursSection,
             tenant.ShowContactSection,
-            businessHours);
+            businessHours,
+            closedDates,
+            tenant.AppointmentBufferMinutes);
 
         return Result.Success(profile);
     }

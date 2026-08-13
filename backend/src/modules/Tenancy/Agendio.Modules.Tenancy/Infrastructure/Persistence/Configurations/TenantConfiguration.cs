@@ -84,6 +84,8 @@ public sealed class TenantConfiguration : IEntityTypeConfiguration<Tenant>
         builder.Property(t => t.ShowHoursSection).IsRequired().HasDefaultValue(true);
         builder.Property(t => t.ShowContactSection).IsRequired().HasDefaultValue(true);
 
+        builder.Property(t => t.AppointmentBufferMinutes).IsRequired().HasDefaultValue(0);
+
         // Colecao de Value Objects sem identidade propria — tabela filha, FK
         // sombra gerada pelo EF, sem repositorio separado (mesmo padrao de
         // Resource.WorkingHours no modulo Resources).
@@ -97,6 +99,17 @@ public sealed class TenantConfiguration : IEntityTypeConfiguration<Tenant>
             businessHours.Property(h => h.DayOfWeek).HasConversion<string>().HasMaxLength(20).IsRequired();
             businessHours.Property(h => h.StartTime).IsRequired();
             businessHours.Property(h => h.EndTime).IsRequired();
+        });
+
+        builder.OwnsMany(t => t.ClosedDates, closedDates =>
+        {
+            closedDates.ToTable("tenant_closed_dates");
+            closedDates.WithOwner().HasForeignKey("tenant_id");
+            closedDates.Property<int>("id");
+            closedDates.HasKey("id");
+
+            closedDates.Property(d => d.Date).IsRequired();
+            closedDates.Property(d => d.Reason).HasMaxLength(200);
         });
 
         builder.Property(t => t.CreatedBy).HasMaxLength(256);

@@ -131,6 +131,12 @@ namespace Agendio.Modules.Tenancy.Infrastructure.Persistence.Migrations
                         .HasColumnType("character varying(500)")
                         .HasColumnName("address");
 
+                    b.Property<int>("AppointmentBufferMinutes")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasDefaultValue(0)
+                        .HasColumnName("appointment_buffer_minutes");
+
                     b.Property<string>("BannerUrl")
                         .HasMaxLength(500)
                         .HasColumnType("character varying(500)")
@@ -395,7 +401,44 @@ namespace Agendio.Modules.Tenancy.Infrastructure.Persistence.Migrations
                                 .HasConstraintName("fk_tenant_business_hours_tenants_tenant_id");
                         });
 
+                    b.OwnsMany("Agendio.Modules.Tenancy.Domain.ClosedDate", "ClosedDates", b1 =>
+                        {
+                            b1.Property<int>("id")
+                                .ValueGeneratedOnAdd()
+                                .HasColumnType("integer")
+                                .HasColumnName("id");
+
+                            NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b1.Property<int>("id"));
+
+                            b1.Property<DateOnly>("Date")
+                                .HasColumnType("date")
+                                .HasColumnName("date");
+
+                            b1.Property<string>("Reason")
+                                .HasMaxLength(200)
+                                .HasColumnType("character varying(200)")
+                                .HasColumnName("reason");
+
+                            b1.Property<Guid>("tenant_id")
+                                .HasColumnType("uuid")
+                                .HasColumnName("tenant_id");
+
+                            b1.HasKey("id")
+                                .HasName("pk_tenant_closed_dates");
+
+                            b1.HasIndex("tenant_id")
+                                .HasDatabaseName("ix_tenant_closed_dates_tenant_id");
+
+                            b1.ToTable("tenant_closed_dates", "tenancy");
+
+                            b1.WithOwner()
+                                .HasForeignKey("tenant_id")
+                                .HasConstraintName("fk_tenant_closed_dates_tenants_tenant_id");
+                        });
+
                     b.Navigation("BusinessHours");
+
+                    b.Navigation("ClosedDates");
                 });
 #pragma warning restore 612, 618
         }

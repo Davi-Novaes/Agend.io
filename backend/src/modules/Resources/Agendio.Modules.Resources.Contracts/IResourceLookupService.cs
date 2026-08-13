@@ -11,4 +11,8 @@ public interface IResourceLookupService
 
     /// <summary>Recursos ATIVOS de um tipo (ex.: "Person") — usado por Financeiro para listar profissionais elegiveis a regra de comissao.</summary>
     Task<IReadOnlyList<ResourceLookupResult>> ListActiveByTypeAsync(string type, CancellationToken cancellationToken = default);
+
+    /// <summary>Folgas do recurso que se sobrepoem ao intervalo [fromDate, toDate] — usado pelo motor de disponibilidade (Scheduling, Fase 4).</summary>
+    Task<IReadOnlyList<TimeOffLookup>> ListTimeOffAsync(
+        Guid resourceId, DateOnly fromDate, DateOnly toDate, CancellationToken cancellationToken = default);
 }

@@ -143,6 +143,173 @@ public class PublicPortalTests(IntegrationTestFixture fixture)
     }
 
     [Fact]
+    public async Task Availability_Is_Empty_On_A_Day_The_Resource_Has_TimeOff()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var client = fixture.CreateClient();
+        var (tenantId, accessToken) = await CreateTenantWithOwnerAndLoginAsync(client, cancellationToken);
+        var (resourceId, serviceId) = await SetUpBookableResourceAndServiceAsync(client, accessToken, cancellationToken);
+
+        var targetDate = DateOnly.FromDateTime(DateTime.UtcNow.AddDays(9));
+        await SetWorkingHoursForDateAsync(client, accessToken, resourceId, targetDate, "09:00:00", "18:00:00", cancellationToken);
+
+        var timeOffResponse = await AuthorizedRequestHelpers.PostAuthorizedAsync(
+            client, accessToken, $"/api/resources/{resourceId}/time-off",
+            new { startDate = targetDate, endDate = targetDate, reason = "Ferias" }, cancellationToken);
+        timeOffResponse.StatusCode.ShouldBe(HttpStatusCode.Created);
+
+        var slots = await GetAvailableSlotsAsync(client, tenantId, resourceId, serviceId, targetDate, cancellationToken);
+
+        slots.ShouldBeEmpty();
+    }
+
+    [Fact]
+    public async Task Public_Booking_On_A_Day_The_Resource_Has_TimeOff_Should_Be_Rejected()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var client = fixture.CreateClient();
+        var (tenantId, accessToken) = await CreateTenantWithOwnerAndLoginAsync(client, cancellationToken);
+        var (resourceId, serviceId) = await SetUpBookableResourceAndServiceAsync(client, accessToken, cancellationToken);
+
+        var targetDate = DateOnly.FromDateTime(DateTime.UtcNow.AddDays(10));
+        await SetWorkingHoursForDateAsync(client, accessToken, resourceId, targetDate, "09:00:00", "18:00:00", cancellationToken);
+        await AuthorizedRequestHelpers.PostAuthorizedAsync(
+            client, accessToken, $"/api/resources/{resourceId}/time-off",
+            new { startDate = targetDate, endDate = targetDate, reason = "Ferias" }, cancellationToken);
+
+        // Chama a confirmacao diretamente (nao passa pela lista de disponibilidade,
+        // que ja excluiria o dia) para provar que a rejeicao acontece nos dois pontos.
+        var startAtUtc = new DateTimeOffset(targetDate.ToDateTime(new TimeOnly(10, 0)), TimeSpan.Zero);
+        var response = await client.PostAsJsonAsync($"/api/public/tenants/{tenantId}/appointments", new
+        {
+            resourceId,
+            serviceId,
+            startAtUtc,
+            customerFullName = "Visitante",
+            customerEmail = $"visitante-{Guid.NewGuid():N}@example.com",
+            customerPhone = (string?)null,
+            notes = (string?)null,
+        }, cancellationToken);
+
+        response.StatusCode.ShouldBe(HttpStatusCode.Conflict);
+    }
+
+    [Fact]
+    public async Task Availability_Is_Empty_On_A_Tenant_Closed_Date()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var client = fixture.CreateClient();
+        var (tenantId, accessToken) = await CreateTenantWithOwnerAndLoginAsync(client, cancellationToken);
+        var (resourceId, serviceId) = await SetUpBookableResourceAndServiceAsync(client, accessToken, cancellationToken);
+
+        var targetDate = DateOnly.FromDateTime(DateTime.UtcNow.AddDays(11));
+        await SetWorkingHoursForDateAsync(client, accessToken, resourceId, targetDate, "09:00:00", "18:00:00", cancellationToken);
+
+        var settingsResponse = await AuthorizedRequestHelpers.PutAuthorizedAsync(
+            client, accessToken, "/api/tenants/scheduling-settings",
+            new { closedDates = new[] { new { date = targetDate, reason = "Feriado" } }, appointmentBufferMinutes = 0 },
+            cancellationToken);
+        settingsResponse.StatusCode.ShouldBe(HttpStatusCode.NoContent);
+
+        var slots = await GetAvailableSlotsAsync(client, tenantId, resourceId, serviceId, targetDate, cancellationToken);
+
+        slots.ShouldBeEmpty();
+    }
+
+    [Fact]
+    public async Task Availability_Is_Restricted_To_The_Tenant_Business_Hours_When_Configured()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var client = fixture.CreateClient();
+        var (tenantId, accessToken) = await CreateTenantWithOwnerAndLoginAsync(client, cancellationToken);
+        var (resourceId, serviceId) = await SetUpBookableResourceAndServiceAsync(client, accessToken, cancellationToken);
+
+        var targetDate = DateOnly.FromDateTime(DateTime.UtcNow.AddDays(12));
+        // O recurso trabalha ate 18:00, mas o estabelecimento so abre ate 12:00
+        // nesse dia — a disponibilidade efetiva precisa respeitar o menor dos dois.
+        await SetWorkingHoursForDateAsync(client, accessToken, resourceId, targetDate, "09:00:00", "18:00:00", cancellationToken);
+        var businessHoursResponse = await AuthorizedRequestHelpers.PutAuthorizedAsync(
+            client, accessToken, "/api/tenants/business-hours",
+            new { entries = new[] { new { dayOfWeek = targetDate.DayOfWeek.ToString(), startTime = "09:00:00", endTime = "12:00:00" } } },
+            cancellationToken);
+        businessHoursResponse.StatusCode.ShouldBe(HttpStatusCode.NoContent);
+
+        var slots = await GetAvailableSlotsAsync(client, tenantId, resourceId, serviceId, targetDate, cancellationToken);
+        var timeZone = TimeZoneInfo.FindSystemTimeZoneById("America/Sao_Paulo");
+
+        slots.ShouldNotBeEmpty();
+        slots.ShouldAllBe(s => TimeZoneInfo.ConvertTime(s, timeZone).TimeOfDay < new TimeSpan(12, 0, 0));
+    }
+
+    [Fact]
+    public async Task Availability_Is_Empty_When_Tenant_Business_Hours_Configured_But_Missing_For_That_Day()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var client = fixture.CreateClient();
+        var (tenantId, accessToken) = await CreateTenantWithOwnerAndLoginAsync(client, cancellationToken);
+        var (resourceId, serviceId) = await SetUpBookableResourceAndServiceAsync(client, accessToken, cancellationToken);
+
+        var targetDate = DateOnly.FromDateTime(DateTime.UtcNow.AddDays(13));
+        await SetWorkingHoursForDateAsync(client, accessToken, resourceId, targetDate, "09:00:00", "18:00:00", cancellationToken);
+
+        // Horario de funcionamento configurado, mas so para um dia diferente do
+        // pedido — o estabelecimento esta fechado nesse dia mesmo com o recurso aberto.
+        var otherDayOfWeek = targetDate.DayOfWeek == DayOfWeek.Monday ? DayOfWeek.Tuesday : DayOfWeek.Monday;
+        var businessHoursResponse = await AuthorizedRequestHelpers.PutAuthorizedAsync(
+            client, accessToken, "/api/tenants/business-hours",
+            new { entries = new[] { new { dayOfWeek = otherDayOfWeek.ToString(), startTime = "09:00:00", endTime = "18:00:00" } } },
+            cancellationToken);
+        businessHoursResponse.StatusCode.ShouldBe(HttpStatusCode.NoContent);
+
+        var slots = await GetAvailableSlotsAsync(client, tenantId, resourceId, serviceId, targetDate, cancellationToken);
+
+        slots.ShouldBeEmpty();
+    }
+
+    [Fact]
+    public async Task Availability_Respects_The_Appointment_Buffer_Around_An_Existing_Booking()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var client = fixture.CreateClient();
+        var (tenantId, accessToken) = await CreateTenantWithOwnerAndLoginAsync(client, cancellationToken);
+        var (resourceId, serviceId) = await SetUpBookableResourceAndServiceAsync(client, accessToken, cancellationToken);
+
+        var targetDate = DateOnly.FromDateTime(DateTime.UtcNow.AddDays(14));
+        await SetWorkingHoursForDateAsync(client, accessToken, resourceId, targetDate, "09:00:00", "18:00:00", cancellationToken);
+
+        var settingsResponse = await AuthorizedRequestHelpers.PutAuthorizedAsync(
+            client, accessToken, "/api/tenants/scheduling-settings",
+            new { closedDates = Array.Empty<object>(), appointmentBufferMinutes = 30 },
+            cancellationToken);
+        settingsResponse.StatusCode.ShouldBe(HttpStatusCode.NoContent);
+
+        var slotsBeforeBooking = await GetAvailableSlotsAsync(client, tenantId, resourceId, serviceId, targetDate, cancellationToken);
+        var firstSlotStart = slotsBeforeBooking[0];
+
+        var bookingResponse = await client.PostAsJsonAsync($"/api/public/tenants/{tenantId}/appointments", new
+        {
+            resourceId,
+            serviceId,
+            startAtUtc = firstSlotStart,
+            customerFullName = "Visitante do Portal",
+            customerEmail = $"visitante-{Guid.NewGuid():N}@example.com",
+            customerPhone = (string?)null,
+            notes = (string?)null,
+        }, cancellationToken);
+        bookingResponse.StatusCode.ShouldBe(HttpStatusCode.Created);
+
+        // Servico de 30min + buffer de 30min dos dois lados: nada entre o inicio
+        // do agendamento e o fim (30min) + buffer (30min) depois dele pode ficar
+        // disponivel; exatamente nesse ponto (60min depois do inicio) volta a abrir.
+        var slotsAfterBooking = await GetAvailableSlotsAsync(client, tenantId, resourceId, serviceId, targetDate, cancellationToken);
+        var bufferEnd = firstSlotStart.AddMinutes(30 + 30);
+
+        slotsAfterBooking.ShouldNotContain(firstSlotStart);
+        slotsAfterBooking.ShouldNotContain(s => s > firstSlotStart && s < bufferEnd);
+        slotsAfterBooking.ShouldContain(bufferEnd);
+    }
+
+    [Fact]
     public async Task Public_Booking_Reuses_An_Existing_Customer_By_Email_Instead_Of_Duplicating()
     {
         var cancellationToken = TestContext.Current.CancellationToken;

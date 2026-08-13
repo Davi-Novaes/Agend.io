@@ -12,6 +12,7 @@ using Agendio.Modules.Tenancy.Application.UpdateTenantBranding;
 using Agendio.Modules.Tenancy.Application.UpdateTenantLogo;
 using Agendio.Modules.Tenancy.Application.UpdateTenantPageCustomization;
 using Agendio.Modules.Tenancy.Application.UpdateTenantProfile;
+using Agendio.Modules.Tenancy.Application.UpdateTenantSchedulingSettings;
 using Agendio.Modules.Tenancy.Application.UpdateUnit;
 using Agendio.Modules.Tenancy.Domain;
 using Agendio.SharedKernel.Messaging;
@@ -139,6 +140,18 @@ public sealed class TenancyEndpoints : IEndpointModule
         .WithName("UpdateTenantPageCustomization")
         .WithSummary("Atualiza a personalizacao da pagina publica: cor secundaria, fonte, estilo de botao e visibilidade de secoes.");
 
+        group.MapPut("/scheduling-settings", async (UpdateSchedulingSettingsRequest request, IDispatcher dispatcher, CancellationToken cancellationToken) =>
+        {
+            var closedDates = request.ClosedDates.Select(d => new ClosedDateDto(d.Date, d.Reason)).ToList();
+            var command = new UpdateTenantSchedulingSettingsCommand(closedDates, request.AppointmentBufferMinutes);
+            var result = await dispatcher.Send(command, cancellationToken);
+
+            return result.IsSuccess ? Results.NoContent() : result.Error.ToProblemResult();
+        })
+        .RequireAuthorization(policy => policy.RequireRole("Owner"))
+        .WithName("UpdateTenantSchedulingSettings")
+        .WithSummary("Atualiza datas fechadas (feriados/eventos) e o intervalo minimo entre agendamentos do estabelecimento.");
+
         group.MapPut("/business-hours", async (SetBusinessHoursRequest request, IDispatcher dispatcher, CancellationToken cancellationToken) =>
         {
             var entries = request.Entries.Select(e => new BusinessHoursEntryDto(e.DayOfWeek, e.StartTime, e.EndTime)).ToList();
@@ -232,4 +245,8 @@ public sealed class TenancyEndpoints : IEndpointModule
     private sealed record BusinessHoursEntryRequest(DayOfWeek DayOfWeek, TimeOnly StartTime, TimeOnly EndTime);
 
     private sealed record SetBusinessHoursRequest(IReadOnlyList<BusinessHoursEntryRequest> Entries);
+
+    private sealed record ClosedDateRequest(DateOnly Date, string? Reason);
+
+    private sealed record UpdateSchedulingSettingsRequest(IReadOnlyList<ClosedDateRequest> ClosedDates, int AppointmentBufferMinutes);
 }

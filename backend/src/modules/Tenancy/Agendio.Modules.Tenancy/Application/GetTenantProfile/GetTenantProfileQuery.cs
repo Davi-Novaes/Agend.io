@@ -7,6 +7,8 @@ public sealed record GetTenantProfileQuery : IQuery<TenantProfile>;
 
 public sealed record BusinessHoursEntryResult(DayOfWeek DayOfWeek, TimeOnly StartTime, TimeOnly EndTime);
 
+public sealed record ClosedDateResult(DateOnly Date, string? Reason);
+
 public sealed record TenantProfile(
     string Name,
     string Slug,
@@ -28,4 +30,6 @@ public sealed record TenantProfile(
     bool ShowTeamSection,
     bool ShowHoursSection,
     bool ShowContactSection,
-    IReadOnlyList<BusinessHoursEntryResult> BusinessHours);
+    IReadOnlyList<BusinessHoursEntryResult> BusinessHours,
+    IReadOnlyList<ClosedDateResult> ClosedDates,
+    int AppointmentBufferMinutes);

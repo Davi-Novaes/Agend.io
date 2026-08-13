@@ -83,6 +83,14 @@ public sealed class Tenant : AggregateRoot<TenantId>, IAuditable, ISoftDeletable
 
     public IReadOnlyCollection<BusinessHoursEntry> BusinessHours => _businessHours;
 
+    /// <summary>Minutos de intervalo exigidos apos cada agendamento antes do proximo poder comecar (mesmo recurso). 0 = sem intervalo.</summary>
+    public int AppointmentBufferMinutes { get; private set; }
+
+    private readonly List<ClosedDate> _closedDates = [];
+
+    /// <summary>Datas especificas em que o estabelecimento nao atende (feriados, eventos) — ver <see cref="ClosedDate"/>.</summary>
+    public IReadOnlyCollection<ClosedDate> ClosedDates => _closedDates;
+
     public DateTimeOffset CreatedAtUtc { get; set; }
 
     public string? CreatedBy { get; set; }
@@ -292,6 +300,24 @@ public sealed class Tenant : AggregateRoot<TenantId>, IAuditable, ISoftDeletable
 
         _businessHours.Clear();
         _businessHours.AddRange(parsedEntries);
+
+        return Result.Success();
+    }
+
+    private const int MaxAppointmentBufferMinutes = 240;
+
+    /// <summary>Substitui a lista inteira de datas fechadas de uma vez (mesmo padrao de SetBusinessHours).</summary>
+    public Result UpdateSchedulingSettings(IReadOnlyList<(DateOnly Date, string? Reason)> closedDates, int appointmentBufferMinutes)
+    {
+        if (appointmentBufferMinutes < 0 || appointmentBufferMinutes > MaxAppointmentBufferMinutes)
+        {
+            return Result.Failure(Error.Validation(
+                "Tenant.InvalidAppointmentBuffer", $"O intervalo entre agendamentos precisa estar entre 0 e {MaxAppointmentBufferMinutes} minutos."));
+        }
+
+        _closedDates.Clear();
+        _closedDates.AddRange(closedDates.Select(d => ClosedDate.Create(d.Date, d.Reason)));
+        AppointmentBufferMinutes = appointmentBufferMinutes;
 
         return Result.Success();
     }
