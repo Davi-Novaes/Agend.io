@@ -22,7 +22,9 @@ import {
   getCashFlowSummary,
   ApiError,
   type AccountReceivableStatus,
+  type AccountReceivableSummary,
   type AccountPayableStatus,
+  type AccountPayableSummary,
   type ExpenseCategory,
   type CommissionRuleSummary,
 } from "@/lib/api/client";
@@ -35,6 +37,16 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -200,6 +212,7 @@ function ContasAReceberTab({ accessToken }: { accessToken: string }) {
   const queryClient = useQueryClient();
   const [page, setPage] = React.useState(1);
   const [status, setStatus] = React.useState<AccountReceivableStatus | "all">("all");
+  const [confirmingReceipt, setConfirmingReceipt] = React.useState<AccountReceivableSummary | null>(null);
 
   const listQuery = useQuery({
     queryKey: ["financeiro", "contas-a-receber", { page, status }],
@@ -293,7 +306,7 @@ function ContasAReceberTab({ accessToken }: { accessToken: string }) {
                 </TableCell>
                 <TableCell className="text-right">
                   {item.status === "Pending" && (
-                    <Button variant="ghost" size="sm" disabled={receiveMutation.isPending} onClick={() => receiveMutation.mutate(item.id)}>
+                    <Button variant="ghost" size="sm" disabled={receiveMutation.isPending} onClick={() => setConfirmingReceipt(item)}>
                       Confirmar recebimento
                     </Button>
                   )}
@@ -318,6 +331,31 @@ function ContasAReceberTab({ accessToken }: { accessToken: string }) {
         </div>
       </div>
       </CardContent>
+
+      <AlertDialog open={confirmingReceipt !== null} onOpenChange={(open) => !open && setConfirmingReceipt(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Confirmar recebimento?</AlertDialogTitle>
+            <AlertDialogDescription>
+              {confirmingReceipt &&
+                `Marcar "${confirmingReceipt.description}" (${formatCurrency(confirmingReceipt.amount)}) como recebido. Essa acao nao pode ser desfeita.`}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                if (confirmingReceipt) {
+                  receiveMutation.mutate(confirmingReceipt.id);
+                  setConfirmingReceipt(null);
+                }
+              }}
+            >
+              Confirmar recebimento
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </Card>
   );
 }
@@ -328,6 +366,7 @@ function ContasAPagarTab({ accessToken }: { accessToken: string }) {
   const [status, setStatus] = React.useState<AccountPayableStatus | "all">("all");
   const [category, setCategory] = React.useState<ExpenseCategory | "all">("all");
   const [dialogOpen, setDialogOpen] = React.useState(false);
+  const [pendingAction, setPendingAction] = React.useState<{ item: AccountPayableSummary; kind: "pay" | "cancel" } | null>(null);
 
   const listQuery = useQuery({
     queryKey: ["financeiro", "contas-a-pagar", { page, status, category }],
@@ -493,10 +532,20 @@ function ContasAPagarTab({ accessToken }: { accessToken: string }) {
                 <TableCell className="text-right">
                   {item.status === "Pending" && (
                     <div className="flex justify-end gap-2">
-                      <Button variant="ghost" size="sm" disabled={payMutation.isPending} onClick={() => payMutation.mutate(item.id)}>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        disabled={payMutation.isPending}
+                        onClick={() => setPendingAction({ item, kind: "pay" })}
+                      >
                         Marcar como pago
                       </Button>
-                      <Button variant="ghost" size="sm" disabled={cancelMutation.isPending} onClick={() => cancelMutation.mutate(item.id)}>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        disabled={cancelMutation.isPending}
+                        onClick={() => setPendingAction({ item, kind: "cancel" })}
+                      >
                         Cancelar
                       </Button>
                     </div>
@@ -605,6 +654,37 @@ function ContasAPagarTab({ accessToken }: { accessToken: string }) {
           </Form>
         </DialogContent>
       </Dialog>
+
+      <AlertDialog open={pendingAction !== null} onOpenChange={(open) => !open && setPendingAction(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>{pendingAction?.kind === "cancel" ? "Cancelar esta conta?" : "Marcar como pago?"}</AlertDialogTitle>
+            <AlertDialogDescription>
+              {pendingAction &&
+                (pendingAction.kind === "cancel"
+                  ? `Cancelar "${pendingAction.item.description}" (${formatCurrency(pendingAction.item.amount)}). Essa acao nao pode ser desfeita.`
+                  : `Marcar "${pendingAction.item.description}" (${formatCurrency(pendingAction.item.amount)}) como pago. Essa acao nao pode ser desfeita.`)}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Voltar</AlertDialogCancel>
+            <AlertDialogAction
+              variant={pendingAction?.kind === "cancel" ? "destructive" : "default"}
+              onClick={() => {
+                if (!pendingAction) return;
+                if (pendingAction.kind === "cancel") {
+                  cancelMutation.mutate(pendingAction.item.id);
+                } else {
+                  payMutation.mutate(pendingAction.item.id);
+                }
+                setPendingAction(null);
+              }}
+            >
+              {pendingAction?.kind === "cancel" ? "Cancelar conta" : "Marcar como pago"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </>
   );
 }
