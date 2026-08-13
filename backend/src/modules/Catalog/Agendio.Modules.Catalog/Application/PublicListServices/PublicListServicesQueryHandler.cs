@@ -12,11 +12,14 @@ public sealed class PublicListServicesQueryHandler(CatalogDbContext dbContext)
     {
         var services = await dbContext.Services.AsNoTracking()
             .Where(s => s.IsActive)
-            .OrderBy(s => s.Name)
+            .OrderBy(s => s.DisplayOrder)
+            .ThenBy(s => s.Name)
             .ToListAsync(cancellationToken);
 
         IReadOnlyList<PublicServiceSummary> items = services
-            .Select(s => new PublicServiceSummary(s.Id.Value, s.Name, s.Description, s.DurationMinutes, s.Price.Amount, s.Price.Currency, s.Category))
+            .Select(s => new PublicServiceSummary(
+                s.Id.Value, s.Name, s.Description, s.DurationMinutes, s.Price.Amount, s.Price.Currency, s.Category,
+                s.ImageUrl, s.DisplayOrder))
             .ToList();
 
         return Result.Success(items);

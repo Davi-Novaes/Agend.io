@@ -26,6 +26,7 @@ public sealed class GetTenantProfileQueryHandler(TenancyDbContext dbContext, ITe
             tenant.Slug.Value,
             tenant.PrimaryColorHex,
             tenant.LogoUrl,
+            tenant.BannerUrl,
             tenant.Description,
             tenant.Phone?.Value,
             tenant.WhatsApp?.Value,

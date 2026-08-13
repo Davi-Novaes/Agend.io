@@ -11,6 +11,7 @@ public sealed record TenantProfile(
     string Slug,
     string? PrimaryColorHex,
     string? LogoUrl,
+    string? BannerUrl,
     string? Description,
     string? Phone,
     string? WhatsApp,

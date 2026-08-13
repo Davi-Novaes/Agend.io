@@ -7,4 +7,5 @@ namespace Agendio.Modules.Catalog.Application.PublicListServices;
 public sealed record PublicListServicesQuery(Guid TenantId) : IQuery<IReadOnlyList<PublicServiceSummary>>, IHasExplicitTenant;
 
 public sealed record PublicServiceSummary(
-    Guid Id, string Name, string? Description, int DurationMinutes, decimal Price, string Currency, string? Category);
+    Guid Id, string Name, string? Description, int DurationMinutes, decimal Price, string Currency, string? Category,
+    string? ImageUrl, int DisplayOrder);

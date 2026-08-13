@@ -35,6 +35,9 @@ public sealed class Tenant : AggregateRoot<TenantId>, IAuditable, ISoftDeletable
     /// <summary>Caminho publico do arquivo salvo por IFileStorage. Null usa um placeholder generico na UI.</summary>
     public string? LogoUrl { get; private set; }
 
+    /// <summary>Imagem de capa da pagina publica (hero). Null usa um gradiente com a cor de marca.</summary>
+    public string? BannerUrl { get; private set; }
+
     public string? Description { get; private set; }
 
     public PhoneNumber? Phone { get; private set; }
@@ -143,6 +146,17 @@ public sealed class Tenant : AggregateRoot<TenantId>, IAuditable, ISoftDeletable
         }
 
         LogoUrl = logoUrl;
+        return Result.Success();
+    }
+
+    public Result SetBanner(string bannerUrl)
+    {
+        if (string.IsNullOrWhiteSpace(bannerUrl))
+        {
+            return Result.Failure(Error.Validation("Tenant.InvalidBannerUrl", "URL do banner invalida."));
+        }
+
+        BannerUrl = bannerUrl;
         return Result.Success();
     }
 

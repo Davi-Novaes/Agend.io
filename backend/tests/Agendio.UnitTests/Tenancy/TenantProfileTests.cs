@@ -102,4 +102,26 @@ public class TenantProfileTests
         result.IsFailure.ShouldBeTrue();
         tenant.BusinessHours.ShouldBeEmpty();
     }
+
+    [Fact]
+    public void SetBanner_Should_Set_The_Url()
+    {
+        var tenant = CreateTenant();
+
+        var result = tenant.SetBanner("/uploads/tenant-banners/abc.png");
+
+        result.IsSuccess.ShouldBeTrue();
+        tenant.BannerUrl.ShouldBe("/uploads/tenant-banners/abc.png");
+    }
+
+    [Fact]
+    public void SetBanner_Should_Fail_With_Empty_Url()
+    {
+        var tenant = CreateTenant();
+
+        var result = tenant.SetBanner("   ");
+
+        result.IsFailure.ShouldBeTrue();
+        tenant.BannerUrl.ShouldBeNull();
+    }
 }
