@@ -368,12 +368,15 @@ export type NotificationLogItem = {
 };
 
 export function listNotificationHistory(
-  params: { page?: number; pageSize?: number },
+  params: { page?: number; pageSize?: number; customerId?: string },
   accessToken: string
 ): Promise<PagedResult<NotificationLogItem>> {
   const query = new URLSearchParams();
   query.set("page", String(params.page ?? 1));
   query.set("pageSize", String(params.pageSize ?? 20));
+  if (params.customerId) {
+    query.set("customerId", params.customerId);
+  }
   return request(`/api/appointments/notifications?${query.toString()}`, {}, accessToken);
 }
 
@@ -821,6 +824,34 @@ export function listAppointments(
 
 export function getAppointmentById(id: string, accessToken: string): Promise<AppointmentDetails> {
   return request(`/api/appointments/${id}`, {}, accessToken);
+}
+
+export type CustomerAppointmentHistoryItem = {
+  appointmentId: string;
+  serviceName: string;
+  resourceId: string;
+  professionalName: string;
+  startUtc: string;
+  endUtc: string;
+  status: AppointmentStatus;
+  price: number;
+  currency: string;
+  notes: string | null;
+};
+
+export type CustomerAppointmentHistory = {
+  items: CustomerAppointmentHistoryItem[];
+  totalVisits: number;
+  totalSpent: number;
+  totalSpentCurrency: string | null;
+  lastVisitAtUtc: string | null;
+  nextAppointmentAtUtc: string | null;
+  favoriteServiceName: string | null;
+  favoriteProfessionalName: string | null;
+};
+
+export function getCustomerAppointmentHistory(customerId: string, accessToken: string): Promise<CustomerAppointmentHistory> {
+  return request(`/api/appointments/customers/${customerId}/history`, {}, accessToken);
 }
 
 export function scheduleAppointment(input: ScheduleAppointmentInput, accessToken: string): Promise<{ id: string }> {

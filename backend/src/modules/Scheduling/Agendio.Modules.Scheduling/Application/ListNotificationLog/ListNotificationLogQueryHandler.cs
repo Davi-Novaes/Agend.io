@@ -21,6 +21,7 @@ public sealed class ListNotificationLogQueryHandler(SchedulingDbContext dbContex
             from log in dbContext.NotificationLogEntries.AsNoTracking()
             join appointment in dbContext.Appointments.AsNoTracking() on log.AppointmentId equals appointment.Id into appointmentGroup
             from appointment in appointmentGroup.DefaultIfEmpty()
+            where request.CustomerId == null || log.CustomerId == request.CustomerId
             orderby log.SentAtUtc descending
             select new
             {

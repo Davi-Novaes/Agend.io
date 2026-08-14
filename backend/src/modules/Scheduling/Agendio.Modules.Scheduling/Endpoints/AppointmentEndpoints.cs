@@ -4,6 +4,7 @@ using Agendio.Modules.Scheduling.Application.CompleteAppointment;
 using Agendio.Modules.Scheduling.Application.ConfirmAppointment;
 using Agendio.Modules.Scheduling.Application.GetAppointmentById;
 using Agendio.Modules.Scheduling.Application.GetAppointmentStats;
+using Agendio.Modules.Scheduling.Application.GetCustomerAppointmentHistory;
 using Agendio.Modules.Scheduling.Application.ListAppointments;
 using Agendio.Modules.Scheduling.Application.ListNotificationLog;
 using Agendio.Modules.Scheduling.Application.MarkAppointmentNoShow;
@@ -39,13 +40,21 @@ public sealed class AppointmentEndpoints : IEndpointModule
         .WithName("GetAppointmentStats")
         .WithSummary("Estatisticas de agendamentos no periodo: conclusao, no-show, cancelamento e faturamento por servico/profissional.");
 
-        group.MapGet("/notifications", async (int page, int pageSize, IDispatcher dispatcher, CancellationToken cancellationToken) =>
+        group.MapGet("/notifications", async (int page, int pageSize, Guid? customerId, IDispatcher dispatcher, CancellationToken cancellationToken) =>
         {
-            var result = await dispatcher.Query(new ListNotificationLogQuery(page == 0 ? 1 : page, pageSize == 0 ? 20 : pageSize), cancellationToken);
+            var result = await dispatcher.Query(new ListNotificationLogQuery(page == 0 ? 1 : page, pageSize == 0 ? 20 : pageSize, customerId), cancellationToken);
             return result.IsSuccess ? Results.Ok(result.Value) : result.Error.ToProblemResult();
         })
         .WithName("ListNotificationLog")
-        .WithSummary("Historico de mensagens (e-mail/WhatsApp) enviadas aos clientes, paginado, mais recentes primeiro (Fase 7).");
+        .WithSummary("Historico de mensagens (e-mail/WhatsApp) enviadas aos clientes, paginado, mais recentes primeiro, opcionalmente filtrado por cliente (Fase 7/8).");
+
+        group.MapGet("/customers/{customerId:guid}/history", async (Guid customerId, IDispatcher dispatcher, CancellationToken cancellationToken) =>
+        {
+            var result = await dispatcher.Query(new GetCustomerAppointmentHistoryQuery(customerId), cancellationToken);
+            return result.IsSuccess ? Results.Ok(result.Value) : result.Error.ToProblemResult();
+        })
+        .WithName("GetCustomerAppointmentHistory")
+        .WithSummary("Historico de agendamentos de um cliente com agregados (visitas, total gasto, ultima/proxima visita, servico/profissional preferido) (Fase 8).");
 
         group.MapGet("/{id:guid}", async (Guid id, IDispatcher dispatcher, CancellationToken cancellationToken) =>
         {
