@@ -12,7 +12,9 @@ internal sealed class CustomerLookupService(CustomersDbContext dbContext) : ICus
         var customer = await dbContext.Customers.AsNoTracking()
             .SingleOrDefaultAsync(c => c.Id == CustomerId.From(customerId), cancellationToken);
 
-        return customer is null ? null : new CustomerLookupResult(customer.Id.Value, customer.FullName, customer.Email?.Value, customer.IsActive);
+        return customer is null
+            ? null
+            : new CustomerLookupResult(customer.Id.Value, customer.FullName, customer.Email?.Value, customer.Phone?.Value, customer.IsActive);
     }
 
     public async Task<IReadOnlyList<CustomerLookupResult>> ListActiveWithEmailAsync(CancellationToken cancellationToken = default)
@@ -23,7 +25,7 @@ internal sealed class CustomerLookupService(CustomersDbContext dbContext) : ICus
             .ToListAsync(cancellationToken);
 
         return customers
-            .Select(c => new CustomerLookupResult(c.Id.Value, c.FullName, c.Email!.Value, c.IsActive))
+            .Select(c => new CustomerLookupResult(c.Id.Value, c.FullName, c.Email!.Value, c.Phone?.Value, c.IsActive))
             .ToList();
     }
 }

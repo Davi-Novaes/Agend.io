@@ -103,6 +103,7 @@ public sealed class RescheduleAppointmentCommandHandler(
             // agendamento (ver AppointmentNotificationJobs).
             AppointmentNotificationScheduler.ScheduleReminders(
                 jobClient, clock, trackedAppointment.TenantId.Value, trackedAppointment.Id.Value, newSlotResult.Value.StartUtc);
+            AppointmentNotificationScheduler.EnqueueReschedule(jobClient, trackedAppointment.TenantId.Value, trackedAppointment.Id.Value);
 
             return Result.Success();
         });

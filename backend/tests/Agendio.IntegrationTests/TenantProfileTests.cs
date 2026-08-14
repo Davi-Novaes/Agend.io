@@ -265,6 +265,145 @@ public class TenantProfileTests(IntegrationTestFixture fixture)
         response.StatusCode.ShouldBe(HttpStatusCode.Forbidden);
     }
 
+    [Fact]
+    public async Task Owner_Can_Connect_WhatsApp_And_Read_Back_Settings_Without_Exposing_The_Raw_Token()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var client = fixture.CreateClient();
+        var accessToken = await CreateTenantWithOwnerAndLoginAsync(client, cancellationToken);
+
+        var updateResponse = await AuthorizedRequestHelpers.PutAuthorizedAsync(
+            client, accessToken, "/api/tenants/whatsapp-settings",
+            new
+            {
+                enabled = true,
+                phoneNumberId = "1234567890",
+                accessToken = "meta-cloud-api-secret-token",
+                scheduledTemplate = "Ola {{cliente}}, agendado para {{data}} as {{hora}}.",
+                reminderTemplate = (string?)null,
+                cancelledTemplate = (string?)null,
+                rescheduledTemplate = (string?)null,
+                confirmedTemplate = (string?)null,
+                completedTemplate = (string?)null,
+            },
+            cancellationToken);
+        updateResponse.StatusCode.ShouldBe(HttpStatusCode.NoContent);
+
+        var profileResponse = await AuthorizedRequestHelpers.GetAuthorizedAsync(client, accessToken, "/api/tenants/profile", cancellationToken);
+        var profile = await profileResponse.Content.ReadFromJsonAsync<JsonElement>(cancellationToken);
+
+        profile.GetProperty("whatsAppIntegrationEnabled").GetBoolean().ShouldBeTrue();
+        profile.GetProperty("whatsAppPhoneNumberId").GetString().ShouldBe("1234567890");
+        profile.GetProperty("whatsAppAccessTokenConfigured").GetBoolean().ShouldBeTrue();
+        profile.GetProperty("whatsAppScheduledTemplate").GetString().ShouldBe("Ola {{cliente}}, agendado para {{data}} as {{hora}}.");
+
+        // O token de acesso e um segredo — a API nunca devolve o valor em texto
+        // puro, so o bool "configurado" acima.
+        profile.TryGetProperty("whatsAppAccessToken", out _).ShouldBeFalse();
+        profile.GetRawText().ShouldNotContain("meta-cloud-api-secret-token");
+    }
+
+    [Fact]
+    public async Task Enabling_WhatsApp_Without_Credentials_Should_Be_Rejected()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var client = fixture.CreateClient();
+        var accessToken = await CreateTenantWithOwnerAndLoginAsync(client, cancellationToken);
+
+        var response = await AuthorizedRequestHelpers.PutAuthorizedAsync(
+            client, accessToken, "/api/tenants/whatsapp-settings",
+            new
+            {
+                enabled = true,
+                phoneNumberId = (string?)null,
+                accessToken = (string?)null,
+                scheduledTemplate = (string?)null,
+                reminderTemplate = (string?)null,
+                cancelledTemplate = (string?)null,
+                rescheduledTemplate = (string?)null,
+                confirmedTemplate = (string?)null,
+                completedTemplate = (string?)null,
+            },
+            cancellationToken);
+
+        response.StatusCode.ShouldBe(HttpStatusCode.BadRequest);
+    }
+
+    [Fact]
+    public async Task Updating_WhatsApp_Settings_Without_A_New_Token_Keeps_The_Existing_One()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var client = fixture.CreateClient();
+        var accessToken = await CreateTenantWithOwnerAndLoginAsync(client, cancellationToken);
+
+        await AuthorizedRequestHelpers.PutAuthorizedAsync(
+            client, accessToken, "/api/tenants/whatsapp-settings",
+            new
+            {
+                enabled = true,
+                phoneNumberId = "1234567890",
+                accessToken = "meta-cloud-api-secret-token",
+                scheduledTemplate = (string?)null,
+                reminderTemplate = (string?)null,
+                cancelledTemplate = (string?)null,
+                rescheduledTemplate = (string?)null,
+                confirmedTemplate = (string?)null,
+                completedTemplate = (string?)null,
+            },
+            cancellationToken);
+
+        // Segunda chamada sem digitar um token novo (nem reenviar o antigo,
+        // que a API nunca devolve) — a integracao precisa continuar ativa.
+        var secondUpdateResponse = await AuthorizedRequestHelpers.PutAuthorizedAsync(
+            client, accessToken, "/api/tenants/whatsapp-settings",
+            new
+            {
+                enabled = true,
+                phoneNumberId = "1234567890",
+                accessToken = (string?)null,
+                scheduledTemplate = "Novo template para {{cliente}}.",
+                reminderTemplate = (string?)null,
+                cancelledTemplate = (string?)null,
+                rescheduledTemplate = (string?)null,
+                confirmedTemplate = (string?)null,
+                completedTemplate = (string?)null,
+            },
+            cancellationToken);
+        secondUpdateResponse.StatusCode.ShouldBe(HttpStatusCode.NoContent);
+
+        var profileResponse = await AuthorizedRequestHelpers.GetAuthorizedAsync(client, accessToken, "/api/tenants/profile", cancellationToken);
+        var profile = await profileResponse.Content.ReadFromJsonAsync<JsonElement>(cancellationToken);
+
+        profile.GetProperty("whatsAppIntegrationEnabled").GetBoolean().ShouldBeTrue();
+        profile.GetProperty("whatsAppAccessTokenConfigured").GetBoolean().ShouldBeTrue();
+        profile.GetProperty("whatsAppScheduledTemplate").GetString().ShouldBe("Novo template para {{cliente}}.");
+    }
+
+    [Fact]
+    public async Task Anonymous_Request_To_Update_WhatsApp_Settings_Should_Be_Unauthorized()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var client = fixture.CreateClient();
+
+        var response = await client.PutAsJsonAsync(
+            "/api/tenants/whatsapp-settings",
+            new
+            {
+                enabled = false,
+                phoneNumberId = (string?)null,
+                accessToken = (string?)null,
+                scheduledTemplate = (string?)null,
+                reminderTemplate = (string?)null,
+                cancelledTemplate = (string?)null,
+                rescheduledTemplate = (string?)null,
+                confirmedTemplate = (string?)null,
+                completedTemplate = (string?)null,
+            },
+            cancellationToken);
+
+        response.StatusCode.ShouldBe(HttpStatusCode.Unauthorized);
+    }
+
     private static async Task<string> CreateTenantWithOwnerAndLoginAsync(HttpClient client, CancellationToken cancellationToken)
     {
         var (_, accessToken) = await CreateTenantWithOwnerAndLoginAsyncWithId(client, cancellationToken);

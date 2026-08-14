@@ -289,6 +289,51 @@ namespace Agendio.Modules.Tenancy.Infrastructure.Persistence.Migrations
                         .HasColumnType("character varying(20)")
                         .HasColumnName("whats_app");
 
+                    b.Property<string>("WhatsAppAccessToken")
+                        .HasColumnType("text")
+                        .HasColumnName("whats_app_access_token");
+
+                    b.Property<string>("WhatsAppCancelledTemplate")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)")
+                        .HasColumnName("whats_app_cancelled_template");
+
+                    b.Property<string>("WhatsAppCompletedTemplate")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)")
+                        .HasColumnName("whats_app_completed_template");
+
+                    b.Property<string>("WhatsAppConfirmedTemplate")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)")
+                        .HasColumnName("whats_app_confirmed_template");
+
+                    b.Property<bool>("WhatsAppIntegrationEnabled")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(false)
+                        .HasColumnName("whats_app_integration_enabled");
+
+                    b.Property<string>("WhatsAppPhoneNumberId")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("whats_app_phone_number_id");
+
+                    b.Property<string>("WhatsAppReminderTemplate")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)")
+                        .HasColumnName("whats_app_reminder_template");
+
+                    b.Property<string>("WhatsAppRescheduledTemplate")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)")
+                        .HasColumnName("whats_app_rescheduled_template");
+
+                    b.Property<string>("WhatsAppScheduledTemplate")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)")
+                        .HasColumnName("whats_app_scheduled_template");
+
                     b.HasKey("Id")
                         .HasName("pk_tenants");
 

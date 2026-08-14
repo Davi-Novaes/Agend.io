@@ -10,6 +10,7 @@ using Agendio.SharedKernel.Multitenancy;
 using Agendio.SharedKernel.Time;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Options;
 using StackExchange.Redis;
 
 namespace Agendio.Infrastructure.DependencyInjection;
@@ -46,6 +47,13 @@ public static class InfrastructureServiceCollectionExtensions
         services.Configure<SmtpOptions>(configuration.GetSection(SmtpOptions.SectionName));
         services.AddTransient<IEmailSender, SmtpEmailSender>();
         services.Configure<FrontendOptions>(configuration.GetSection(FrontendOptions.SectionName));
+
+        services.Configure<WhatsAppOptions>(configuration.GetSection(WhatsAppOptions.SectionName));
+        services.AddHttpClient<IWhatsAppSender, WhatsAppCloudApiSender>((serviceProvider, httpClient) =>
+        {
+            var options = serviceProvider.GetRequiredService<IOptions<WhatsAppOptions>>().Value;
+            httpClient.BaseAddress = new Uri(options.BaseUrl);
+        });
 
         services.AddSingleton<IFileStorage, LocalFileStorage>();
 

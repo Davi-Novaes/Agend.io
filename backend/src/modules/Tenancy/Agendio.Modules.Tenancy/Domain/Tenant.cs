@@ -91,6 +91,33 @@ public sealed class Tenant : AggregateRoot<TenantId>, IAuditable, ISoftDeletable
     /// <summary>Datas especificas em que o estabelecimento nao atende (feriados, eventos) — ver <see cref="ClosedDate"/>.</summary>
     public IReadOnlyCollection<ClosedDate> ClosedDates => _closedDates;
 
+    /// <summary>
+    /// Integracao real com a WhatsApp Cloud API (Fase 6) — desligada por padrao,
+    /// nenhuma mensagem sai sem o dono conectar o proprio numero. Distinto de
+    /// <see cref="WhatsApp"/> (numero de contato exibido na pagina publica):
+    /// isto e credencial de API pra ENVIAR mensagem automatica.
+    /// </summary>
+    public bool WhatsAppIntegrationEnabled { get; private set; }
+
+    /// <summary>Identificador do numero na Cloud API (nao e o numero em si).</summary>
+    public string? WhatsAppPhoneNumberId { get; private set; }
+
+    /// <summary>Token de acesso da Cloud API — criptografado em coluna (ver TenancyDbContext), nunca logado nem devolvido em texto puro pela API.</summary>
+    public string? WhatsAppAccessToken { get; private set; }
+
+    /// <summary>Template customizado; null usa o texto padrao (ver WhatsAppMessageDefaults no modulo Scheduling).</summary>
+    public string? WhatsAppScheduledTemplate { get; private set; }
+
+    public string? WhatsAppReminderTemplate { get; private set; }
+
+    public string? WhatsAppCancelledTemplate { get; private set; }
+
+    public string? WhatsAppRescheduledTemplate { get; private set; }
+
+    public string? WhatsAppConfirmedTemplate { get; private set; }
+
+    public string? WhatsAppCompletedTemplate { get; private set; }
+
     public DateTimeOffset CreatedAtUtc { get; set; }
 
     public string? CreatedBy { get; set; }
@@ -318,6 +345,43 @@ public sealed class Tenant : AggregateRoot<TenantId>, IAuditable, ISoftDeletable
         _closedDates.Clear();
         _closedDates.AddRange(closedDates.Select(d => ClosedDate.Create(d.Date, d.Reason)));
         AppointmentBufferMinutes = appointmentBufferMinutes;
+
+        return Result.Success();
+    }
+
+    /// <summary>
+    /// Substitui a configuracao inteira de uma vez (mesmo padrao de
+    /// SetBusinessHours/UpdateSchedulingSettings). AccessToken chega ja
+    /// resolvido pelo handler (mantem o token atual quando o dono nao digita
+    /// um novo — ver UpdateTenantWhatsAppSettingsCommandHandler); aqui so
+    /// valida a invariante "ligado precisa de credencial".
+    /// </summary>
+    public Result UpdateWhatsAppSettings(
+        bool enabled,
+        string? phoneNumberId,
+        string? accessToken,
+        string? scheduledTemplate,
+        string? reminderTemplate,
+        string? cancelledTemplate,
+        string? rescheduledTemplate,
+        string? confirmedTemplate,
+        string? completedTemplate)
+    {
+        if (enabled && (string.IsNullOrWhiteSpace(phoneNumberId) || string.IsNullOrWhiteSpace(accessToken)))
+        {
+            return Result.Failure(Error.Validation(
+                "Tenant.WhatsAppCredentialsRequired", "Para ativar o WhatsApp, informe o numero (Phone Number ID) e o token de acesso."));
+        }
+
+        WhatsAppIntegrationEnabled = enabled;
+        WhatsAppPhoneNumberId = string.IsNullOrWhiteSpace(phoneNumberId) ? null : phoneNumberId.Trim();
+        WhatsAppAccessToken = string.IsNullOrWhiteSpace(accessToken) ? null : accessToken.Trim();
+        WhatsAppScheduledTemplate = string.IsNullOrWhiteSpace(scheduledTemplate) ? null : scheduledTemplate.Trim();
+        WhatsAppReminderTemplate = string.IsNullOrWhiteSpace(reminderTemplate) ? null : reminderTemplate.Trim();
+        WhatsAppCancelledTemplate = string.IsNullOrWhiteSpace(cancelledTemplate) ? null : cancelledTemplate.Trim();
+        WhatsAppRescheduledTemplate = string.IsNullOrWhiteSpace(rescheduledTemplate) ? null : rescheduledTemplate.Trim();
+        WhatsAppConfirmedTemplate = string.IsNullOrWhiteSpace(confirmedTemplate) ? null : confirmedTemplate.Trim();
+        WhatsAppCompletedTemplate = string.IsNullOrWhiteSpace(completedTemplate) ? null : completedTemplate.Trim();
 
         return Result.Success();
     }

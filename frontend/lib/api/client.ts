@@ -274,6 +274,15 @@ export type TenantProfile = {
   businessHours: WorkingHourEntry[];
   closedDates: ClosedDate[];
   appointmentBufferMinutes: number;
+  whatsAppIntegrationEnabled: boolean;
+  whatsAppPhoneNumberId: string | null;
+  whatsAppAccessTokenConfigured: boolean;
+  whatsAppScheduledTemplate: string | null;
+  whatsAppReminderTemplate: string | null;
+  whatsAppCancelledTemplate: string | null;
+  whatsAppRescheduledTemplate: string | null;
+  whatsAppConfirmedTemplate: string | null;
+  whatsAppCompletedTemplate: string | null;
 };
 
 export type ClosedDate = {
@@ -313,6 +322,23 @@ export function updateTenantSchedulingSettings(
   accessToken: string
 ): Promise<void> {
   return request("/api/tenants/scheduling-settings", { method: "PUT", body: JSON.stringify(input) }, accessToken);
+}
+
+export type UpdateTenantWhatsAppSettingsInput = {
+  enabled: boolean;
+  phoneNumberId: string | null;
+  // null = nao alterar o token ja salvo (a API nunca devolve o valor atual para reenviar).
+  accessToken: string | null;
+  scheduledTemplate: string | null;
+  reminderTemplate: string | null;
+  cancelledTemplate: string | null;
+  rescheduledTemplate: string | null;
+  confirmedTemplate: string | null;
+  completedTemplate: string | null;
+};
+
+export function updateTenantWhatsAppSettings(input: UpdateTenantWhatsAppSettingsInput, accessToken: string): Promise<void> {
+  return request("/api/tenants/whatsapp-settings", { method: "PUT", body: JSON.stringify(input) }, accessToken);
 }
 
 export type TenantPageCustomizationInput = {

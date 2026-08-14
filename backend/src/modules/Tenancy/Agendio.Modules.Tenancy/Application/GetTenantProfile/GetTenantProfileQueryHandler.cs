@@ -48,7 +48,16 @@ public sealed class GetTenantProfileQueryHandler(TenancyDbContext dbContext, ITe
             tenant.ShowContactSection,
             businessHours,
             closedDates,
-            tenant.AppointmentBufferMinutes);
+            tenant.AppointmentBufferMinutes,
+            tenant.WhatsAppIntegrationEnabled,
+            tenant.WhatsAppPhoneNumberId,
+            tenant.WhatsAppAccessToken is not null,
+            tenant.WhatsAppScheduledTemplate,
+            tenant.WhatsAppReminderTemplate,
+            tenant.WhatsAppCancelledTemplate,
+            tenant.WhatsAppRescheduledTemplate,
+            tenant.WhatsAppConfirmedTemplate,
+            tenant.WhatsAppCompletedTemplate);
 
         return Result.Success(profile);
     }

@@ -84,6 +84,13 @@ public class AppointmentNotificationTests(IntegrationTestFixture fixture)
             client, accessToken, $"/api/appointments/{appointmentId}/reschedule", new { newStartAtUtc }, cancellationToken);
         rescheduleResponse.EnsureSuccessStatusCode();
 
+        // Remarcar agora tambem enfileira seu proprio aviso por e-mail (Fase 6)
+        // — espera ele chegar antes de medir a contagem "antes", senao a chegada
+        // assincrona desse aviso poderia ser confundida com o envio indevido
+        // que este teste esta verificando que NAO acontece.
+        var rescheduleNoticeArrived = await PollMailHogForAsync(customerEmail, cancellationToken, subjectContains: "remarcado");
+        rescheduleNoticeArrived.ShouldBeTrue("o aviso de remarcacao deveria ter chegado no MailHog.");
+
         var countBefore = await CountMailHogMessagesForAsync(customerEmail, cancellationToken);
 
         using var scope = fixture.Services.CreateScope();

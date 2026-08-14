@@ -86,6 +86,19 @@ public sealed class TenantConfiguration : IEntityTypeConfiguration<Tenant>
 
         builder.Property(t => t.AppointmentBufferMinutes).IsRequired().HasDefaultValue(0);
 
+        builder.Property(t => t.WhatsAppIntegrationEnabled).IsRequired().HasDefaultValue(false);
+        builder.Property(t => t.WhatsAppPhoneNumberId).HasMaxLength(64);
+        // WhatsAppAccessToken: sem HasMaxLength de proposito, mesmo raciocinio
+        // de Customer.Cpf/HealthNotes — o conversor criptografado (aplicado no
+        // OnModelCreating do TenancyDbContext, depois deste IEntityTypeConfiguration
+        // rodar) aumenta o tamanho do valor persistido.
+        builder.Property(t => t.WhatsAppScheduledTemplate).HasMaxLength(1000);
+        builder.Property(t => t.WhatsAppReminderTemplate).HasMaxLength(1000);
+        builder.Property(t => t.WhatsAppCancelledTemplate).HasMaxLength(1000);
+        builder.Property(t => t.WhatsAppRescheduledTemplate).HasMaxLength(1000);
+        builder.Property(t => t.WhatsAppConfirmedTemplate).HasMaxLength(1000);
+        builder.Property(t => t.WhatsAppCompletedTemplate).HasMaxLength(1000);
+
         // Colecao de Value Objects sem identidade propria — tabela filha, FK
         // sombra gerada pelo EF, sem repositorio separado (mesmo padrao de
         // Resource.WorkingHours no modulo Resources).

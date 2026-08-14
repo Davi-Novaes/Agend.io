@@ -32,4 +32,15 @@ public sealed record TenantProfile(
     bool ShowContactSection,
     IReadOnlyList<BusinessHoursEntryResult> BusinessHours,
     IReadOnlyList<ClosedDateResult> ClosedDates,
-    int AppointmentBufferMinutes);
+    int AppointmentBufferMinutes,
+    bool WhatsAppIntegrationEnabled,
+    string? WhatsAppPhoneNumberId,
+    // Nunca o token em texto puro — so se ja existe um configurado, pro
+    // frontend decidir se mostra "ja conectado" sem expor o segredo.
+    bool WhatsAppAccessTokenConfigured,
+    string? WhatsAppScheduledTemplate,
+    string? WhatsAppReminderTemplate,
+    string? WhatsAppCancelledTemplate,
+    string? WhatsAppRescheduledTemplate,
+    string? WhatsAppConfirmedTemplate,
+    string? WhatsAppCompletedTemplate);
