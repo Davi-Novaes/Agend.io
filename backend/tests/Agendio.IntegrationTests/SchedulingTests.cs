@@ -392,6 +392,75 @@ public class SchedulingTests(IntegrationTestFixture fixture)
         response.StatusCode.ShouldBe(HttpStatusCode.Unauthorized);
     }
 
+    [Fact]
+    public async Task Customer_Appointment_History_Should_Aggregate_Visits_Spend_And_Preferences()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var client = fixture.CreateClient();
+        var accessToken = await CreateTenantWithOwnerAndLoginAsync(client, cancellationToken);
+
+        var customerId = await CreateCustomerAsync(client, accessToken, cancellationToken);
+        var resourceAId = await CreateResourceAsync(client, accessToken, "Cadeira A", cancellationToken);
+        var resourceBId = await CreateResourceAsync(client, accessToken, "Cadeira B", cancellationToken);
+        var serviceAId = await CreateServiceAsync(client, accessToken, "Corte", 45.90m, cancellationToken);
+        var serviceBId = await CreateServiceAsync(client, accessToken, "Barba", 30.00m, cancellationToken);
+
+        var baseUtc = DateTimeOffset.UtcNow.AddDays(1);
+
+        var appointment1Id = await ScheduleAppointmentAsync(client, accessToken, customerId, resourceAId, serviceAId, baseUtc, cancellationToken);
+        await CompleteAppointmentAsync(client, accessToken, appointment1Id, cancellationToken);
+
+        var appointment2Id = await ScheduleAppointmentAsync(client, accessToken, customerId, resourceAId, serviceAId, baseUtc.AddHours(2), cancellationToken);
+        await CompleteAppointmentAsync(client, accessToken, appointment2Id, cancellationToken);
+
+        var appointment3Id = await ScheduleAppointmentAsync(client, accessToken, customerId, resourceBId, serviceBId, baseUtc.AddHours(4), cancellationToken);
+        await CompleteAppointmentAsync(client, accessToken, appointment3Id, cancellationToken);
+
+        var futureAtUtc = DateTimeOffset.UtcNow.AddDays(10);
+        await ScheduleAppointmentAsync(client, accessToken, customerId, resourceAId, serviceAId, futureAtUtc, cancellationToken);
+
+        var response = await AuthorizedRequestHelpers.GetAuthorizedAsync(
+            client, accessToken, $"/api/appointments/customers/{customerId}/history", cancellationToken);
+        response.StatusCode.ShouldBe(HttpStatusCode.OK);
+
+        var body = await response.Content.ReadFromJsonAsync<JsonElement>(cancellationToken);
+        body.GetProperty("items").GetArrayLength().ShouldBe(4);
+        body.GetProperty("totalVisits").GetInt32().ShouldBe(3);
+        body.GetProperty("totalSpent").GetDecimal().ShouldBe(45.90m + 45.90m + 30.00m);
+        body.GetProperty("totalSpentCurrency").GetString().ShouldBe("BRL");
+        Math.Abs((body.GetProperty("lastVisitAtUtc").GetDateTimeOffset() - baseUtc.AddHours(4)).TotalSeconds).ShouldBeLessThan(1);
+        Math.Abs((body.GetProperty("nextAppointmentAtUtc").GetDateTimeOffset() - futureAtUtc).TotalSeconds).ShouldBeLessThan(1);
+        body.GetProperty("favoriteServiceName").GetString().ShouldBe("Corte");
+        body.GetProperty("favoriteProfessionalName").GetString().ShouldBe("Cadeira A");
+    }
+
+    [Fact]
+    public async Task Customer_Appointment_History_Is_Empty_When_The_Customer_Belongs_To_Another_Tenant()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var client = fixture.CreateClient();
+
+        var tenantAToken = await CreateTenantWithOwnerAndLoginAsync(client, cancellationToken);
+        var (customerId, resourceId, serviceId) = await CreateBookingPrerequisitesAsync(client, tenantAToken, cancellationToken);
+        var appointmentId = await ScheduleAppointmentAsync(
+            client, tenantAToken, customerId, resourceId, serviceId, DateTimeOffset.UtcNow.AddDays(1), cancellationToken);
+        await CompleteAppointmentAsync(client, tenantAToken, appointmentId, cancellationToken);
+
+        var tenantBToken = await CreateTenantWithOwnerAndLoginAsync(client, cancellationToken);
+
+        var response = await AuthorizedRequestHelpers.GetAuthorizedAsync(
+            client, tenantBToken, $"/api/appointments/customers/{customerId}/history", cancellationToken);
+        response.StatusCode.ShouldBe(HttpStatusCode.OK);
+
+        var body = await response.Content.ReadFromJsonAsync<JsonElement>(cancellationToken);
+        body.GetProperty("items").GetArrayLength().ShouldBe(0);
+        body.GetProperty("totalVisits").GetInt32().ShouldBe(0);
+        body.GetProperty("totalSpent").GetDecimal().ShouldBe(0m);
+        body.GetProperty("lastVisitAtUtc").ValueKind.ShouldBe(JsonValueKind.Null);
+        body.GetProperty("nextAppointmentAtUtc").ValueKind.ShouldBe(JsonValueKind.Null);
+        body.GetProperty("favoriteServiceName").ValueKind.ShouldBe(JsonValueKind.Null);
+    }
+
     private static async Task<Guid> CreateCustomerAsync(HttpClient client, string accessToken, CancellationToken cancellationToken)
     {
         var response = await AuthorizedRequestHelpers.PostAuthorizedAsync(

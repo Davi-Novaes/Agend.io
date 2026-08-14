@@ -2,7 +2,7 @@ using Agendio.SharedKernel.Messaging;
 
 namespace Agendio.Modules.Scheduling.Application.ListNotificationLog;
 
-public sealed record ListNotificationLogQuery(int Page = 1, int PageSize = 20) : IQuery<ListNotificationLogResult>;
+public sealed record ListNotificationLogQuery(int Page = 1, int PageSize = 20, Guid? CustomerId = null) : IQuery<ListNotificationLogResult>;
 
 public sealed record NotificationLogItem(
     Guid Id,

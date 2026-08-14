@@ -19,6 +19,7 @@ import {
   type CustomerSummary,
 } from "@/lib/api/client";
 import { useSession } from "@/lib/auth/session-context";
+import { CustomerProfileSheet } from "@/components/customers/customer-profile-sheet";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -73,6 +74,7 @@ export default function CustomersPage() {
   const [search, setSearch] = React.useState("");
   const [dialogOpen, setDialogOpen] = React.useState(false);
   const [editingCustomer, setEditingCustomer] = React.useState<CustomerSummary | null>(null);
+  const [viewingCustomerId, setViewingCustomerId] = React.useState<string | null>(null);
   const importInputRef = React.useRef<HTMLInputElement>(null);
 
   const accessToken = session?.accessToken ?? "";
@@ -316,6 +318,9 @@ export default function CustomersPage() {
                     </TableCell>
                     <TableCell className="text-right">
                       <div className="flex justify-end gap-2">
+                        <Button variant="ghost" size="sm" onClick={() => setViewingCustomerId(customer.id)}>
+                          Ver perfil
+                        </Button>
                         <Button variant="ghost" size="sm" onClick={() => openEditDialog(customer)}>
                           Editar
                         </Button>
@@ -462,6 +467,15 @@ export default function CustomersPage() {
           </Form>
         </DialogContent>
       </Dialog>
+
+      <CustomerProfileSheet
+        customerId={viewingCustomerId}
+        onOpenChange={(open) => {
+          if (!open) {
+            setViewingCustomerId(null);
+          }
+        }}
+      />
     </div>
   );
 }

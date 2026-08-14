@@ -211,6 +211,48 @@ public class AppointmentNotificationTests(IntegrationTestFixture fixture)
         historyResponse.Value.GetProperty("customerName").GetString().ShouldBe("Cliente Notificacao");
     }
 
+    [Fact]
+    public async Task Notification_History_Can_Be_Filtered_By_Customer()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var client = fixture.CreateClient();
+        var accessToken = await CreateTenantWithOwnerAndLoginAsync(client, cancellationToken);
+        var (customerAId, resourceAId, serviceAId, customerAEmail) = await SetUpBookingPrerequisitesAsync(client, accessToken, cancellationToken);
+        var (customerBId, resourceBId, serviceBId, customerBEmail) = await SetUpBookingPrerequisitesAsync(client, accessToken, cancellationToken);
+
+        await AuthorizedRequestHelpers.PostAuthorizedAsync(
+            client, accessToken, "/api/appointments",
+            new { customerId = customerAId, resourceId = resourceAId, serviceId = serviceAId, startAtUtc = DateTimeOffset.UtcNow.AddDays(1), notes = (string?)null },
+            cancellationToken);
+        await AuthorizedRequestHelpers.PostAuthorizedAsync(
+            client, accessToken, "/api/appointments",
+            new { customerId = customerBId, resourceId = resourceBId, serviceId = serviceBId, startAtUtc = DateTimeOffset.UtcNow.AddDays(1), notes = (string?)null },
+            cancellationToken);
+
+        (await PollMailHogForAsync(customerAEmail, cancellationToken, subjectContains: "confirmado")).ShouldBeTrue();
+        (await PollMailHogForAsync(customerBEmail, cancellationToken, subjectContains: "confirmado")).ShouldBeTrue();
+
+        JsonElement? filteredBody = null;
+        for (var attempt = 0; attempt < 20; attempt++)
+        {
+            var response = await AuthorizedRequestHelpers.GetAuthorizedAsync(
+                client, accessToken, $"/api/appointments/notifications?page=1&pageSize=20&customerId={customerAId}", cancellationToken);
+            var body = await response.Content.ReadFromJsonAsync<JsonElement>(cancellationToken);
+            if (body.GetProperty("items").GetArrayLength() > 0)
+            {
+                filteredBody = body;
+                break;
+            }
+
+            await Task.Delay(300, cancellationToken);
+        }
+
+        filteredBody.ShouldNotBeNull("o historico filtrado por cliente deveria ter pelo menos um registro.");
+        var items = filteredBody!.Value.GetProperty("items").EnumerateArray().ToList();
+        items.ShouldNotBeEmpty();
+        items.ShouldAllBe(item => item.GetProperty("customerId").GetGuid() == customerAId);
+    }
+
     private static async Task<JsonElement?> PollNotificationHistoryForAsync(
         HttpClient client, string accessToken, Guid appointmentId, CancellationToken cancellationToken)
     {
