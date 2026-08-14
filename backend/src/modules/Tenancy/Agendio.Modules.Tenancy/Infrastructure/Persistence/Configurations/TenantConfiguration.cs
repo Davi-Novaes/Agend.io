@@ -99,6 +99,10 @@ public sealed class TenantConfiguration : IEntityTypeConfiguration<Tenant>
         builder.Property(t => t.WhatsAppConfirmedTemplate).HasMaxLength(1000);
         builder.Property(t => t.WhatsAppCompletedTemplate).HasMaxLength(1000);
 
+        builder.Property(t => t.Reminder24hEnabled).IsRequired().HasDefaultValue(true);
+        builder.Property(t => t.Reminder2hEnabled).IsRequired().HasDefaultValue(true);
+        builder.Property(t => t.PostServiceThankYouEnabled).IsRequired().HasDefaultValue(true);
+
         // Colecao de Value Objects sem identidade propria — tabela filha, FK
         // sombra gerada pelo EF, sem repositorio separado (mesmo padrao de
         // Resource.WorkingHours no modulo Resources).

@@ -223,10 +223,28 @@ namespace Agendio.Modules.Tenancy.Infrastructure.Persistence.Migrations
                         .HasColumnType("character varying(20)")
                         .HasColumnName("phone");
 
+                    b.Property<bool>("PostServiceThankYouEnabled")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(true)
+                        .HasColumnName("post_service_thank_you_enabled");
+
                     b.Property<string>("PrimaryColorHex")
                         .HasMaxLength(7)
                         .HasColumnType("character varying(7)")
                         .HasColumnName("primary_color_hex");
+
+                    b.Property<bool>("Reminder24hEnabled")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(true)
+                        .HasColumnName("reminder24h_enabled");
+
+                    b.Property<bool>("Reminder2hEnabled")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(true)
+                        .HasColumnName("reminder2h_enabled");
 
                     b.Property<string>("SecondaryColorHex")
                         .HasMaxLength(7)

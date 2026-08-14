@@ -13,6 +13,8 @@ public sealed class SchedulingDbContext(DbContextOptions<SchedulingDbContext> op
 
     public DbSet<Appointment> Appointments => Set<Appointment>();
 
+    public DbSet<NotificationLogEntry> NotificationLogEntries => Set<NotificationLogEntry>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.HasDefaultSchema("scheduling");
@@ -22,6 +24,7 @@ public sealed class SchedulingDbContext(DbContextOptions<SchedulingDbContext> op
         modelBuilder.ApplyConfigurationsFromAssembly(typeof(SchedulingDbContext).Assembly);
 
         modelBuilder.Entity<Appointment>().HasQueryFilter(a => a.TenantId == CurrentTenantId());
+        modelBuilder.Entity<NotificationLogEntry>().HasQueryFilter(n => n.TenantId == CurrentTenantId());
     }
 
     private TenantId CurrentTenantId() => _tenantContext.HasTenant ? _tenantContext.TenantId : TenantId.Empty;

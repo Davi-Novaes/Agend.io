@@ -283,6 +283,9 @@ export type TenantProfile = {
   whatsAppRescheduledTemplate: string | null;
   whatsAppConfirmedTemplate: string | null;
   whatsAppCompletedTemplate: string | null;
+  reminder24hEnabled: boolean;
+  reminder2hEnabled: boolean;
+  postServiceThankYouEnabled: boolean;
 };
 
 export type ClosedDate = {
@@ -339,6 +342,39 @@ export type UpdateTenantWhatsAppSettingsInput = {
 
 export function updateTenantWhatsAppSettings(input: UpdateTenantWhatsAppSettingsInput, accessToken: string): Promise<void> {
   return request("/api/tenants/whatsapp-settings", { method: "PUT", body: JSON.stringify(input) }, accessToken);
+}
+
+export type UpdateTenantReminderSettingsInput = {
+  reminder24hEnabled: boolean;
+  reminder2hEnabled: boolean;
+  postServiceThankYouEnabled: boolean;
+};
+
+export function updateTenantReminderSettings(input: UpdateTenantReminderSettingsInput, accessToken: string): Promise<void> {
+  return request("/api/tenants/reminder-settings", { method: "PUT", body: JSON.stringify(input) }, accessToken);
+}
+
+export type NotificationLogItem = {
+  id: string;
+  appointmentId: string;
+  serviceName: string;
+  customerId: string;
+  customerName: string;
+  channel: "Email" | "WhatsApp";
+  trigger: "Scheduled" | "Reminder" | "Cancelled" | "Rescheduled" | "Confirmed" | "Completed";
+  status: "Sent" | "Failed";
+  sentAtUtc: string;
+  errorMessage: string | null;
+};
+
+export function listNotificationHistory(
+  params: { page?: number; pageSize?: number },
+  accessToken: string
+): Promise<PagedResult<NotificationLogItem>> {
+  const query = new URLSearchParams();
+  query.set("page", String(params.page ?? 1));
+  query.set("pageSize", String(params.pageSize ?? 20));
+  return request(`/api/appointments/notifications?${query.toString()}`, {}, accessToken);
 }
 
 export type TenantPageCustomizationInput = {

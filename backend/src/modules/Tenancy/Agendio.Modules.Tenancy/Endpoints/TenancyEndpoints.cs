@@ -12,6 +12,7 @@ using Agendio.Modules.Tenancy.Application.UpdateTenantBranding;
 using Agendio.Modules.Tenancy.Application.UpdateTenantLogo;
 using Agendio.Modules.Tenancy.Application.UpdateTenantPageCustomization;
 using Agendio.Modules.Tenancy.Application.UpdateTenantProfile;
+using Agendio.Modules.Tenancy.Application.UpdateTenantReminderSettings;
 using Agendio.Modules.Tenancy.Application.UpdateTenantSchedulingSettings;
 using Agendio.Modules.Tenancy.Application.UpdateTenantWhatsAppSettings;
 using Agendio.Modules.Tenancy.Application.UpdateUnit;
@@ -173,6 +174,18 @@ public sealed class TenancyEndpoints : IEndpointModule
         .WithName("UpdateTenantWhatsAppSettings")
         .WithSummary("Conecta/desconecta a integracao com WhatsApp e configura os templates de mensagem (Fase 6).");
 
+        group.MapPut("/reminder-settings", async (UpdateReminderSettingsRequest request, IDispatcher dispatcher, CancellationToken cancellationToken) =>
+        {
+            var command = new UpdateTenantReminderSettingsCommand(
+                request.Reminder24hEnabled, request.Reminder2hEnabled, request.PostServiceThankYouEnabled);
+            var result = await dispatcher.Send(command, cancellationToken);
+
+            return result.IsSuccess ? Results.NoContent() : result.Error.ToProblemResult();
+        })
+        .RequireAuthorization(policy => policy.RequireRole("Owner"))
+        .WithName("UpdateTenantReminderSettings")
+        .WithSummary("Liga/desliga os lembretes automaticos (24h antes, 2h antes, pos-atendimento) do estabelecimento (Fase 7).");
+
         group.MapPut("/business-hours", async (SetBusinessHoursRequest request, IDispatcher dispatcher, CancellationToken cancellationToken) =>
         {
             var entries = request.Entries.Select(e => new BusinessHoursEntryDto(e.DayOfWeek, e.StartTime, e.EndTime)).ToList();
@@ -281,4 +294,6 @@ public sealed class TenancyEndpoints : IEndpointModule
         string? RescheduledTemplate,
         string? ConfirmedTemplate,
         string? CompletedTemplate);
+
+    private sealed record UpdateReminderSettingsRequest(bool Reminder24hEnabled, bool Reminder2hEnabled, bool PostServiceThankYouEnabled);
 }

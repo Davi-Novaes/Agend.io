@@ -15,6 +15,7 @@ import {
   CreditCard,
   ShieldCheck,
   MessageCircle,
+  Bell,
 } from "lucide-react";
 
 export type NavItem = {
@@ -60,6 +61,7 @@ export const NAV_GROUPS: NavGroup[] = [
     items: [
       { href: "/marketing", label: "Marketing", icon: Megaphone },
       { href: "/settings/whatsapp", label: "WhatsApp", icon: MessageCircle },
+      { href: "/settings/notifications", label: "Notificações", icon: Bell },
     ],
   },
   {

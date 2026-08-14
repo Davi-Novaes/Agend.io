@@ -5,6 +5,7 @@ using Agendio.Modules.Scheduling.Application.ConfirmAppointment;
 using Agendio.Modules.Scheduling.Application.GetAppointmentById;
 using Agendio.Modules.Scheduling.Application.GetAppointmentStats;
 using Agendio.Modules.Scheduling.Application.ListAppointments;
+using Agendio.Modules.Scheduling.Application.ListNotificationLog;
 using Agendio.Modules.Scheduling.Application.MarkAppointmentNoShow;
 using Agendio.Modules.Scheduling.Application.RescheduleAppointment;
 using Agendio.Modules.Scheduling.Application.ScheduleAppointment;
@@ -37,6 +38,14 @@ public sealed class AppointmentEndpoints : IEndpointModule
         })
         .WithName("GetAppointmentStats")
         .WithSummary("Estatisticas de agendamentos no periodo: conclusao, no-show, cancelamento e faturamento por servico/profissional.");
+
+        group.MapGet("/notifications", async (int page, int pageSize, IDispatcher dispatcher, CancellationToken cancellationToken) =>
+        {
+            var result = await dispatcher.Query(new ListNotificationLogQuery(page == 0 ? 1 : page, pageSize == 0 ? 20 : pageSize), cancellationToken);
+            return result.IsSuccess ? Results.Ok(result.Value) : result.Error.ToProblemResult();
+        })
+        .WithName("ListNotificationLog")
+        .WithSummary("Historico de mensagens (e-mail/WhatsApp) enviadas aos clientes, paginado, mais recentes primeiro (Fase 7).");
 
         group.MapGet("/{id:guid}", async (Guid id, IDispatcher dispatcher, CancellationToken cancellationToken) =>
         {

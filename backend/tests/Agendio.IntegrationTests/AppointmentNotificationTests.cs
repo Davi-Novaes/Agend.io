@@ -1,3 +1,4 @@
+using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
 using Agendio.Modules.Scheduling.Infrastructure.Notifications;
@@ -55,7 +56,7 @@ public class AppointmentNotificationTests(IntegrationTestFixture fixture)
 
         using var scope = fixture.Services.CreateScope();
         var jobs = scope.ServiceProvider.GetRequiredService<AppointmentNotificationJobs>();
-        await jobs.SendReminderEmailAsync(tenantId, appointmentId, startAtUtc, "em 24 horas", cancellationToken);
+        await jobs.SendReminderEmailAsync(tenantId, appointmentId, startAtUtc, ReminderLeadTime.TwentyFourHours, cancellationToken);
 
         var found = await PollMailHogForAsync(customerEmail, cancellationToken, subjectContains: "Lembrete");
         found.ShouldBeTrue("o lembrete deveria ter chegado no MailHog quando o horario esperado bate com o agendamento.");
@@ -95,13 +96,141 @@ public class AppointmentNotificationTests(IntegrationTestFixture fixture)
 
         using var scope = fixture.Services.CreateScope();
         var jobs = scope.ServiceProvider.GetRequiredService<AppointmentNotificationJobs>();
-        await jobs.SendReminderEmailAsync(tenantId, appointmentId, originalStartAtUtc, "em 24 horas", cancellationToken);
+        await jobs.SendReminderEmailAsync(tenantId, appointmentId, originalStartAtUtc, ReminderLeadTime.TwentyFourHours, cancellationToken);
 
         // Da um tempo para um envio indevido (se houvesse) chegar, depois confirma que nada mudou.
         await Task.Delay(500, cancellationToken);
         var countAfter = await CountMailHogMessagesForAsync(customerEmail, cancellationToken);
 
         countAfter.ShouldBe(countBefore);
+    }
+
+    [Fact]
+    public async Task Reminder_Job_Is_A_No_Op_When_The_24h_Reminder_Is_Disabled_For_The_Tenant()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var client = fixture.CreateClient();
+        var (tenantId, accessToken) = await CreateTenantWithOwnerAndLoginAsyncWithId(client, cancellationToken);
+        var (customerId, resourceId, serviceId, customerEmail) = await SetUpBookingPrerequisitesAsync(client, accessToken, cancellationToken);
+
+        var disableResponse = await AuthorizedRequestHelpers.PutAuthorizedAsync(
+            client, accessToken, "/api/tenants/reminder-settings",
+            new { reminder24hEnabled = false, reminder2hEnabled = true, postServiceThankYouEnabled = true },
+            cancellationToken);
+        disableResponse.StatusCode.ShouldBe(HttpStatusCode.NoContent);
+
+        var startAtUtc = DateTimeOffset.UtcNow.AddDays(1);
+        var createResponse = await AuthorizedRequestHelpers.PostAuthorizedAsync(
+            client, accessToken, "/api/appointments",
+            new { customerId, resourceId, serviceId, startAtUtc, notes = (string?)null },
+            cancellationToken);
+        var createBody = await createResponse.Content.ReadFromJsonAsync<JsonElement>(cancellationToken);
+        var appointmentId = createBody.GetProperty("id").GetGuid();
+
+        // Confirmacao (Scheduled) nao e afetada pelo toggle — so confirma que
+        // ela chegou antes de testar o lembrete, pra nao confundir "24h
+        // desligado" com "nada sai desse tenant".
+        var confirmationArrived = await PollMailHogForAsync(customerEmail, cancellationToken, subjectContains: "confirmado");
+        confirmationArrived.ShouldBeTrue("a confirmacao deveria ter chegado normalmente — so o lembrete 24h esta desligado.");
+        var countBefore = await CountMailHogMessagesForAsync(customerEmail, cancellationToken);
+
+        using var scope = fixture.Services.CreateScope();
+        var jobs = scope.ServiceProvider.GetRequiredService<AppointmentNotificationJobs>();
+        await jobs.SendReminderEmailAsync(tenantId, appointmentId, startAtUtc, ReminderLeadTime.TwentyFourHours, cancellationToken);
+
+        await Task.Delay(500, cancellationToken);
+        var countAfter = await CountMailHogMessagesForAsync(customerEmail, cancellationToken);
+
+        countAfter.ShouldBe(countBefore);
+    }
+
+    [Fact]
+    public async Task Completed_Notification_Is_A_No_Op_When_Post_Service_Thank_You_Is_Disabled()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var client = fixture.CreateClient();
+        var (tenantId, accessToken) = await CreateTenantWithOwnerAndLoginAsyncWithId(client, cancellationToken);
+        var (customerId, resourceId, serviceId, customerEmail) = await SetUpBookingPrerequisitesAsync(client, accessToken, cancellationToken);
+
+        var disableResponse = await AuthorizedRequestHelpers.PutAuthorizedAsync(
+            client, accessToken, "/api/tenants/reminder-settings",
+            new { reminder24hEnabled = true, reminder2hEnabled = true, postServiceThankYouEnabled = false },
+            cancellationToken);
+        disableResponse.StatusCode.ShouldBe(HttpStatusCode.NoContent);
+
+        var createResponse = await AuthorizedRequestHelpers.PostAuthorizedAsync(
+            client, accessToken, "/api/appointments",
+            new { customerId, resourceId, serviceId, startAtUtc = DateTimeOffset.UtcNow.AddMinutes(5), notes = (string?)null },
+            cancellationToken);
+        var createBody = await createResponse.Content.ReadFromJsonAsync<JsonElement>(cancellationToken);
+        var appointmentId = createBody.GetProperty("id").GetGuid();
+
+        await AuthorizedRequestHelpers.PostAuthorizedAsync(client, accessToken, $"/api/appointments/{appointmentId}/start", new { }, cancellationToken);
+        var completeResponse = await AuthorizedRequestHelpers.PostAuthorizedAsync(
+            client, accessToken, $"/api/appointments/{appointmentId}/complete", new { }, cancellationToken);
+        completeResponse.EnsureSuccessStatusCode();
+
+        var countBefore = await CountMailHogMessagesForAsync(customerEmail, cancellationToken);
+
+        using var scope = fixture.Services.CreateScope();
+        var jobs = scope.ServiceProvider.GetRequiredService<AppointmentNotificationJobs>();
+        await jobs.SendCompletedNotificationAsync(tenantId, appointmentId, cancellationToken);
+
+        await Task.Delay(500, cancellationToken);
+        var countAfter = await CountMailHogMessagesForAsync(customerEmail, cancellationToken);
+
+        countAfter.ShouldBe(countBefore, "o obrigado pos-atendimento nao deveria ter sido enviado com o toggle desligado.");
+    }
+
+    [Fact]
+    public async Task Confirmation_Email_Is_Recorded_In_The_Notification_History()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var client = fixture.CreateClient();
+        var accessToken = await CreateTenantWithOwnerAndLoginAsync(client, cancellationToken);
+        var (customerId, resourceId, serviceId, customerEmail) = await SetUpBookingPrerequisitesAsync(client, accessToken, cancellationToken);
+
+        var createResponse = await AuthorizedRequestHelpers.PostAuthorizedAsync(
+            client, accessToken, "/api/appointments",
+            new { customerId, resourceId, serviceId, startAtUtc = DateTimeOffset.UtcNow.AddDays(1), notes = (string?)null },
+            cancellationToken);
+        var createBody = await createResponse.Content.ReadFromJsonAsync<JsonElement>(cancellationToken);
+        var appointmentId = createBody.GetProperty("id").GetGuid();
+
+        var confirmationArrived = await PollMailHogForAsync(customerEmail, cancellationToken, subjectContains: "confirmado");
+        confirmationArrived.ShouldBeTrue();
+
+        // O envio real acontece via Hangfire (fora da requisicao); da um
+        // instante pro job persistir o NotificationLogEntry antes de consultar.
+        var historyResponse = await PollNotificationHistoryForAsync(client, accessToken, appointmentId, cancellationToken);
+        historyResponse.ShouldNotBeNull("o historico deveria ter um registro do e-mail de confirmacao enviado.");
+
+        historyResponse!.Value.GetProperty("channel").GetString().ShouldBe("Email");
+        historyResponse.Value.GetProperty("trigger").GetString().ShouldBe("Scheduled");
+        historyResponse.Value.GetProperty("status").GetString().ShouldBe("Sent");
+        historyResponse.Value.GetProperty("customerName").GetString().ShouldBe("Cliente Notificacao");
+    }
+
+    private static async Task<JsonElement?> PollNotificationHistoryForAsync(
+        HttpClient client, string accessToken, Guid appointmentId, CancellationToken cancellationToken)
+    {
+        for (var attempt = 0; attempt < 20; attempt++)
+        {
+            var response = await AuthorizedRequestHelpers.GetAuthorizedAsync(
+                client, accessToken, "/api/appointments/notifications?page=1&pageSize=20", cancellationToken);
+            var body = await response.Content.ReadFromJsonAsync<JsonElement>(cancellationToken);
+            var match = body.GetProperty("items").EnumerateArray()
+                .FirstOrDefault(item => item.GetProperty("appointmentId").GetGuid() == appointmentId);
+
+            if (match.ValueKind != JsonValueKind.Undefined)
+            {
+                return match;
+            }
+
+            await Task.Delay(300, cancellationToken);
+        }
+
+        return null;
     }
 
     private async Task<bool> PollMailHogForAsync(string mustContain, CancellationToken cancellationToken, string? subjectContains = null)

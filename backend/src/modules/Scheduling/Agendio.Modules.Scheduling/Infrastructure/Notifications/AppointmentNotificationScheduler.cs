@@ -45,12 +45,12 @@ public static class AppointmentNotificationScheduler
 
     public static void ScheduleReminders(IBackgroundJobClient jobClient, IClock clock, Guid tenantId, Guid appointmentId, DateTimeOffset startUtc)
     {
-        ScheduleReminderIfInFuture(jobClient, clock, tenantId, appointmentId, startUtc, ReminderBefore24h, "em 24 horas");
-        ScheduleReminderIfInFuture(jobClient, clock, tenantId, appointmentId, startUtc, ReminderBefore2h, "em 2 horas");
+        ScheduleReminderIfInFuture(jobClient, clock, tenantId, appointmentId, startUtc, ReminderBefore24h, ReminderLeadTime.TwentyFourHours);
+        ScheduleReminderIfInFuture(jobClient, clock, tenantId, appointmentId, startUtc, ReminderBefore2h, ReminderLeadTime.TwoHours);
     }
 
     private static void ScheduleReminderIfInFuture(
-        IBackgroundJobClient jobClient, IClock clock, Guid tenantId, Guid appointmentId, DateTimeOffset startUtc, TimeSpan leadTime, string reminderLabel)
+        IBackgroundJobClient jobClient, IClock clock, Guid tenantId, Guid appointmentId, DateTimeOffset startUtc, TimeSpan leadTime, ReminderLeadTime reminderLeadTime)
     {
         var fireAtUtc = startUtc - leadTime;
         var delay = fireAtUtc - clock.UtcNow;
@@ -61,6 +61,6 @@ public static class AppointmentNotificationScheduler
         }
 
         jobClient.Schedule<AppointmentNotificationJobs>(
-            job => job.SendReminderEmailAsync(tenantId, appointmentId, startUtc, reminderLabel, CancellationToken.None), delay);
+            job => job.SendReminderEmailAsync(tenantId, appointmentId, startUtc, reminderLeadTime, CancellationToken.None), delay);
     }
 }

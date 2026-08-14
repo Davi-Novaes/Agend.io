@@ -43,4 +43,7 @@ public sealed record TenantProfile(
     string? WhatsAppCancelledTemplate,
     string? WhatsAppRescheduledTemplate,
     string? WhatsAppConfirmedTemplate,
-    string? WhatsAppCompletedTemplate);
+    string? WhatsAppCompletedTemplate,
+    bool Reminder24hEnabled,
+    bool Reminder2hEnabled,
+    bool PostServiceThankYouEnabled);

@@ -18,4 +18,7 @@ public interface ITenantLookupService
 
     /// <summary>Credenciais e templates da integracao com WhatsApp — usado pelo Scheduling para notificar o cliente (Fase 6).</summary>
     Task<TenantWhatsAppSettings?> GetWhatsAppSettingsAsync(TenantId tenantId, CancellationToken cancellationToken = default);
+
+    /// <summary>Quais lembretes automaticos estao ligados — usado pelo Scheduling antes de cada envio (Fase 7).</summary>
+    Task<TenantNotificationSettings?> GetNotificationSettingsAsync(TenantId tenantId, CancellationToken cancellationToken = default);
 }
