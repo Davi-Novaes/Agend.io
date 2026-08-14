@@ -1,6 +1,7 @@
 using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
+using Npgsql;
 
 namespace Agendio.IntegrationTests;
 
@@ -459,6 +460,71 @@ public class SchedulingTests(IntegrationTestFixture fixture)
         body.GetProperty("lastVisitAtUtc").ValueKind.ShouldBe(JsonValueKind.Null);
         body.GetProperty("nextAppointmentAtUtc").ValueKind.ShouldBe(JsonValueKind.Null);
         body.GetProperty("favoriteServiceName").ValueKind.ShouldBe(JsonValueKind.Null);
+    }
+
+    [Fact]
+    public async Task Customer_Recovery_Should_Flag_Customers_Overdue_Beyond_Their_Own_Usual_Interval()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var client = fixture.CreateClient();
+        var accessToken = await CreateTenantWithOwnerAndLoginAsync(client, cancellationToken);
+        var resourceId = await CreateResourceAsync(client, accessToken, "Cadeira 1", cancellationToken);
+        var serviceId = await CreateServiceAsync(client, accessToken, "Corte", 40.00m, cancellationToken);
+        var nowUtc = DateTimeOffset.UtcNow;
+
+        // Cliente atrasado: 2 visitas concluidas com 30 dias de intervalo entre
+        // si, a ultima ha 60 dias — 30 dias alem do proprio habitual.
+        var overdueCustomerId = await CreateCustomerAsync(client, accessToken, cancellationToken);
+        var overdueVisit1 = await ScheduleAppointmentAsync(client, accessToken, overdueCustomerId, resourceId, serviceId, nowUtc.AddMinutes(5), cancellationToken);
+        await CompleteAppointmentAsync(client, accessToken, overdueVisit1, cancellationToken);
+        await BackdateAppointmentAsync(fixture, overdueVisit1, nowUtc.AddDays(-90), cancellationToken);
+        var overdueVisit2 = await ScheduleAppointmentAsync(client, accessToken, overdueCustomerId, resourceId, serviceId, nowUtc.AddMinutes(10), cancellationToken);
+        await CompleteAppointmentAsync(client, accessToken, overdueVisit2, cancellationToken);
+        await BackdateAppointmentAsync(fixture, overdueVisit2, nowUtc.AddDays(-60), cancellationToken);
+
+        // Historico curto demais (so 1 visita concluida) — sem media confiavel, nunca deveria aparecer.
+        var newCustomerId = await CreateCustomerAsync(client, accessToken, cancellationToken);
+        var newCustomerVisit = await ScheduleAppointmentAsync(client, accessToken, newCustomerId, resourceId, serviceId, nowUtc.AddMinutes(15), cancellationToken);
+        await CompleteAppointmentAsync(client, accessToken, newCustomerVisit, cancellationToken);
+        await BackdateAppointmentAsync(fixture, newCustomerVisit, nowUtc.AddDays(-200), cancellationToken);
+
+        // Mesmo padrao do cliente atrasado, mas ja tem agendamento futuro marcado — nao precisa de recuperacao.
+        var rebookedCustomerId = await CreateCustomerAsync(client, accessToken, cancellationToken);
+        var rebookedVisit1 = await ScheduleAppointmentAsync(client, accessToken, rebookedCustomerId, resourceId, serviceId, nowUtc.AddMinutes(20), cancellationToken);
+        await CompleteAppointmentAsync(client, accessToken, rebookedVisit1, cancellationToken);
+        await BackdateAppointmentAsync(fixture, rebookedVisit1, nowUtc.AddDays(-90), cancellationToken);
+        var rebookedVisit2 = await ScheduleAppointmentAsync(client, accessToken, rebookedCustomerId, resourceId, serviceId, nowUtc.AddMinutes(25), cancellationToken);
+        await CompleteAppointmentAsync(client, accessToken, rebookedVisit2, cancellationToken);
+        await BackdateAppointmentAsync(fixture, rebookedVisit2, nowUtc.AddDays(-60), cancellationToken);
+        await ScheduleAppointmentAsync(client, accessToken, rebookedCustomerId, resourceId, serviceId, nowUtc.AddDays(5), cancellationToken);
+
+        var response = await AuthorizedRequestHelpers.GetAuthorizedAsync(client, accessToken, "/api/appointments/customer-recovery", cancellationToken);
+        response.StatusCode.ShouldBe(HttpStatusCode.OK);
+
+        var body = await response.Content.ReadFromJsonAsync<JsonElement>(cancellationToken);
+        var items = body.EnumerateArray().ToList();
+
+        items.ShouldContain(i => i.GetProperty("customerId").GetGuid() == overdueCustomerId);
+        items.ShouldNotContain(i => i.GetProperty("customerId").GetGuid() == newCustomerId);
+        items.ShouldNotContain(i => i.GetProperty("customerId").GetGuid() == rebookedCustomerId);
+
+        var overdueItem = items.Single(i => i.GetProperty("customerId").GetGuid() == overdueCustomerId);
+        overdueItem.GetProperty("averageIntervalDays").GetInt32().ShouldBeInRange(29, 31);
+        overdueItem.GetProperty("daysSinceLastVisit").GetInt32().ShouldBeInRange(59, 61);
+        overdueItem.GetProperty("daysOverdue").GetInt32().ShouldBeInRange(28, 32);
+    }
+
+    private static async Task BackdateAppointmentAsync(
+        IntegrationTestFixture fixture, Guid appointmentId, DateTimeOffset newStartUtc, CancellationToken cancellationToken)
+    {
+        await using var connection = new NpgsqlConnection(fixture.DatabaseOwnerConnectionString);
+        await connection.OpenAsync(cancellationToken);
+        await using var command = new NpgsqlCommand(
+            "UPDATE scheduling.appointments SET start_at_utc = @start, end_at_utc = @end WHERE id = @id", connection);
+        command.Parameters.AddWithValue("start", newStartUtc);
+        command.Parameters.AddWithValue("end", newStartUtc.AddMinutes(30));
+        command.Parameters.AddWithValue("id", appointmentId);
+        await command.ExecuteNonQueryAsync(cancellationToken);
     }
 
     private static async Task<Guid> CreateCustomerAsync(HttpClient client, string accessToken, CancellationToken cancellationToken)

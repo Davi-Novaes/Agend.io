@@ -15,6 +15,8 @@
     <PackageReference Include="CsvHelper" />
     <PackageReference Include="FluentValidation" />
     <PackageReference Include="FluentValidation.DependencyInjectionExtensions" />
+    <!-- IBackgroundJobClient: enfileira o envio de mensagem avulsa (Fase 10). -->
+    <PackageReference Include="Hangfire.Core" />
   </ItemGroup>
 
   <ItemGroup>

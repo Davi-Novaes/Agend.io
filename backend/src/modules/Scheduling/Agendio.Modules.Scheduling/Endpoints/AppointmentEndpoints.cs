@@ -5,6 +5,7 @@ using Agendio.Modules.Scheduling.Application.ConfirmAppointment;
 using Agendio.Modules.Scheduling.Application.GetAppointmentById;
 using Agendio.Modules.Scheduling.Application.GetAppointmentStats;
 using Agendio.Modules.Scheduling.Application.GetCustomerAppointmentHistory;
+using Agendio.Modules.Scheduling.Application.GetCustomerRecoveryCandidates;
 using Agendio.Modules.Scheduling.Application.ListAppointments;
 using Agendio.Modules.Scheduling.Application.ListNotificationLog;
 using Agendio.Modules.Scheduling.Application.MarkAppointmentNoShow;
@@ -47,6 +48,14 @@ public sealed class AppointmentEndpoints : IEndpointModule
         })
         .WithName("ListNotificationLog")
         .WithSummary("Historico de mensagens (e-mail/WhatsApp) enviadas aos clientes, paginado, mais recentes primeiro, opcionalmente filtrado por cliente (Fase 7/8).");
+
+        group.MapGet("/customer-recovery", async (IDispatcher dispatcher, CancellationToken cancellationToken) =>
+        {
+            var result = await dispatcher.Query(new GetCustomerRecoveryCandidatesQuery(), cancellationToken);
+            return result.IsSuccess ? Results.Ok(result.Value) : result.Error.ToProblemResult();
+        })
+        .WithName("GetCustomerRecoveryCandidates")
+        .WithSummary("Clientes atrasados em relacao ao proprio intervalo habitual de retorno, sem agendamento futuro marcado (Fase 10).");
 
         group.MapGet("/customers/{customerId:guid}/history", async (Guid customerId, IDispatcher dispatcher, CancellationToken cancellationToken) =>
         {

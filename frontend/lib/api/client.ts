@@ -521,6 +521,12 @@ export function setCustomerActiveStatus(id: string, isActive: boolean, accessTok
   return request(`/api/customers/${id}/status`, { method: "PATCH", body: JSON.stringify({ isActive }) }, accessToken);
 }
 
+export function sendCustomerMessage(
+  id: string, input: { subject: string; body: string }, accessToken: string
+): Promise<void> {
+  return request(`/api/customers/${id}/send-message`, { method: "POST", body: JSON.stringify(input) }, accessToken);
+}
+
 export type ImportCustomersResult = {
   imported: number;
   skipped: number;
@@ -859,6 +865,20 @@ export type CustomerAppointmentHistory = {
 
 export function getCustomerAppointmentHistory(customerId: string, accessToken: string): Promise<CustomerAppointmentHistory> {
   return request(`/api/appointments/customers/${customerId}/history`, {}, accessToken);
+}
+
+export type CustomerRecoveryCandidate = {
+  customerId: string;
+  customerName: string;
+  customerEmail: string | null;
+  averageIntervalDays: number;
+  daysSinceLastVisit: number;
+  daysOverdue: number;
+  lastVisitAtUtc: string;
+};
+
+export function getCustomerRecoveryCandidates(accessToken: string): Promise<CustomerRecoveryCandidate[]> {
+  return request(`/api/appointments/customer-recovery`, {}, accessToken);
 }
 
 export function scheduleAppointment(input: ScheduleAppointmentInput, accessToken: string): Promise<{ id: string }> {
