@@ -118,6 +118,17 @@ public sealed class Tenant : AggregateRoot<TenantId>, IAuditable, ISoftDeletable
 
     public string? WhatsAppCompletedTemplate { get; private set; }
 
+    /// <summary>
+    /// Ligados por padrao (Fase 7) — o motor de lembretes ja funciona sem o
+    /// dono configurar nada; estes toggles so servem pra DESLIGAR o que nao
+    /// interessa. Controlam e-mail e WhatsApp juntos, nao por canal.
+    /// </summary>
+    public bool Reminder24hEnabled { get; private set; } = true;
+
+    public bool Reminder2hEnabled { get; private set; } = true;
+
+    public bool PostServiceThankYouEnabled { get; private set; } = true;
+
     public DateTimeOffset CreatedAtUtc { get; set; }
 
     public string? CreatedBy { get; set; }
@@ -382,6 +393,16 @@ public sealed class Tenant : AggregateRoot<TenantId>, IAuditable, ISoftDeletable
         WhatsAppRescheduledTemplate = string.IsNullOrWhiteSpace(rescheduledTemplate) ? null : rescheduledTemplate.Trim();
         WhatsAppConfirmedTemplate = string.IsNullOrWhiteSpace(confirmedTemplate) ? null : confirmedTemplate.Trim();
         WhatsAppCompletedTemplate = string.IsNullOrWhiteSpace(completedTemplate) ? null : completedTemplate.Trim();
+
+        return Result.Success();
+    }
+
+    /// <summary>Nao ha invariante pra validar aqui — qualquer combinacao dos 3 toggles e valida.</summary>
+    public Result UpdateReminderSettings(bool reminder24hEnabled, bool reminder2hEnabled, bool postServiceThankYouEnabled)
+    {
+        Reminder24hEnabled = reminder24hEnabled;
+        Reminder2hEnabled = reminder2hEnabled;
+        PostServiceThankYouEnabled = postServiceThankYouEnabled;
 
         return Result.Success();
     }

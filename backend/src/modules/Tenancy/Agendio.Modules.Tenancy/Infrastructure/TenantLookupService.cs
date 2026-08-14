@@ -73,6 +73,19 @@ internal sealed class TenantLookupService(TenancyDbContext dbContext) : ITenantL
             tenant.WhatsAppCompletedTemplate);
     }
 
+    public async Task<TenantNotificationSettings?> GetNotificationSettingsAsync(TenantId tenantId, CancellationToken cancellationToken = default)
+    {
+        var tenant = await dbContext.Tenants.AsNoTracking()
+            .SingleOrDefaultAsync(t => t.Id == tenantId, cancellationToken);
+
+        if (tenant is null)
+        {
+            return null;
+        }
+
+        return new TenantNotificationSettings(tenant.Reminder24hEnabled, tenant.Reminder2hEnabled, tenant.PostServiceThankYouEnabled);
+    }
+
     private static TenantLookupResult Map(Tenant tenant) =>
         new(tenant.Id, tenant.Name, tenant.Slug.Value, tenant.TimeZoneId, tenant.IsActive, tenant.PrimaryColorHex, tenant.LogoUrl);
 }

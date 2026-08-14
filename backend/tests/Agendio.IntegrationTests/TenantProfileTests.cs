@@ -266,6 +266,34 @@ public class TenantProfileTests(IntegrationTestFixture fixture)
     }
 
     [Fact]
+    public async Task Owner_Can_Update_And_Read_Back_Reminder_Settings()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var client = fixture.CreateClient();
+        var accessToken = await CreateTenantWithOwnerAndLoginAsync(client, cancellationToken);
+
+        // Novo tenant nasce com tudo ligado (default sensato) — confirma isso
+        // antes de desligar, pra provar o zero-config e nao so o resultado do teste.
+        var initialProfileResponse = await AuthorizedRequestHelpers.GetAuthorizedAsync(client, accessToken, "/api/tenants/profile", cancellationToken);
+        var initialProfile = await initialProfileResponse.Content.ReadFromJsonAsync<JsonElement>(cancellationToken);
+        initialProfile.GetProperty("reminder24hEnabled").GetBoolean().ShouldBeTrue();
+        initialProfile.GetProperty("reminder2hEnabled").GetBoolean().ShouldBeTrue();
+        initialProfile.GetProperty("postServiceThankYouEnabled").GetBoolean().ShouldBeTrue();
+
+        var updateResponse = await AuthorizedRequestHelpers.PutAuthorizedAsync(
+            client, accessToken, "/api/tenants/reminder-settings",
+            new { reminder24hEnabled = false, reminder2hEnabled = true, postServiceThankYouEnabled = false },
+            cancellationToken);
+        updateResponse.StatusCode.ShouldBe(HttpStatusCode.NoContent);
+
+        var profileResponse = await AuthorizedRequestHelpers.GetAuthorizedAsync(client, accessToken, "/api/tenants/profile", cancellationToken);
+        var profile = await profileResponse.Content.ReadFromJsonAsync<JsonElement>(cancellationToken);
+        profile.GetProperty("reminder24hEnabled").GetBoolean().ShouldBeFalse();
+        profile.GetProperty("reminder2hEnabled").GetBoolean().ShouldBeTrue();
+        profile.GetProperty("postServiceThankYouEnabled").GetBoolean().ShouldBeFalse();
+    }
+
+    [Fact]
     public async Task Owner_Can_Connect_WhatsApp_And_Read_Back_Settings_Without_Exposing_The_Raw_Token()
     {
         var cancellationToken = TestContext.Current.CancellationToken;

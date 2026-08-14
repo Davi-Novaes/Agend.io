@@ -57,7 +57,10 @@ public sealed class GetTenantProfileQueryHandler(TenancyDbContext dbContext, ITe
             tenant.WhatsAppCancelledTemplate,
             tenant.WhatsAppRescheduledTemplate,
             tenant.WhatsAppConfirmedTemplate,
-            tenant.WhatsAppCompletedTemplate);
+            tenant.WhatsAppCompletedTemplate,
+            tenant.Reminder24hEnabled,
+            tenant.Reminder2hEnabled,
+            tenant.PostServiceThankYouEnabled);
 
         return Result.Success(profile);
     }

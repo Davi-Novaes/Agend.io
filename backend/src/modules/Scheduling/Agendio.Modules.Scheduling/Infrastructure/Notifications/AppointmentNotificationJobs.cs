@@ -5,6 +5,7 @@ using Agendio.Modules.Scheduling.Domain;
 using Agendio.Modules.Scheduling.Infrastructure.Persistence;
 using Agendio.Modules.Tenancy.Contracts;
 using Agendio.SharedKernel.Multitenancy;
+using Agendio.SharedKernel.Time;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 
@@ -14,10 +15,13 @@ namespace Agendio.Modules.Scheduling.Infrastructure.Notifications;
 /// Confirmacao, lembretes T-24h/T-2h (Sprint 5, por e-mail), e a partir da
 /// Fase 6 tambem cancelamento/reagendamento/confirmacao de presenca/pos-atendimento,
 /// cada um por e-mail (sempre) e WhatsApp (so se o tenant tiver conectado a
-/// integracao, ver Tenant.UpdateWhatsAppSettings). Cada metodo publico e um
-/// job do Hangfire — a durabilidade (sobrevive a reinicio do processo, storage
-/// no Postgres) e o retry automatico em falha transitoria (rede, SMTP/WhatsApp
-/// fora do ar) sao do PROPRIO Hangfire, sem logica extra aqui.
+/// integracao, ver Tenant.UpdateWhatsAppSettings). Lembrete e pos-atendimento
+/// tambem respeitam os toggles da Fase 7 (Tenant.UpdateReminderSettings) — os
+/// outros 4 gatilhos nao sao configuraveis, o roadmap so pede isso pros dois.
+/// Cada metodo publico e um job do Hangfire — a durabilidade (sobrevive a
+/// reinicio do processo, storage no Postgres) e o retry automatico em falha
+/// transitoria (rede, SMTP/WhatsApp fora do ar) sao do PROPRIO Hangfire, sem
+/// logica extra aqui.
 ///
 /// Reagendar/cancelar um agendamento NAO cancela o job de lembrete pendente no
 /// Hangfire — mais simples e mais robusto e cada job reconferir, na hora de
@@ -28,6 +32,11 @@ namespace Agendio.Modules.Scheduling.Infrastructure.Notifications;
 /// remarcado, confirmado, concluido) disparam UMA VEZ, na mesma janela da
 /// requisicao que mudou o status — sem essa reconferencia de obsolescencia.
 ///
+/// Toda tentativa de envio (sucesso ou falha) vira um NotificationLogEntry —
+/// "historico de mensagens" da Fase 7. Uma falha seguida de retry bem-sucedido
+/// do Hangfire aparece como duas linhas de proposito: mostra que houve uma
+/// falha real, sem esconder nada do dono.
+///
 /// Roda fora de uma requisicao HTTP (sem JWT, sem tenant ambiente) — por isso
 /// cada metodo recebe o tenantId explicito e ancora o ITenantContext manualmente,
 /// o mesmo papel que ExplicitTenantBehavior cumpre para comandos publicos.
@@ -35,6 +44,7 @@ namespace Agendio.Modules.Scheduling.Infrastructure.Notifications;
 public sealed class AppointmentNotificationJobs(
     SchedulingDbContext dbContext,
     ITenantContext tenantContext,
+    IClock clock,
     ICustomerLookupService customerLookup,
     ITenantLookupService tenantLookup,
     IEmailSender emailSender,
@@ -51,13 +61,22 @@ public sealed class AppointmentNotificationJobs(
             return;
         }
 
-        await NotifyAsync(appointment, WhatsAppTrigger.Scheduled, "Agendamento confirmado", null, cancellationToken);
+        await NotifyAsync(appointment, NotificationTrigger.Scheduled, "Agendamento confirmado", null, cancellationToken);
     }
 
     public async Task SendReminderEmailAsync(
-        Guid tenantId, Guid appointmentId, DateTimeOffset expectedStartUtc, string reminderLabel, CancellationToken cancellationToken)
+        Guid tenantId, Guid appointmentId, DateTimeOffset expectedStartUtc, ReminderLeadTime leadTime, CancellationToken cancellationToken)
     {
         tenantContext.SetTenant(TenantId.From(tenantId));
+
+        var notificationSettings = await tenantLookup.GetNotificationSettingsAsync(TenantId.From(tenantId), cancellationToken);
+        var reminderEnabled = leadTime == ReminderLeadTime.TwentyFourHours
+            ? notificationSettings?.Reminder24hEnabled ?? true
+            : notificationSettings?.Reminder2hEnabled ?? true;
+        if (!reminderEnabled)
+        {
+            return;
+        }
 
         var appointment = await LoadActiveAppointmentAsync(appointmentId, expectedStartUtc, cancellationToken);
         if (appointment is null)
@@ -65,7 +84,8 @@ public sealed class AppointmentNotificationJobs(
             return;
         }
 
-        await NotifyAsync(appointment, WhatsAppTrigger.Reminder, "Lembrete de agendamento", reminderLabel, cancellationToken);
+        var reminderLabel = leadTime == ReminderLeadTime.TwentyFourHours ? "em 24 horas" : "em 2 horas";
+        await NotifyAsync(appointment, NotificationTrigger.Reminder, "Lembrete de agendamento", reminderLabel, cancellationToken);
     }
 
     public async Task SendCancellationNotificationAsync(Guid tenantId, Guid appointmentId, CancellationToken cancellationToken)
@@ -78,7 +98,7 @@ public sealed class AppointmentNotificationJobs(
             return;
         }
 
-        await NotifyAsync(appointment, WhatsAppTrigger.Cancelled, "Agendamento cancelado", null, cancellationToken);
+        await NotifyAsync(appointment, NotificationTrigger.Cancelled, "Agendamento cancelado", null, cancellationToken);
     }
 
     public async Task SendRescheduleNotificationAsync(Guid tenantId, Guid appointmentId, CancellationToken cancellationToken)
@@ -91,7 +111,7 @@ public sealed class AppointmentNotificationJobs(
             return;
         }
 
-        await NotifyAsync(appointment, WhatsAppTrigger.Rescheduled, "Agendamento remarcado", null, cancellationToken);
+        await NotifyAsync(appointment, NotificationTrigger.Rescheduled, "Agendamento remarcado", null, cancellationToken);
     }
 
     public async Task SendConfirmedAttendanceNotificationAsync(Guid tenantId, Guid appointmentId, CancellationToken cancellationToken)
@@ -104,12 +124,18 @@ public sealed class AppointmentNotificationJobs(
             return;
         }
 
-        await NotifyAsync(appointment, WhatsAppTrigger.Confirmed, "Presenca confirmada", null, cancellationToken);
+        await NotifyAsync(appointment, NotificationTrigger.Confirmed, "Presenca confirmada", null, cancellationToken);
     }
 
     public async Task SendCompletedNotificationAsync(Guid tenantId, Guid appointmentId, CancellationToken cancellationToken)
     {
         tenantContext.SetTenant(TenantId.From(tenantId));
+
+        var notificationSettings = await tenantLookup.GetNotificationSettingsAsync(TenantId.From(tenantId), cancellationToken);
+        if (notificationSettings is not null && !notificationSettings.PostServiceThankYouEnabled)
+        {
+            return;
+        }
 
         var appointment = await LoadAppointmentAsync(appointmentId, cancellationToken);
         if (appointment is null)
@@ -117,7 +143,7 @@ public sealed class AppointmentNotificationJobs(
             return;
         }
 
-        await NotifyAsync(appointment, WhatsAppTrigger.Completed, "Obrigado pela visita", null, cancellationToken);
+        await NotifyAsync(appointment, NotificationTrigger.Completed, "Obrigado pela visita", null, cancellationToken);
     }
 
     private async Task<Appointment?> LoadAppointmentAsync(Guid appointmentId, CancellationToken cancellationToken) =>
@@ -152,7 +178,7 @@ public sealed class AppointmentNotificationJobs(
     }
 
     private async Task NotifyAsync(
-        Appointment appointment, WhatsAppTrigger trigger, string emailSubjectPrefix, string? reminderLabel, CancellationToken cancellationToken)
+        Appointment appointment, NotificationTrigger trigger, string emailSubjectPrefix, string? reminderLabel, CancellationToken cancellationToken)
     {
         var customer = await customerLookup.FindByIdAsync(appointment.CustomerId, cancellationToken);
         if (customer is null)
@@ -189,15 +215,25 @@ public sealed class AppointmentNotificationJobs(
                 <p>{tenantName}</p>
                 """;
 
-            await emailSender.SendAsync(customer.Email, $"{emailSubjectPrefix} — {tenantName}", html, cancellationToken);
+            try
+            {
+                await emailSender.SendAsync(customer.Email, $"{emailSubjectPrefix} — {tenantName}", html, cancellationToken);
+                await RecordNotificationAsync(appointment, customer.CustomerId, NotificationChannel.Email, trigger, succeeded: true, errorMessage: null, cancellationToken);
+            }
+            catch (Exception ex)
+            {
+                await RecordNotificationAsync(appointment, customer.CustomerId, NotificationChannel.Email, trigger, succeeded: false, ex.Message, cancellationToken);
+                throw;
+            }
         }
 
-        await TrySendWhatsAppAsync(appointment.TenantId, trigger, customer.Phone, customer.FullName, appointment.ServiceName, localStart, tenantName, cancellationToken);
+        await TrySendWhatsAppAsync(appointment, customer.CustomerId, trigger, customer.Phone, customer.FullName, appointment.ServiceName, localStart, tenantName, cancellationToken);
     }
 
     private async Task TrySendWhatsAppAsync(
-        TenantId tenantId,
-        WhatsAppTrigger trigger,
+        Appointment appointment,
+        Guid customerId,
+        NotificationTrigger trigger,
         string? customerPhone,
         string customerName,
         string serviceName,
@@ -210,7 +246,7 @@ public sealed class AppointmentNotificationJobs(
             return;
         }
 
-        var settings = await tenantLookup.GetWhatsAppSettingsAsync(tenantId, cancellationToken);
+        var settings = await tenantLookup.GetWhatsAppSettingsAsync(appointment.TenantId, cancellationToken);
         if (settings is null || !settings.Enabled || settings.PhoneNumberId is null || settings.AccessToken is null)
         {
             return;
@@ -220,17 +256,45 @@ public sealed class AppointmentNotificationJobs(
         var message = RenderTemplate(template, customerName, serviceName, localStart, tenantName);
         var credentials = new WhatsAppCredentials(settings.PhoneNumberId, settings.AccessToken);
 
-        await whatsAppSender.SendAsync(credentials, customerPhone, message, cancellationToken);
+        try
+        {
+            await whatsAppSender.SendAsync(credentials, customerPhone, message, cancellationToken);
+            await RecordNotificationAsync(appointment, customerId, NotificationChannel.WhatsApp, trigger, succeeded: true, errorMessage: null, cancellationToken);
+        }
+        catch (Exception ex)
+        {
+            await RecordNotificationAsync(appointment, customerId, NotificationChannel.WhatsApp, trigger, succeeded: false, ex.Message, cancellationToken);
+            throw;
+        }
     }
 
-    private static string? SelectTemplate(TenantWhatsAppSettings settings, WhatsAppTrigger trigger) => trigger switch
+    private async Task RecordNotificationAsync(
+        Appointment appointment, Guid customerId, NotificationChannel channel, NotificationTrigger trigger, bool succeeded, string? errorMessage,
+        CancellationToken cancellationToken)
     {
-        WhatsAppTrigger.Scheduled => settings.ScheduledTemplate,
-        WhatsAppTrigger.Reminder => settings.ReminderTemplate,
-        WhatsAppTrigger.Cancelled => settings.CancelledTemplate,
-        WhatsAppTrigger.Rescheduled => settings.RescheduledTemplate,
-        WhatsAppTrigger.Confirmed => settings.ConfirmedTemplate,
-        WhatsAppTrigger.Completed => settings.CompletedTemplate,
+        var entryResult = succeeded
+            ? NotificationLogEntry.RecordSent(appointment.TenantId, appointment.Id, customerId, channel, trigger, clock.UtcNow)
+            : NotificationLogEntry.RecordFailed(
+                appointment.TenantId, appointment.Id, customerId, channel, trigger, clock.UtcNow, errorMessage ?? "Erro desconhecido.");
+
+        if (entryResult.IsFailure)
+        {
+            logger.LogWarning("Nao foi possivel registrar o historico de notificacao: {Error}", entryResult.Error.Message);
+            return;
+        }
+
+        dbContext.NotificationLogEntries.Add(entryResult.Value);
+        await dbContext.SaveChangesAsync(cancellationToken);
+    }
+
+    private static string? SelectTemplate(TenantWhatsAppSettings settings, NotificationTrigger trigger) => trigger switch
+    {
+        NotificationTrigger.Scheduled => settings.ScheduledTemplate,
+        NotificationTrigger.Reminder => settings.ReminderTemplate,
+        NotificationTrigger.Cancelled => settings.CancelledTemplate,
+        NotificationTrigger.Rescheduled => settings.RescheduledTemplate,
+        NotificationTrigger.Confirmed => settings.ConfirmedTemplate,
+        NotificationTrigger.Completed => settings.CompletedTemplate,
         _ => null,
     };
 
@@ -243,33 +307,29 @@ public sealed class AppointmentNotificationJobs(
             .Replace("{{estabelecimento}}", tenantName);
 }
 
-/// <summary>Os 6 gatilhos de notificacao ligados a mudanca de status de um agendamento — campanhas (Fase 21) e recuperacao de cliente (Fase 10) usam WhatsAppCredentials/RenderTemplate diretamente quando chegar a vez, sem precisar de um trigger aqui.</summary>
-internal enum WhatsAppTrigger
+/// <summary>Qual dos dois lembretes automaticos — cada um com seu proprio toggle (Tenant.Reminder24hEnabled/Reminder2hEnabled, Fase 7).</summary>
+public enum ReminderLeadTime
 {
-    Scheduled,
-    Reminder,
-    Cancelled,
-    Rescheduled,
-    Confirmed,
-    Completed,
+    TwentyFourHours,
+    TwoHours,
 }
 
 /// <summary>Texto usado quando o tenant nao customizou o template do gatilho — placeholders: {{cliente}}, {{servico}}, {{data}}, {{hora}}, {{estabelecimento}}.</summary>
 internal static class WhatsAppMessageDefaults
 {
-    public static string For(WhatsAppTrigger trigger) => trigger switch
+    public static string For(NotificationTrigger trigger) => trigger switch
     {
-        WhatsAppTrigger.Scheduled =>
+        NotificationTrigger.Scheduled =>
             "Ola {{cliente}}! Seu agendamento de {{servico}} em {{estabelecimento}} foi confirmado para {{data}} as {{hora}}.",
-        WhatsAppTrigger.Reminder =>
+        NotificationTrigger.Reminder =>
             "Lembrete: seu agendamento de {{servico}} em {{estabelecimento}} e {{data}} as {{hora}}.",
-        WhatsAppTrigger.Cancelled =>
+        NotificationTrigger.Cancelled =>
             "Seu agendamento de {{servico}} em {{estabelecimento}} marcado para {{data}} as {{hora}} foi cancelado.",
-        WhatsAppTrigger.Rescheduled =>
+        NotificationTrigger.Rescheduled =>
             "Seu agendamento de {{servico}} em {{estabelecimento}} foi remarcado para {{data}} as {{hora}}.",
-        WhatsAppTrigger.Confirmed =>
+        NotificationTrigger.Confirmed =>
             "Seu agendamento de {{servico}} em {{estabelecimento}} para {{data}} as {{hora}} esta confirmado. Contamos com voce!",
-        WhatsAppTrigger.Completed =>
+        NotificationTrigger.Completed =>
             "Obrigado por visitar {{estabelecimento}}, {{cliente}}! Esperamos que tenha gostado do seu {{servico}}.",
         _ => throw new ArgumentOutOfRangeException(nameof(trigger)),
     };

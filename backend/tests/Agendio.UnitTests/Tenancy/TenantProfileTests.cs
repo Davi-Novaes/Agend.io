@@ -273,4 +273,27 @@ public class TenantProfileTests
         tenant.WhatsAppPhoneNumberId.ShouldBeNull();
         tenant.WhatsAppAccessToken.ShouldBeNull();
     }
+
+    [Fact]
+    public void New_Tenant_Has_All_Reminders_Enabled_By_Default()
+    {
+        var tenant = CreateTenant();
+
+        tenant.Reminder24hEnabled.ShouldBeTrue();
+        tenant.Reminder2hEnabled.ShouldBeTrue();
+        tenant.PostServiceThankYouEnabled.ShouldBeTrue();
+    }
+
+    [Fact]
+    public void UpdateReminderSettings_Should_Set_Each_Toggle_Independently()
+    {
+        var tenant = CreateTenant();
+
+        var result = tenant.UpdateReminderSettings(reminder24hEnabled: false, reminder2hEnabled: true, postServiceThankYouEnabled: false);
+
+        result.IsSuccess.ShouldBeTrue();
+        tenant.Reminder24hEnabled.ShouldBeFalse();
+        tenant.Reminder2hEnabled.ShouldBeTrue();
+        tenant.PostServiceThankYouEnabled.ShouldBeFalse();
+    }
 }
