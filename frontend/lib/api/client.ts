@@ -465,12 +465,15 @@ function buildListQuery(params: { search?: string; page?: number; pageSize?: num
 
 // ---------- Customers ----------
 
+export type CustomerSegment = "Novo" | "Recorrente" | "Vip" | "EmRisco" | "Inativo" | "NoShow";
+
 export type CustomerSummary = {
   id: string;
   fullName: string;
   email: string | null;
   phone: string | null;
   isActive: boolean;
+  segment: CustomerSegment;
 };
 
 export type CustomerDetails = CustomerSummary & {
@@ -492,10 +495,14 @@ export type CustomerInput = {
 };
 
 export function listCustomers(
-  params: { search?: string; page?: number; pageSize?: number },
+  params: { search?: string; page?: number; pageSize?: number; segment?: CustomerSegment },
   accessToken: string
 ): Promise<PagedResult<CustomerSummary>> {
-  return request(`/api/customers?${buildListQuery(params)}`, {}, accessToken);
+  const query = new URLSearchParams(buildListQuery(params));
+  if (params.segment) {
+    query.set("segment", params.segment);
+  }
+  return request(`/api/customers?${query.toString()}`, {}, accessToken);
 }
 
 export function getCustomerById(id: string, accessToken: string): Promise<CustomerDetails> {

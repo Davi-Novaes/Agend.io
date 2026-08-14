@@ -21,6 +21,8 @@
     <ProjectReference Include="..\..\..\shared\Agendio.SharedKernel\Agendio.SharedKernel.csproj" />
     <ProjectReference Include="..\..\..\shared\Agendio.Infrastructure\Agendio.Infrastructure.csproj" />
     <ProjectReference Include="..\Agendio.Modules.Customers.Contracts\Agendio.Modules.Customers.Contracts.csproj" />
+    <!-- Fase 9: auto-segmentacao le agregados de visitas via Scheduling.Contracts, nunca o modulo inteiro. -->
+    <ProjectReference Include="..\..\Scheduling\Agendio.Modules.Scheduling.Contracts\Agendio.Modules.Scheduling.Contracts.csproj" />
   </ItemGroup>
 
 </Project>

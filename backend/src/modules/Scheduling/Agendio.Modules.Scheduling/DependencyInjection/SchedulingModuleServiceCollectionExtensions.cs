@@ -1,7 +1,9 @@
 using System.Reflection;
 using Agendio.Infrastructure.DependencyInjection;
 using Agendio.Infrastructure.Endpoints;
+using Agendio.Modules.Scheduling.Contracts;
 using Agendio.Modules.Scheduling.Endpoints;
+using Agendio.Modules.Scheduling.Infrastructure;
 using Agendio.Modules.Scheduling.Infrastructure.Notifications;
 using Agendio.Modules.Scheduling.Infrastructure.Persistence;
 using Agendio.SharedKernel.Messaging;
@@ -26,6 +28,7 @@ public static class SchedulingModuleServiceCollectionExtensions
         services.AddSingleton<IEndpointModule, AppointmentEndpoints>();
         services.AddSingleton<IEndpointModule, PublicAppointmentEndpoints>();
         services.AddScoped<AppointmentNotificationJobs>();
+        services.AddScoped<ICustomerVisitStatsLookupService, CustomerVisitStatsLookupService>();
 
         return services;
     }

@@ -22,14 +22,14 @@ public sealed class CustomerEndpoints : IEndpointModule
         // page/pageSize precisam de "= valor" aqui (nao so no record da query):
         // um parametro de query string sem default no delegate e OBRIGATORIO
         // no Minimal API — ausente na URL vira 400, nao o default do C#.
-        group.MapGet("/", async (string? search, IDispatcher dispatcher, CancellationToken cancellationToken, int page = 1, int pageSize = 20) =>
+        group.MapGet("/", async (string? search, CustomerSegment? segment, IDispatcher dispatcher, CancellationToken cancellationToken, int page = 1, int pageSize = 20) =>
         {
-            var result = await dispatcher.Query(new ListCustomersQuery(search, page, pageSize), cancellationToken);
+            var result = await dispatcher.Query(new ListCustomersQuery(search, segment, page, pageSize), cancellationToken);
 
             return result.IsSuccess ? Results.Ok(result.Value) : result.Error.ToProblemResult();
         })
         .WithName("ListCustomers")
-        .WithSummary("Lista os clientes do estabelecimento, com busca por nome e paginacao.");
+        .WithSummary("Lista os clientes do estabelecimento, com busca por nome, filtro por segmento (Fase 9) e paginacao.");
 
         group.MapGet("/{id:guid}", async (Guid id, IDispatcher dispatcher, CancellationToken cancellationToken) =>
         {

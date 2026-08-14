@@ -371,4 +371,29 @@ public class ModuleDependencyRulesTests
             "Marketing so pode depender do .Contracts de Customers, nunca de nenhum modulo inteiro. " +
             "Tipos violando a regra: " + string.Join(", ", result.FailingTypeNames ?? []));
     }
+
+    [Fact]
+    public void Customers_Module_Should_Not_Depend_On_Scheduling_Internals()
+    {
+        // Fase 9 (auto-segmentacao): Customers resolve agregados de visita via
+        // ICustomerVisitStatsLookupService — nunca deveria enxergar Appointment
+        // (Scheduling.Domain) diretamente.
+        var forbiddenNamespaces = new[]
+        {
+            "Agendio.Modules.Scheduling.Domain",
+            "Agendio.Modules.Scheduling.Application",
+            "Agendio.Modules.Scheduling.Infrastructure",
+            "Agendio.Modules.Scheduling.Endpoints",
+            "Agendio.Modules.Scheduling.DependencyInjection",
+        };
+
+        var result = Types.InAssembly(CustomersAssembly)
+            .That().ResideInNamespace("Agendio.Modules.Customers")
+            .ShouldNot().HaveDependencyOnAny(forbiddenNamespaces)
+            .GetResult();
+
+        result.IsSuccessful.ShouldBeTrue(
+            "Customers so pode depender do .Contracts de Scheduling, nunca do modulo inteiro. " +
+            "Tipos violando a regra: " + string.Join(", ", result.FailingTypeNames ?? []));
+    }
 }
