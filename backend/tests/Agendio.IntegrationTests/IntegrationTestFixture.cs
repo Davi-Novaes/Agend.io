@@ -256,7 +256,10 @@ public sealed class IntegrationTestFixture : WebApplicationFactory<Program>, IAs
             .UseNpgsql(OwnerConnectionString)
             .UseSnakeCaseNamingConvention();
 
-        return new TenancyDbContext(optionsBuilder.Options, new NullTenantContext());
+        var encryptionService = new AesGcmEncryptionService(
+            Options.Create(new ColumnEncryptionOptions { Key = "aW50ZWdyYXRpb24tdGVzdC1jb2wta2V5LTMyYnl0ZXM=" }));
+
+        return new TenancyDbContext(optionsBuilder.Options, new NullTenantContext(), encryptionService);
     }
 
     private IdentityDbContext CreateIdentityDbContext()

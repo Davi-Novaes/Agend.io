@@ -220,7 +220,7 @@ public class TenantIsolationRulesTests
             .UseNpgsql("Host=localhost;Database=architecture_tests_only")
             .UseSnakeCaseNamingConvention();
 
-        return new TenancyDbContext(optionsBuilder.Options, new NullTenantContext());
+        return new TenancyDbContext(optionsBuilder.Options, new NullTenantContext(), CreateEncryptionService());
     }
 
     private static CustomersDbContext CreateCustomersDbContext()

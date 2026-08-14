@@ -51,6 +51,28 @@ internal sealed class TenantLookupService(TenancyDbContext dbContext) : ITenantL
         return new TenantAvailabilityInfo(tenant.TimeZoneId, businessHours, closedDates, tenant.AppointmentBufferMinutes);
     }
 
+    public async Task<TenantWhatsAppSettings?> GetWhatsAppSettingsAsync(TenantId tenantId, CancellationToken cancellationToken = default)
+    {
+        var tenant = await dbContext.Tenants.AsNoTracking()
+            .SingleOrDefaultAsync(t => t.Id == tenantId, cancellationToken);
+
+        if (tenant is null)
+        {
+            return null;
+        }
+
+        return new TenantWhatsAppSettings(
+            tenant.WhatsAppIntegrationEnabled,
+            tenant.WhatsAppPhoneNumberId,
+            tenant.WhatsAppAccessToken,
+            tenant.WhatsAppScheduledTemplate,
+            tenant.WhatsAppReminderTemplate,
+            tenant.WhatsAppCancelledTemplate,
+            tenant.WhatsAppRescheduledTemplate,
+            tenant.WhatsAppConfirmedTemplate,
+            tenant.WhatsAppCompletedTemplate);
+    }
+
     private static TenantLookupResult Map(Tenant tenant) =>
         new(tenant.Id, tenant.Name, tenant.Slug.Value, tenant.TimeZoneId, tenant.IsActive, tenant.PrimaryColorHex, tenant.LogoUrl);
 }

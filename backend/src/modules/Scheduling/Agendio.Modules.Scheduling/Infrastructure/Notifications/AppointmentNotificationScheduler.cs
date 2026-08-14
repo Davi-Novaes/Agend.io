@@ -19,6 +19,30 @@ public static class AppointmentNotificationScheduler
             job => job.SendConfirmationEmailAsync(tenantId, appointmentId, CancellationToken.None));
     }
 
+    public static void EnqueueCancellation(IBackgroundJobClient jobClient, Guid tenantId, Guid appointmentId)
+    {
+        jobClient.Enqueue<AppointmentNotificationJobs>(
+            job => job.SendCancellationNotificationAsync(tenantId, appointmentId, CancellationToken.None));
+    }
+
+    public static void EnqueueReschedule(IBackgroundJobClient jobClient, Guid tenantId, Guid appointmentId)
+    {
+        jobClient.Enqueue<AppointmentNotificationJobs>(
+            job => job.SendRescheduleNotificationAsync(tenantId, appointmentId, CancellationToken.None));
+    }
+
+    public static void EnqueueConfirmedAttendance(IBackgroundJobClient jobClient, Guid tenantId, Guid appointmentId)
+    {
+        jobClient.Enqueue<AppointmentNotificationJobs>(
+            job => job.SendConfirmedAttendanceNotificationAsync(tenantId, appointmentId, CancellationToken.None));
+    }
+
+    public static void EnqueueCompleted(IBackgroundJobClient jobClient, Guid tenantId, Guid appointmentId)
+    {
+        jobClient.Enqueue<AppointmentNotificationJobs>(
+            job => job.SendCompletedNotificationAsync(tenantId, appointmentId, CancellationToken.None));
+    }
+
     public static void ScheduleReminders(IBackgroundJobClient jobClient, IClock clock, Guid tenantId, Guid appointmentId, DateTimeOffset startUtc)
     {
         ScheduleReminderIfInFuture(jobClient, clock, tenantId, appointmentId, startUtc, ReminderBefore24h, "em 24 horas");

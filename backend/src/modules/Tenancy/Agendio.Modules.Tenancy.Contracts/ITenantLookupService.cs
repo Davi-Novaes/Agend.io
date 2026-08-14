@@ -15,4 +15,7 @@ public interface ITenantLookupService
 
     /// <summary>Horario de funcionamento, datas fechadas e intervalo entre agendamentos — usado pelo motor de disponibilidade (Scheduling, Fase 4).</summary>
     Task<TenantAvailabilityInfo?> GetAvailabilityInfoAsync(TenantId tenantId, CancellationToken cancellationToken = default);
+
+    /// <summary>Credenciais e templates da integracao com WhatsApp — usado pelo Scheduling para notificar o cliente (Fase 6).</summary>
+    Task<TenantWhatsAppSettings?> GetWhatsAppSettingsAsync(TenantId tenantId, CancellationToken cancellationToken = default);
 }

@@ -13,6 +13,7 @@ using Agendio.Modules.Tenancy.Application.UpdateTenantLogo;
 using Agendio.Modules.Tenancy.Application.UpdateTenantPageCustomization;
 using Agendio.Modules.Tenancy.Application.UpdateTenantProfile;
 using Agendio.Modules.Tenancy.Application.UpdateTenantSchedulingSettings;
+using Agendio.Modules.Tenancy.Application.UpdateTenantWhatsAppSettings;
 using Agendio.Modules.Tenancy.Application.UpdateUnit;
 using Agendio.Modules.Tenancy.Domain;
 using Agendio.SharedKernel.Messaging;
@@ -152,6 +153,26 @@ public sealed class TenancyEndpoints : IEndpointModule
         .WithName("UpdateTenantSchedulingSettings")
         .WithSummary("Atualiza datas fechadas (feriados/eventos) e o intervalo minimo entre agendamentos do estabelecimento.");
 
+        group.MapPut("/whatsapp-settings", async (UpdateWhatsAppSettingsRequest request, IDispatcher dispatcher, CancellationToken cancellationToken) =>
+        {
+            var command = new UpdateTenantWhatsAppSettingsCommand(
+                request.Enabled,
+                request.PhoneNumberId,
+                request.AccessToken,
+                request.ScheduledTemplate,
+                request.ReminderTemplate,
+                request.CancelledTemplate,
+                request.RescheduledTemplate,
+                request.ConfirmedTemplate,
+                request.CompletedTemplate);
+            var result = await dispatcher.Send(command, cancellationToken);
+
+            return result.IsSuccess ? Results.NoContent() : result.Error.ToProblemResult();
+        })
+        .RequireAuthorization(policy => policy.RequireRole("Owner"))
+        .WithName("UpdateTenantWhatsAppSettings")
+        .WithSummary("Conecta/desconecta a integracao com WhatsApp e configura os templates de mensagem (Fase 6).");
+
         group.MapPut("/business-hours", async (SetBusinessHoursRequest request, IDispatcher dispatcher, CancellationToken cancellationToken) =>
         {
             var entries = request.Entries.Select(e => new BusinessHoursEntryDto(e.DayOfWeek, e.StartTime, e.EndTime)).ToList();
@@ -249,4 +270,15 @@ public sealed class TenancyEndpoints : IEndpointModule
     private sealed record ClosedDateRequest(DateOnly Date, string? Reason);
 
     private sealed record UpdateSchedulingSettingsRequest(IReadOnlyList<ClosedDateRequest> ClosedDates, int AppointmentBufferMinutes);
+
+    private sealed record UpdateWhatsAppSettingsRequest(
+        bool Enabled,
+        string? PhoneNumberId,
+        string? AccessToken,
+        string? ScheduledTemplate,
+        string? ReminderTemplate,
+        string? CancelledTemplate,
+        string? RescheduledTemplate,
+        string? ConfirmedTemplate,
+        string? CompletedTemplate);
 }

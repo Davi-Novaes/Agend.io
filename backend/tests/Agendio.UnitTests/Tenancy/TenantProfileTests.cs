@@ -224,4 +224,53 @@ public class TenantProfileTests
         result.IsFailure.ShouldBeTrue();
         tenant.AppointmentBufferMinutes.ShouldBe(0);
     }
+
+    [Fact]
+    public void UpdateWhatsAppSettings_Should_Set_Credentials_And_Templates_When_Enabled()
+    {
+        var tenant = CreateTenant();
+
+        var result = tenant.UpdateWhatsAppSettings(
+            true, "1234567890", "meta-secret-token",
+            "Ola {{cliente}}", "Lembrete para {{cliente}}", "Cancelado {{cliente}}", "Remarcado {{cliente}}", "Confirmado {{cliente}}", "Obrigado {{cliente}}");
+
+        result.IsSuccess.ShouldBeTrue();
+        tenant.WhatsAppIntegrationEnabled.ShouldBeTrue();
+        tenant.WhatsAppPhoneNumberId.ShouldBe("1234567890");
+        tenant.WhatsAppAccessToken.ShouldBe("meta-secret-token");
+        tenant.WhatsAppScheduledTemplate.ShouldBe("Ola {{cliente}}");
+        tenant.WhatsAppReminderTemplate.ShouldBe("Lembrete para {{cliente}}");
+        tenant.WhatsAppCancelledTemplate.ShouldBe("Cancelado {{cliente}}");
+        tenant.WhatsAppRescheduledTemplate.ShouldBe("Remarcado {{cliente}}");
+        tenant.WhatsAppConfirmedTemplate.ShouldBe("Confirmado {{cliente}}");
+        tenant.WhatsAppCompletedTemplate.ShouldBe("Obrigado {{cliente}}");
+    }
+
+    [Theory]
+    [InlineData(null, "token")]
+    [InlineData("1234567890", null)]
+    [InlineData(null, null)]
+    public void UpdateWhatsAppSettings_Should_Fail_When_Enabled_Without_Full_Credentials(string? phoneNumberId, string? accessToken)
+    {
+        var tenant = CreateTenant();
+
+        var result = tenant.UpdateWhatsAppSettings(true, phoneNumberId, accessToken, null, null, null, null, null, null);
+
+        result.IsFailure.ShouldBeTrue();
+        tenant.WhatsAppIntegrationEnabled.ShouldBeFalse();
+    }
+
+    [Fact]
+    public void UpdateWhatsAppSettings_Should_Allow_Disabling_Without_Credentials()
+    {
+        var tenant = CreateTenant();
+        tenant.UpdateWhatsAppSettings(true, "1234567890", "meta-secret-token", null, null, null, null, null, null);
+
+        var result = tenant.UpdateWhatsAppSettings(false, null, null, null, null, null, null, null, null);
+
+        result.IsSuccess.ShouldBeTrue();
+        tenant.WhatsAppIntegrationEnabled.ShouldBeFalse();
+        tenant.WhatsAppPhoneNumberId.ShouldBeNull();
+        tenant.WhatsAppAccessToken.ShouldBeNull();
+    }
 }

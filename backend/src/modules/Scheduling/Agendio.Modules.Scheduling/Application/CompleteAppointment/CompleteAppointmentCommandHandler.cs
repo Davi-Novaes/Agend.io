@@ -1,13 +1,16 @@
 using Agendio.Modules.Scheduling.Domain;
+using Agendio.Modules.Scheduling.Infrastructure.Notifications;
 using Agendio.Modules.Scheduling.Infrastructure.Persistence;
 using Agendio.SharedKernel.Messaging;
 using Agendio.SharedKernel.Results;
 using Agendio.SharedKernel.Time;
+using Hangfire;
 using Microsoft.EntityFrameworkCore;
 
 namespace Agendio.Modules.Scheduling.Application.CompleteAppointment;
 
-public sealed class CompleteAppointmentCommandHandler(SchedulingDbContext dbContext, IClock clock) : ICommandHandler<CompleteAppointmentCommand>
+public sealed class CompleteAppointmentCommandHandler(SchedulingDbContext dbContext, IClock clock, IBackgroundJobClient jobClient)
+    : ICommandHandler<CompleteAppointmentCommand>
 {
     public async Task<Result> Handle(CompleteAppointmentCommand request, CancellationToken cancellationToken)
     {
@@ -26,6 +29,9 @@ public sealed class CompleteAppointmentCommandHandler(SchedulingDbContext dbCont
         }
 
         await dbContext.SaveChangesAsync(cancellationToken);
+
+        AppointmentNotificationScheduler.EnqueueCompleted(jobClient, appointment.TenantId.Value, appointment.Id.Value);
+
         return Result.Success();
     }
 }
