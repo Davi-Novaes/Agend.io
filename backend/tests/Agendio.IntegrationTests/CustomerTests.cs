@@ -164,6 +164,74 @@ public class CustomerTests(IntegrationTestFixture fixture)
         response.StatusCode.ShouldBe(HttpStatusCode.Unauthorized);
     }
 
+    [Fact]
+    public async Task New_Customer_Without_Appointments_Should_Be_Segmented_As_Novo()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var client = fixture.CreateClient();
+        var accessToken = await CreateTenantWithOwnerAndLoginAsync(client, cancellationToken);
+
+        var createResponse = await AuthorizedRequestHelpers.PostAuthorizedAsync(
+            client, accessToken, "/api/customers", new { fullName = "Cliente Sem Historico" }, cancellationToken);
+        var createBody = await createResponse.Content.ReadFromJsonAsync<JsonElement>(cancellationToken);
+        var customerId = createBody.GetProperty("id").GetGuid();
+
+        var listResponse = await AuthorizedRequestHelpers.GetAuthorizedAsync(
+            client, accessToken, "/api/customers?search=" + Uri.EscapeDataString("Cliente Sem Historico"), cancellationToken);
+        var listBody = await listResponse.Content.ReadFromJsonAsync<JsonElement>(cancellationToken);
+        var item = listBody.GetProperty("items").EnumerateArray().Single(i => i.GetProperty("id").GetGuid() == customerId);
+        item.GetProperty("segment").GetString().ShouldBe("Novo");
+    }
+
+    [Fact]
+    public async Task Customer_With_A_Completed_Visit_Should_Be_Segmented_As_Recorrente_And_Filterable()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var client = fixture.CreateClient();
+        var accessToken = await CreateTenantWithOwnerAndLoginAsync(client, cancellationToken);
+
+        var customerResponse = await AuthorizedRequestHelpers.PostAuthorizedAsync(
+            client, accessToken, "/api/customers", new { fullName = "Cliente Recorrente" }, cancellationToken);
+        var customerId = (await customerResponse.Content.ReadFromJsonAsync<JsonElement>(cancellationToken)).GetProperty("id").GetGuid();
+
+        var resourceResponse = await AuthorizedRequestHelpers.PostAuthorizedAsync(
+            client, accessToken, "/api/resources", new { name = "Cadeira 1", type = "Room", capacity = 1, description = (string?)null }, cancellationToken);
+        var resourceId = (await resourceResponse.Content.ReadFromJsonAsync<JsonElement>(cancellationToken)).GetProperty("id").GetGuid();
+
+        var serviceResponse = await AuthorizedRequestHelpers.PostAuthorizedAsync(
+            client, accessToken, "/api/services",
+            new { name = "Corte", description = (string?)null, durationMinutes = 30, price = 45.90m, currency = "BRL", category = (string?)null },
+            cancellationToken);
+        var serviceId = (await serviceResponse.Content.ReadFromJsonAsync<JsonElement>(cancellationToken)).GetProperty("id").GetGuid();
+
+        var appointmentResponse = await AuthorizedRequestHelpers.PostAuthorizedAsync(
+            client, accessToken, "/api/appointments",
+            new { customerId, resourceId, serviceId, startAtUtc = DateTimeOffset.UtcNow.AddDays(1), notes = (string?)null },
+            cancellationToken);
+        var appointmentId = (await appointmentResponse.Content.ReadFromJsonAsync<JsonElement>(cancellationToken)).GetProperty("id").GetGuid();
+
+        await AuthorizedRequestHelpers.PostAuthorizedAsync(client, accessToken, $"/api/appointments/{appointmentId}/confirm", new { }, cancellationToken);
+        await AuthorizedRequestHelpers.PostAuthorizedAsync(client, accessToken, $"/api/appointments/{appointmentId}/start", new { }, cancellationToken);
+        (await AuthorizedRequestHelpers.PostAuthorizedAsync(client, accessToken, $"/api/appointments/{appointmentId}/complete", new { }, cancellationToken))
+            .StatusCode.ShouldBe(HttpStatusCode.NoContent);
+
+        var listResponse = await AuthorizedRequestHelpers.GetAuthorizedAsync(
+            client, accessToken, "/api/customers?search=" + Uri.EscapeDataString("Cliente Recorrente"), cancellationToken);
+        var listBody = await listResponse.Content.ReadFromJsonAsync<JsonElement>(cancellationToken);
+        var item = listBody.GetProperty("items").EnumerateArray().Single(i => i.GetProperty("id").GetGuid() == customerId);
+        item.GetProperty("segment").GetString().ShouldBe("Recorrente");
+
+        var filteredResponse = await AuthorizedRequestHelpers.GetAuthorizedAsync(
+            client, accessToken, "/api/customers?segment=Recorrente", cancellationToken);
+        var filteredBody = await filteredResponse.Content.ReadFromJsonAsync<JsonElement>(cancellationToken);
+        filteredBody.GetProperty("items").EnumerateArray().ShouldContain(i => i.GetProperty("id").GetGuid() == customerId);
+
+        var wrongFilterResponse = await AuthorizedRequestHelpers.GetAuthorizedAsync(
+            client, accessToken, "/api/customers?segment=Novo", cancellationToken);
+        var wrongFilterBody = await wrongFilterResponse.Content.ReadFromJsonAsync<JsonElement>(cancellationToken);
+        wrongFilterBody.GetProperty("items").EnumerateArray().ShouldNotContain(i => i.GetProperty("id").GetGuid() == customerId);
+    }
+
     private static async Task<string> CreateTenantWithOwnerAndLoginAsync(HttpClient client, CancellationToken cancellationToken)
     {
         var tenantResponse = await client.PostAsJsonAsync("/api/tenants", new

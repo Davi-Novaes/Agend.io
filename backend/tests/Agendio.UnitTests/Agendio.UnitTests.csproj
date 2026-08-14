@@ -35,6 +35,7 @@
     <ProjectReference Include="..\..\src\modules\Marketing\Agendio.Modules.Marketing\Agendio.Modules.Marketing.csproj" />
     <ProjectReference Include="..\..\src\modules\Catalog\Agendio.Modules.Catalog\Agendio.Modules.Catalog.csproj" />
     <ProjectReference Include="..\..\src\modules\Resources\Agendio.Modules.Resources\Agendio.Modules.Resources.csproj" />
+    <ProjectReference Include="..\..\src\modules\Customers\Agendio.Modules.Customers\Agendio.Modules.Customers.csproj" />
   </ItemGroup>
 
 </Project>

@@ -17,6 +17,7 @@ import {
   importCustomersFromCsv,
   ApiError,
   type CustomerSummary,
+  type CustomerSegment,
 } from "@/lib/api/client";
 import { useSession } from "@/lib/auth/session-context";
 import { CustomerProfileSheet } from "@/components/customers/customer-profile-sheet";
@@ -28,6 +29,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from "@/components/ui/table";
 import { Skeleton } from "@/components/ui/skeleton";
 import { EmptyState } from "@/components/ui/empty-state";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import {
   Dialog,
   DialogContent,
@@ -65,6 +67,26 @@ function toNullable(value: string): string | null {
   return value.trim() === "" ? null : value.trim();
 }
 
+// Fase 9 — auto-segmentacao. Prioridade fixa calculada no backend
+// (CustomerSegmentCalculator); aqui e so rotulo/cor de exibicao.
+const SEGMENT_LABEL: Record<CustomerSegment, string> = {
+  Novo: "Novo",
+  Recorrente: "Recorrente",
+  Vip: "VIP",
+  EmRisco: "Em risco",
+  Inativo: "Inativo",
+  NoShow: "Faltas",
+};
+
+const SEGMENT_VARIANT: Record<CustomerSegment, "secondary" | "default" | "success" | "warning" | "outline" | "destructive"> = {
+  Novo: "secondary",
+  Recorrente: "default",
+  Vip: "success",
+  EmRisco: "warning",
+  Inativo: "outline",
+  NoShow: "destructive",
+};
+
 export default function CustomersPage() {
   const { session } = useSession();
   const queryClient = useQueryClient();
@@ -72,6 +94,7 @@ export default function CustomersPage() {
   const [page, setPage] = React.useState(1);
   const [searchInput, setSearchInput] = React.useState("");
   const [search, setSearch] = React.useState("");
+  const [segment, setSegment] = React.useState<CustomerSegment | "all">("all");
   const [dialogOpen, setDialogOpen] = React.useState(false);
   const [editingCustomer, setEditingCustomer] = React.useState<CustomerSummary | null>(null);
   const [viewingCustomerId, setViewingCustomerId] = React.useState<string | null>(null);
@@ -80,8 +103,12 @@ export default function CustomersPage() {
   const accessToken = session?.accessToken ?? "";
 
   const customersQuery = useQuery({
-    queryKey: ["customers", { page, search }],
-    queryFn: () => listCustomers({ page, pageSize: PAGE_SIZE, search: search || undefined }, accessToken),
+    queryKey: ["customers", { page, search, segment }],
+    queryFn: () =>
+      listCustomers(
+        { page, pageSize: PAGE_SIZE, search: search || undefined, segment: segment === "all" ? undefined : segment },
+        accessToken
+      ),
     enabled: Boolean(session),
     placeholderData: (previous) => previous,
   });
@@ -245,6 +272,25 @@ export default function CustomersPage() {
             >
               <Search className="size-4" />
             </Button>
+            <Select
+              value={segment}
+              onValueChange={(value) => {
+                setSegment(value as CustomerSegment | "all");
+                setPage(1);
+              }}
+            >
+              <SelectTrigger className="w-40" aria-label="Filtrar por segmento">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Todos os segmentos</SelectItem>
+                {(Object.keys(SEGMENT_LABEL) as CustomerSegment[]).map((option) => (
+                  <SelectItem key={option} value={option}>
+                    {SEGMENT_LABEL[option]}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
 
           <Table>
@@ -254,6 +300,7 @@ export default function CustomersPage() {
                 <TableHead>E-mail</TableHead>
                 <TableHead>Telefone</TableHead>
                 <TableHead>Status</TableHead>
+                <TableHead>Segmento</TableHead>
                 <TableHead className="text-right">Acoes</TableHead>
               </TableRow>
             </TableHeader>
@@ -265,16 +312,17 @@ export default function CustomersPage() {
                     <TableCell><Skeleton className="h-4 w-40" /></TableCell>
                     <TableCell><Skeleton className="h-4 w-24" /></TableCell>
                     <TableCell><Skeleton className="h-5 w-14 rounded-full" /></TableCell>
+                    <TableCell><Skeleton className="h-5 w-16 rounded-full" /></TableCell>
                     <TableCell className="text-right"><Skeleton className="ml-auto h-4 w-20" /></TableCell>
                   </TableRow>
                 ))
               ) : customersQuery.data?.items.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={5} className="p-0">
-                    {search ? (
+                  <TableCell colSpan={6} className="p-0">
+                    {search || segment !== "all" ? (
                       <EmptyState
                         icon={Search}
-                        title={`Nenhum cliente encontrado para "${search}"`}
+                        title={search ? `Nenhum cliente encontrado para "${search}"` : `Nenhum cliente no segmento "${SEGMENT_LABEL[segment as CustomerSegment]}"`}
                         description="Tente ajustar os termos da busca ou limpe o filtro."
                         action={
                           <Button
@@ -283,10 +331,11 @@ export default function CustomersPage() {
                             onClick={() => {
                               setSearchInput("");
                               setSearch("");
+                              setSegment("all");
                               setPage(1);
                             }}
                           >
-                            Limpar busca
+                            Limpar filtros
                           </Button>
                         }
                       />
@@ -315,6 +364,9 @@ export default function CustomersPage() {
                       <Badge variant={customer.isActive ? "default" : "outline"}>
                         {customer.isActive ? "Ativo" : "Inativo"}
                       </Badge>
+                    </TableCell>
+                    <TableCell>
+                      <Badge variant={SEGMENT_VARIANT[customer.segment]}>{SEGMENT_LABEL[customer.segment]}</Badge>
                     </TableCell>
                     <TableCell className="text-right">
                       <div className="flex justify-end gap-2">
