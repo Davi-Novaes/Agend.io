@@ -5,6 +5,7 @@ using Agendio.Modules.Customers.Application.GetCustomerAuditLog;
 using Agendio.Modules.Customers.Application.GetCustomerById;
 using Agendio.Modules.Customers.Application.ImportCustomersFromCsv;
 using Agendio.Modules.Customers.Application.ListCustomers;
+using Agendio.Modules.Customers.Application.SendCustomerMessage;
 using Agendio.Modules.Customers.Application.UpdateCustomer;
 using Agendio.SharedKernel.Messaging;
 using Microsoft.AspNetCore.Builder;
@@ -81,6 +82,14 @@ public sealed class CustomerEndpoints : IEndpointModule
         .WithName("GetCustomerAuditLog")
         .WithSummary("Trilha de auditoria do cliente: quem criou/alterou o cadastro, quando, e o que mudou.");
 
+        group.MapPost("/{id:guid}/send-message", async (Guid id, SendCustomerMessageRequest request, IDispatcher dispatcher, CancellationToken cancellationToken) =>
+        {
+            var result = await dispatcher.Send(new SendCustomerMessageCommand(id, request.Subject, request.Body), cancellationToken);
+            return result.IsSuccess ? Results.NoContent() : result.Error.ToProblemResult();
+        })
+        .WithName("SendCustomerMessage")
+        .WithSummary("Envia uma mensagem avulsa por e-mail a um cliente especifico (Fase 10 — recuperacao de clientes).");
+
         group.MapPost("/import", async (IFormFile file, IDispatcher dispatcher, CancellationToken cancellationToken) =>
         {
             await using var contentStream = new MemoryStream();
@@ -103,4 +112,6 @@ public sealed class CustomerEndpoints : IEndpointModule
         string? Cpf = null, string? HealthNotes = null);
 
     private sealed record SetActiveStatusRequest(bool IsActive);
+
+    private sealed record SendCustomerMessageRequest(string Subject, string Body);
 }

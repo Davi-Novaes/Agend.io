@@ -21,6 +21,7 @@ import {
 } from "@/lib/api/client";
 import { useSession } from "@/lib/auth/session-context";
 import { CustomerProfileSheet } from "@/components/customers/customer-profile-sheet";
+import { CustomerRecoveryCard } from "@/components/customers/customer-recovery-card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -245,6 +246,10 @@ export default function CustomersPage() {
             Novo cliente
           </Button>
         </div>
+      </div>
+
+      <div className="mb-6">
+        <CustomerRecoveryCard />
       </div>
 
       <Card>

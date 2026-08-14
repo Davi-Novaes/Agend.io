@@ -232,6 +232,64 @@ public class CustomerTests(IntegrationTestFixture fixture)
         wrongFilterBody.GetProperty("items").EnumerateArray().ShouldNotContain(i => i.GetProperty("id").GetGuid() == customerId);
     }
 
+    [Fact]
+    public async Task Owner_Can_Send_An_Adhoc_Message_To_A_Customer_With_Email()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var client = fixture.CreateClient();
+        var accessToken = await CreateTenantWithOwnerAndLoginAsync(client, cancellationToken);
+
+        var customerEmail = $"cliente-recuperacao-{Guid.NewGuid():N}@example.com";
+        var createResponse = await AuthorizedRequestHelpers.PostAuthorizedAsync(
+            client, accessToken, "/api/customers", new { fullName = "Cliente Recuperacao", email = customerEmail }, cancellationToken);
+        var customerId = (await createResponse.Content.ReadFromJsonAsync<JsonElement>(cancellationToken)).GetProperty("id").GetGuid();
+
+        var response = await AuthorizedRequestHelpers.PostAuthorizedAsync(
+            client, accessToken, $"/api/customers/{customerId}/send-message",
+            new { subject = "Sentimos sua falta!", body = "Faz tempo que voce nao aparece por aqui." },
+            cancellationToken);
+        response.StatusCode.ShouldBe(HttpStatusCode.NoContent);
+
+        var arrived = await PollMailHogForAsync(customerEmail, cancellationToken, subjectContains: "Sentimos sua falta");
+        arrived.ShouldBeTrue("a mensagem avulsa deveria ter chegado no MailHog.");
+    }
+
+    [Fact]
+    public async Task Sending_A_Message_To_A_Customer_Without_Email_Should_Be_Rejected()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var client = fixture.CreateClient();
+        var accessToken = await CreateTenantWithOwnerAndLoginAsync(client, cancellationToken);
+
+        var createResponse = await AuthorizedRequestHelpers.PostAuthorizedAsync(
+            client, accessToken, "/api/customers", new { fullName = "Cliente Sem Email" }, cancellationToken);
+        var customerId = (await createResponse.Content.ReadFromJsonAsync<JsonElement>(cancellationToken)).GetProperty("id").GetGuid();
+
+        var response = await AuthorizedRequestHelpers.PostAuthorizedAsync(
+            client, accessToken, $"/api/customers/{customerId}/send-message",
+            new { subject = "Ola", body = "Mensagem de teste." },
+            cancellationToken);
+        response.StatusCode.ShouldBe(HttpStatusCode.BadRequest);
+    }
+
+    private async Task<bool> PollMailHogForAsync(string mustContain, CancellationToken cancellationToken, string? subjectContains = null)
+    {
+        using var mailHogClient = new HttpClient { BaseAddress = new Uri(fixture.MailHogApiBaseUrl) };
+        for (var attempt = 0; attempt < 20; attempt++)
+        {
+            var messagesJson = await mailHogClient.GetStringAsync("/api/v2/messages", cancellationToken);
+            if (messagesJson.Contains(mustContain, StringComparison.OrdinalIgnoreCase)
+                && (subjectContains is null || messagesJson.Contains(subjectContains, StringComparison.OrdinalIgnoreCase)))
+            {
+                return true;
+            }
+
+            await Task.Delay(300, cancellationToken);
+        }
+
+        return false;
+    }
+
     private static async Task<string> CreateTenantWithOwnerAndLoginAsync(HttpClient client, CancellationToken cancellationToken)
     {
         var tenantResponse = await client.PostAsJsonAsync("/api/tenants", new
