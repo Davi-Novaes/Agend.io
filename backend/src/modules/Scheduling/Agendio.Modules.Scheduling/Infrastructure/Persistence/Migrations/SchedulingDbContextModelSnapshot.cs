@@ -336,6 +336,87 @@ namespace Agendio.Modules.Scheduling.Infrastructure.Persistence.Migrations
                     b.ToTable("reviews", "scheduling");
                 });
 
+            modelBuilder.Entity("Agendio.Modules.Scheduling.Domain.WaitlistEntry", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<Guid?>("ConvertedAppointmentId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("converted_appointment_id");
+
+                    b.Property<DateTimeOffset>("CreatedAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at_utc");
+
+                    b.Property<string>("CreatedBy")
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)")
+                        .HasColumnName("created_by");
+
+                    b.Property<Guid>("CustomerId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("customer_id");
+
+                    b.Property<string>("Notes")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("notes");
+
+                    b.Property<DateTimeOffset?>("NotifiedAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("notified_at_utc");
+
+                    b.Property<DateOnly>("PreferredDate")
+                        .HasColumnType("date")
+                        .HasColumnName("preferred_date");
+
+                    b.Property<Guid?>("ResourceId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("resource_id");
+
+                    b.Property<Guid>("ServiceId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("service_id");
+
+                    b.Property<string>("ServiceName")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("service_name");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("status");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("tenant_id");
+
+                    b.Property<DateTimeOffset?>("UpdatedAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at_utc");
+
+                    b.Property<string>("UpdatedBy")
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)")
+                        .HasColumnName("updated_by");
+
+                    b.HasKey("Id")
+                        .HasName("pk_waitlist_entries");
+
+                    b.HasIndex("TenantId", "Status", "CreatedAtUtc")
+                        .HasDatabaseName("ix_waitlist_entries_tenant_id_status_created_at_utc");
+
+                    b.HasIndex("TenantId", "ServiceId", "PreferredDate", "Status")
+                        .HasDatabaseName("ix_waitlist_entries_tenant_id_service_id_preferred_date_status");
+
+                    b.ToTable("waitlist_entries", "scheduling");
+                });
+
             modelBuilder.Entity("Agendio.Modules.Scheduling.Domain.Appointment", b =>
                 {
                     b.OwnsOne("Agendio.SharedKernel.ValueObjects.Money", "Price", b1 =>

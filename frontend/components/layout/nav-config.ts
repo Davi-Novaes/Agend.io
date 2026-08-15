@@ -17,6 +17,7 @@ import {
   MessageCircle,
   Bell,
   Gift,
+  Hourglass,
 } from "lucide-react";
 
 export type NavItem = {
@@ -41,6 +42,7 @@ export const NAV_GROUPS: NavGroup[] = [
     label: "Gestão",
     items: [
       { href: "/agenda", label: "Agenda", icon: CalendarDays },
+      { href: "/waitlist", label: "Lista de espera", icon: Hourglass },
       { href: "/clientes", label: "Clientes", icon: Users },
       { href: "/servicos", label: "Serviços", icon: Sparkles },
       { href: "/recursos", label: "Recursos", icon: Armchair },
