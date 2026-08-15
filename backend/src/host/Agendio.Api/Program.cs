@@ -13,6 +13,7 @@ using Agendio.Modules.Billing.Infrastructure.Jobs;
 using Agendio.Modules.Catalog.DependencyInjection;
 using Agendio.Modules.Customers.DependencyInjection;
 using Agendio.Modules.Estoque.DependencyInjection;
+using Agendio.Modules.Assistant.DependencyInjection;
 using Agendio.Modules.Marketing.DependencyInjection;
 using Agendio.Modules.Financeiro.DependencyInjection;
 using Agendio.Modules.Identity.DependencyInjection;
@@ -80,6 +81,7 @@ try
     builder.Services.AddFinanceiroModule(builder.Configuration);
     builder.Services.AddEstoqueModule(builder.Configuration);
     builder.Services.AddMarketingModule(builder.Configuration);
+    builder.Services.AddAssistantModule();
     builder.Services.AddAgendioHangfire(builder.Configuration);
 
     // ---------- Autenticacao / Autorizacao ----------
@@ -145,6 +147,13 @@ try
     var authRateLimitPermits = builder.Configuration.GetValue("RateLimiting:AuthPermitLimit", 10);
     var authRateLimitWindowSeconds = builder.Configuration.GetValue("RateLimiting:AuthWindowSeconds", 60);
 
+    // Fase 22 — Assistente: chamada de IA tem custo real por requisicao (chave
+    // global paga pela plataforma), por isso um limite bem mais agressivo que o
+    // global generico. Particiona por tenant (nao por IP) pelo mesmo motivo do
+    // limite global acima.
+    var aiAssistantRateLimitPermits = builder.Configuration.GetValue("RateLimiting:AiAssistantPermitLimit", 20);
+    var aiAssistantRateLimitWindowSeconds = builder.Configuration.GetValue("RateLimiting:AiAssistantWindowSeconds", 3600);
+
     // Particiona por tenant (claim do JWT) quando a requisicao esta autenticada,
     // e cai para IP quando nao ha claim (login/registro/portal publico). Isso
     // exige que UseRateLimiter() rode DEPOIS de UseAuthentication() no pipeline
@@ -177,6 +186,15 @@ try
                 {
                     PermitLimit = authRateLimitPermits,
                     Window = TimeSpan.FromSeconds(authRateLimitWindowSeconds),
+                }));
+
+        options.AddPolicy("ai-assistant", httpContext =>
+            RateLimitPartition.GetFixedWindowLimiter(
+                partitionKey: ResolveGlobalRateLimitPartitionKey(httpContext),
+                factory: _ => new FixedWindowRateLimiterOptions
+                {
+                    PermitLimit = aiAssistantRateLimitPermits,
+                    Window = TimeSpan.FromSeconds(aiAssistantRateLimitWindowSeconds),
                 }));
     });
 

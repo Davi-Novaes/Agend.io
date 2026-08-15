@@ -19,6 +19,8 @@
   <ItemGroup>
     <ProjectReference Include="..\..\..\shared\Agendio.SharedKernel\Agendio.SharedKernel.csproj" />
     <ProjectReference Include="..\..\..\shared\Agendio.Infrastructure\Agendio.Infrastructure.csproj" />
+    <!-- Contracts do proprio modulo (implementado na Infrastructure) — leitura agregada usada pelo Assistente (Fase 22). -->
+    <ProjectReference Include="..\Agendio.Modules.Estoque.Contracts\Agendio.Modules.Estoque.Contracts.csproj" />
   </ItemGroup>
 
 </Project>

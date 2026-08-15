@@ -1607,3 +1607,19 @@ export function listCampaigns(
   query.set("pageSize", String(params.pageSize ?? 20));
   return request(`/api/marketing/campanhas?${query.toString()}`, {}, accessToken);
 }
+
+// ---------- Assistant ----------
+
+export type AssistantMessage = {
+  role: "user" | "assistant";
+  text: string;
+};
+
+export type AskAssistantInput = {
+  question: string;
+  history: AssistantMessage[];
+};
+
+export function askAssistant(input: AskAssistantInput, accessToken: string): Promise<{ answer: string }> {
+  return request("/api/assistant/ask", { method: "POST", body: JSON.stringify(input) }, accessToken);
+}

@@ -1,3 +1,6 @@
+using System.Net.Http.Headers;
+using Agendio.Infrastructure.AiAssistant;
+using Agendio.Infrastructure.AiAssistant.Providers;
 using Agendio.Infrastructure.Behaviors;
 using Agendio.Infrastructure.Messaging;
 using Agendio.Infrastructure.Multitenancy;
@@ -65,6 +68,9 @@ public static class InfrastructureServiceCollectionExtensions
             httpClient.DefaultRequestHeaders.Add("User-Agent", "Agendio");
         });
 
+        services.Configure<AiAssistantOptions>(configuration.GetSection(AiAssistantOptions.SectionName));
+        AddAiChatClients(services);
+
         services.AddSingleton<IFileStorage, LocalFileStorage>();
 
         AddRedis(services, configuration);
@@ -91,6 +97,46 @@ public static class InfrastructureServiceCollectionExtensions
         services.AddTransient(typeof(IPipelineBehavior<,>), typeof(ExplicitTenantBehavior<,>));
 
         return services;
+    }
+
+    // Os 3 clientes concretos ficam sempre registrados (Fase 22: usuario pediu
+    // suporte simultaneo a Anthropic/OpenAI/DeepSeek); IAiChatClient resolve pro
+    // que estiver ativo em AiAssistantOptions.Provider, sem o modulo Assistant
+    // precisar saber qual e.
+    private static void AddAiChatClients(IServiceCollection services)
+    {
+        services.AddHttpClient<AnthropicChatClient>((serviceProvider, httpClient) =>
+        {
+            var aiOptions = serviceProvider.GetRequiredService<IOptions<AiAssistantOptions>>().Value;
+            httpClient.BaseAddress = new Uri("https://api.anthropic.com/");
+            httpClient.DefaultRequestHeaders.Add("x-api-key", aiOptions.ApiKey);
+            httpClient.DefaultRequestHeaders.Add("anthropic-version", "2023-06-01");
+        });
+
+        services.AddHttpClient<OpenAiChatClient>((serviceProvider, httpClient) =>
+        {
+            var aiOptions = serviceProvider.GetRequiredService<IOptions<AiAssistantOptions>>().Value;
+            httpClient.BaseAddress = new Uri("https://api.openai.com/v1/");
+            httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", aiOptions.ApiKey);
+        });
+
+        services.AddHttpClient<DeepSeekChatClient>((serviceProvider, httpClient) =>
+        {
+            var aiOptions = serviceProvider.GetRequiredService<IOptions<AiAssistantOptions>>().Value;
+            httpClient.BaseAddress = new Uri("https://api.deepseek.com/");
+            httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", aiOptions.ApiKey);
+        });
+
+        services.AddScoped<IAiChatClient>(serviceProvider =>
+        {
+            var provider = serviceProvider.GetRequiredService<IOptions<AiAssistantOptions>>().Value.Provider;
+            return provider switch
+            {
+                AiAssistantProvider.OpenAi => serviceProvider.GetRequiredService<OpenAiChatClient>(),
+                AiAssistantProvider.DeepSeek => serviceProvider.GetRequiredService<DeepSeekChatClient>(),
+                _ => serviceProvider.GetRequiredService<AnthropicChatClient>(),
+            };
+        });
     }
 
     private static void AddRedis(IServiceCollection services, IConfiguration configuration)
