@@ -1,6 +1,7 @@
 using Agendio.Infrastructure.Endpoints;
 using Agendio.Modules.Scheduling.Application.GetAvailableSlots;
 using Agendio.Modules.Scheduling.Application.PublicScheduleAppointment;
+using Agendio.Modules.Scheduling.Application.SubmitReview;
 using Agendio.SharedKernel.Messaging;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
@@ -36,8 +37,21 @@ public sealed class PublicAppointmentEndpoints : IEndpointModule
         })
         .WithName("PublicScheduleAppointment")
         .WithSummary("Cria um agendamento pelo portal publico, sem exigir login previo do cliente.");
+
+        group.MapPost("/appointments/{appointmentId:guid}/review", async (
+            Guid tenantId, Guid appointmentId, SubmitReviewRequest request, IDispatcher dispatcher, CancellationToken cancellationToken) =>
+        {
+            var command = new SubmitReviewCommand(tenantId, appointmentId, request.CustomerEmail, request.Rating, request.Comment);
+            var result = await dispatcher.Send(command, cancellationToken);
+
+            return result.IsSuccess ? Results.NoContent() : result.Error.ToProblemResult();
+        })
+        .WithName("SubmitReview")
+        .WithSummary("Cliente avalia um atendimento concluido, confirmando a identidade pelo e-mail cadastrado (Fase 12).");
     }
 
     private sealed record PublicScheduleAppointmentRequest(
         Guid ResourceId, Guid ServiceId, DateTimeOffset StartAtUtc, string CustomerFullName, string CustomerEmail, string? CustomerPhone, string? Notes);
+
+    private sealed record SubmitReviewRequest(string CustomerEmail, int Rating, string? Comment);
 }

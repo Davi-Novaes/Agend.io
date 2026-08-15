@@ -1378,6 +1378,36 @@ export function getAppointmentStats(params: { from: string; to: string }, access
   return request(`/api/appointments/stats?${query.toString()}`, {}, accessToken);
 }
 
+export type ReviewMonthPoint = { month: string; averageRating: number; count: number };
+export type ServiceRatingPoint = { serviceName: string; averageRating: number; count: number };
+export type ProfessionalRatingPoint = { resourceId: string; resourceName: string; averageRating: number; count: number };
+export type RecentReviewPoint = { id: string; serviceName: string; rating: number; comment: string | null; createdAtUtc: string };
+
+export type ReviewsSummary = {
+  averageRating: number;
+  totalCount: number;
+  seriesByMonth: ReviewMonthPoint[];
+  byService: ServiceRatingPoint[];
+  byProfessional: ProfessionalRatingPoint[];
+  recentReviews: RecentReviewPoint[];
+};
+
+export function getReviewsSummary(params: { from: string; to: string }, accessToken: string): Promise<ReviewsSummary> {
+  const query = new URLSearchParams({ from: params.from, to: params.to });
+  return request(`/api/appointments/reviews/summary?${query.toString()}`, {}, accessToken);
+}
+
+export function submitReview(
+  tenantId: string,
+  appointmentId: string,
+  input: { customerEmail: string; rating: number; comment?: string | null }
+): Promise<void> {
+  return request(`/api/public/tenants/${tenantId}/appointments/${appointmentId}/review`, {
+    method: "POST",
+    body: JSON.stringify(input),
+  });
+}
+
 export type StockValueByCurrency = { currency: string; total: number };
 
 export type InventorySummary = {

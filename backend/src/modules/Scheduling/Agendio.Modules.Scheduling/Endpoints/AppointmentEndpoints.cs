@@ -6,6 +6,7 @@ using Agendio.Modules.Scheduling.Application.GetAppointmentById;
 using Agendio.Modules.Scheduling.Application.GetAppointmentStats;
 using Agendio.Modules.Scheduling.Application.GetCustomerAppointmentHistory;
 using Agendio.Modules.Scheduling.Application.GetCustomerRecoveryCandidates;
+using Agendio.Modules.Scheduling.Application.GetReviewsSummary;
 using Agendio.Modules.Scheduling.Application.ListAppointments;
 using Agendio.Modules.Scheduling.Application.ListNotificationLog;
 using Agendio.Modules.Scheduling.Application.MarkAppointmentNoShow;
@@ -40,6 +41,14 @@ public sealed class AppointmentEndpoints : IEndpointModule
         })
         .WithName("GetAppointmentStats")
         .WithSummary("Estatisticas de agendamentos no periodo: conclusao, no-show, cancelamento e faturamento por servico/profissional.");
+
+        group.MapGet("/reviews/summary", async (DateOnly from, DateOnly to, IDispatcher dispatcher, CancellationToken cancellationToken) =>
+        {
+            var result = await dispatcher.Query(new GetReviewsSummaryQuery(from, to), cancellationToken);
+            return result.IsSuccess ? Results.Ok(result.Value) : result.Error.ToProblemResult();
+        })
+        .WithName("GetReviewsSummary")
+        .WithSummary("Resumo de avaliacoes no periodo: media geral, evolucao mensal, por profissional/servico e avaliacoes recentes (Fase 12).");
 
         group.MapGet("/notifications", async (int page, int pageSize, Guid? customerId, IDispatcher dispatcher, CancellationToken cancellationToken) =>
         {

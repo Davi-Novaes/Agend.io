@@ -265,6 +265,77 @@ namespace Agendio.Modules.Scheduling.Infrastructure.Persistence.Migrations
                     b.ToTable("notification_log_entries", "scheduling");
                 });
 
+            modelBuilder.Entity("Agendio.Modules.Scheduling.Domain.Review", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<Guid>("AppointmentId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("appointment_id");
+
+                    b.Property<string>("Comment")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)")
+                        .HasColumnName("comment");
+
+                    b.Property<DateTimeOffset>("CreatedAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at_utc");
+
+                    b.Property<string>("CreatedBy")
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)")
+                        .HasColumnName("created_by");
+
+                    b.Property<Guid>("CustomerId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("customer_id");
+
+                    b.Property<int>("Rating")
+                        .HasColumnType("integer")
+                        .HasColumnName("rating");
+
+                    b.Property<Guid>("ResourceId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("resource_id");
+
+                    b.Property<string>("ServiceName")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("service_name");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("tenant_id");
+
+                    b.Property<DateTimeOffset?>("UpdatedAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at_utc");
+
+                    b.Property<string>("UpdatedBy")
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)")
+                        .HasColumnName("updated_by");
+
+                    b.HasKey("Id")
+                        .HasName("pk_reviews");
+
+                    b.HasIndex("TenantId", "AppointmentId")
+                        .IsUnique()
+                        .HasDatabaseName("ix_reviews_tenant_id_appointment_id");
+
+                    b.HasIndex("TenantId", "CreatedAtUtc")
+                        .HasDatabaseName("ix_reviews_tenant_id_created_at_utc");
+
+                    b.HasIndex("TenantId", "ResourceId")
+                        .HasDatabaseName("ix_reviews_tenant_id_resource_id");
+
+                    b.ToTable("reviews", "scheduling");
+                });
+
             modelBuilder.Entity("Agendio.Modules.Scheduling.Domain.Appointment", b =>
                 {
                     b.OwnsOne("Agendio.SharedKernel.ValueObjects.Money", "Price", b1 =>
