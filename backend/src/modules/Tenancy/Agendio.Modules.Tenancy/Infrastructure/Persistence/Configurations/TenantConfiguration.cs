@@ -107,6 +107,9 @@ public sealed class TenantConfiguration : IEntityTypeConfiguration<Tenant>
         builder.Property(t => t.LoyaltyVisitsForReward).IsRequired().HasDefaultValue(10);
         builder.Property(t => t.LoyaltyRewardDescription).IsRequired().HasMaxLength(200).HasDefaultValue("Um agradecimento especial");
 
+        builder.Property(t => t.RequireDepositAfterNoShows).IsRequired().HasDefaultValue(false);
+        builder.Property(t => t.NoShowThresholdForDeposit).IsRequired().HasDefaultValue(2);
+
         // Colecao de Value Objects sem identidade propria — tabela filha, FK
         // sombra gerada pelo EF, sem repositorio separado (mesmo padrao de
         // Resource.WorkingHours no modulo Resources).

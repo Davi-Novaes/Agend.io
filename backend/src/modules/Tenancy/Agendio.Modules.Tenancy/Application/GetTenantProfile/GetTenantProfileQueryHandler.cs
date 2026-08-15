@@ -63,7 +63,9 @@ public sealed class GetTenantProfileQueryHandler(TenancyDbContext dbContext, ITe
             tenant.PostServiceThankYouEnabled,
             tenant.LoyaltyProgramEnabled,
             tenant.LoyaltyVisitsForReward,
-            tenant.LoyaltyRewardDescription);
+            tenant.LoyaltyRewardDescription,
+            tenant.RequireDepositAfterNoShows,
+            tenant.NoShowThresholdForDeposit);
 
         return Result.Success(profile);
     }

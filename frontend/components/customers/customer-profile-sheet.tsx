@@ -3,7 +3,7 @@
 import * as React from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { CalendarDays, Gift, Mail, MessageCircle, Scissors, User, Wallet } from "lucide-react";
+import { AlertTriangle, CalendarDays, Gift, Mail, MessageCircle, Scissors, User, Wallet } from "lucide-react";
 
 import {
   getCustomerById,
@@ -212,6 +212,18 @@ function CustomerProfileContent({
               Profissional preferido: <span className="font-medium text-foreground">{history.favoriteProfessionalName}</span>
             </div>
           ) : null}
+        </div>
+      ) : null}
+
+      {tenantProfileQuery.data?.requireDepositAfterNoShows &&
+      history &&
+      history.noShowCount >= tenantProfileQuery.data.noShowThresholdForDeposit ? (
+        <div className="flex items-start gap-2 rounded-lg border border-warning/30 bg-warning/10 p-3 text-sm text-warning">
+          <AlertTriangle className="mt-0.5 size-4 shrink-0" />
+          <p>
+            Este cliente já faltou {history.noShowCount}{" "}
+            {history.noShowCount === 1 ? "vez" : "vezes"}. Considere exigir sinal para o próximo agendamento.
+          </p>
         </div>
       ) : null}
 

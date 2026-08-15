@@ -238,6 +238,12 @@ namespace Agendio.Modules.Tenancy.Infrastructure.Persistence.Migrations
                         .HasColumnType("character varying(200)")
                         .HasColumnName("name");
 
+                    b.Property<int>("NoShowThresholdForDeposit")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasDefaultValue(2)
+                        .HasColumnName("no_show_threshold_for_deposit");
+
                     b.Property<string>("Phone")
                         .HasMaxLength(20)
                         .HasColumnType("character varying(20)")
@@ -265,6 +271,12 @@ namespace Agendio.Modules.Tenancy.Infrastructure.Persistence.Migrations
                         .HasColumnType("boolean")
                         .HasDefaultValue(true)
                         .HasColumnName("reminder2h_enabled");
+
+                    b.Property<bool>("RequireDepositAfterNoShows")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(false)
+                        .HasColumnName("require_deposit_after_no_shows");
 
                     b.Property<string>("SecondaryColorHex")
                         .HasMaxLength(7)

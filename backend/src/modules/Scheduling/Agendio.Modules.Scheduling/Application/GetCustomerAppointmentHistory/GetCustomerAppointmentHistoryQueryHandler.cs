@@ -72,8 +72,10 @@ public sealed class GetCustomerAppointmentHistoryQueryHandler(
             .Select(group => resourceNames[group.Key])
             .FirstOrDefault();
 
+        var noShowCount = appointments.Count(a => a.Status == AppointmentStatus.NoShow);
+
         return Result.Success(new CustomerAppointmentHistory(
             items, totalVisits, totalSpent, totalSpentCurrency, lastVisitAtUtc, nextAppointmentAtUtc,
-            favoriteServiceName, favoriteProfessionalName));
+            favoriteServiceName, favoriteProfessionalName, noShowCount));
     }
 }
