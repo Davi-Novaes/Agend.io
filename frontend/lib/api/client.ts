@@ -1296,6 +1296,20 @@ export function deactivateCommissionRule(resourceId: string, accessToken: string
   return request(`/api/financeiro/comissoes/${resourceId}`, { method: "DELETE" }, accessToken);
 }
 
+export type CommissionReportEntry = {
+  resourceId: string;
+  resourceName: string;
+  pendingAmount: number;
+  paidAmount: number;
+  totalAmount: number;
+  currency: string;
+};
+
+export function getCommissionReport(params: { from: string; to: string }, accessToken: string): Promise<CommissionReportEntry[]> {
+  const query = new URLSearchParams({ from: params.from, to: params.to });
+  return request(`/api/financeiro/comissoes/relatorio?${query.toString()}`, {}, accessToken);
+}
+
 export type CashFlowMonthPoint = {
   month: string;
   received: number;

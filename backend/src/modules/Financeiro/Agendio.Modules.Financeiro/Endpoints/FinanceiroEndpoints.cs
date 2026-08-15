@@ -3,6 +3,7 @@ using Agendio.Modules.Financeiro.Application.CancelAccountPayable;
 using Agendio.Modules.Financeiro.Application.CreateAccountPayable;
 using Agendio.Modules.Financeiro.Application.DeactivateCommissionRule;
 using Agendio.Modules.Financeiro.Application.GetCashFlowSummary;
+using Agendio.Modules.Financeiro.Application.GetCommissionReport;
 using Agendio.Modules.Financeiro.Application.ListAccountsPayable;
 using Agendio.Modules.Financeiro.Application.ListAccountsReceivable;
 using Agendio.Modules.Financeiro.Application.ListCommissionRules;
@@ -112,6 +113,14 @@ public sealed class FinanceiroEndpoints : IEndpointModule
         .RequireAuthorization(policy => policy.RequireRole("Owner"))
         .WithName("DeactivateCommissionRule")
         .WithSummary("Remove a comissao configurada de um profissional.");
+
+        group.MapGet("/comissoes/relatorio", async (DateOnly from, DateOnly to, IDispatcher dispatcher, CancellationToken cancellationToken) =>
+        {
+            var result = await dispatcher.Query(new GetCommissionReportQuery(from, to), cancellationToken);
+            return result.IsSuccess ? Results.Ok(result.Value) : result.Error.ToProblemResult();
+        })
+        .WithName("GetCommissionReport")
+        .WithSummary("Total de comissao (pendente e paga) por profissional, num periodo.");
 
         group.MapGet("/fluxo-de-caixa", async (DateOnly from, DateOnly to, IDispatcher dispatcher, CancellationToken cancellationToken) =>
         {

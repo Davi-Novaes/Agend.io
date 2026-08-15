@@ -4,7 +4,7 @@ import * as React from "react";
 import Link from "next/link";
 import { useQuery } from "@tanstack/react-query";
 
-import { getCashFlowSummary, getAppointmentStats, getInventorySummary, getReviewsSummary } from "@/lib/api/client";
+import { getCashFlowSummary, getAppointmentStats, getCommissionReport, getInventorySummary, getReviewsSummary } from "@/lib/api/client";
 import { useSession } from "@/lib/auth/session-context";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -40,6 +40,7 @@ export default function RelatoriosPage() {
 
       <div className="flex flex-col gap-10">
         <FinanceiroSection from={from} to={to} accessToken={session.accessToken} />
+        <ComissoesSection from={from} to={to} accessToken={session.accessToken} />
         <AgendaSection from={from} to={to} accessToken={session.accessToken} />
         <AvaliacoesSection from={from} to={to} accessToken={session.accessToken} />
         <EstoqueSection accessToken={session.accessToken} />
@@ -97,6 +98,39 @@ function FinanceiroSection({ from, to, accessToken }: { from: string; to: string
         />
       </div>
       {summary && <CashFlowChart seriesByMonth={summary.seriesByMonth} categoryBreakdown={summary.categoryBreakdown} />}
+    </section>
+  );
+}
+
+function ComissoesSection({ from, to, accessToken }: { from: string; to: string; accessToken: string }) {
+  const query = useQuery({
+    queryKey: ["relatorios", "comissoes", from, to],
+    queryFn: () => getCommissionReport({ from, to }, accessToken),
+  });
+  const entries = query.data;
+
+  const pendingTotal = entries?.reduce((sum, entry) => sum + entry.pendingAmount, 0) ?? 0;
+  const paidTotal = entries?.reduce((sum, entry) => sum + entry.paidAmount, 0) ?? 0;
+  const grandTotal = pendingTotal + paidTotal;
+
+  return (
+    <section className="flex flex-col gap-4">
+      <SectionHeading title="Comissoes" description="Comissao por profissional no periodo, pendente e paga." />
+      <div className="grid gap-4 sm:grid-cols-3">
+        <KpiCard label="Total no periodo" value={entries ? formatCurrency(grandTotal) : "—"} isLoading={query.isLoading} />
+        <KpiCard label="Pendente" value={entries ? formatCurrency(pendingTotal) : "—"} isLoading={query.isLoading} />
+        <KpiCard label="Paga" value={entries ? formatCurrency(paidTotal) : "—"} isLoading={query.isLoading} />
+      </div>
+      {entries && (
+        <CategoryBreakdownChart
+          id="commission-by-professional"
+          title="Comissao por profissional"
+          subtitle="Total (pendente + paga) no periodo"
+          emptyMessage="Nenhuma comissao no periodo."
+          categoryLabel="Profissional"
+          data={entries.map((entry) => ({ category: entry.resourceName, total: entry.totalAmount }))}
+        />
+      )}
     </section>
   );
 }
