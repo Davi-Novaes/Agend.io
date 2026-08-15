@@ -22,6 +22,8 @@ public sealed class CampaignConfiguration : IEntityTypeConfiguration<Campaign>
 
         builder.Property(c => c.Subject).IsRequired().HasMaxLength(200);
         builder.Property(c => c.Body).IsRequired().HasMaxLength(10000);
+        builder.Property(c => c.Channel).HasConversion<string>().HasMaxLength(20).IsRequired().HasDefaultValue(CampaignChannel.Email);
+        builder.Property(c => c.TargetSegment).HasMaxLength(20);
         builder.Property(c => c.RecipientCount).IsRequired();
         builder.Property(c => c.SentAtUtc).IsRequired();
 

@@ -106,6 +106,96 @@ public class MarketingTests(IntegrationTestFixture fixture)
     }
 
     [Fact]
+    public async Task Sending_A_Campaign_By_Segment_Should_Only_Count_Customers_In_That_Segment()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var client = fixture.CreateClient();
+        var accessToken = await CreateTenantWithOwnerAndLoginAsync(client, cancellationToken);
+
+        // Cliente recem-criado, sem nenhuma visita concluida, e sempre "Novo"
+        // (CustomerSegmentCalculator) — nao precisa de agendamento pra testar
+        // o filtro de segmento.
+        await CreateCustomerAsync(client, accessToken, "Cliente Novo 1", $"novo1-{Guid.NewGuid():N}@example.com", cancellationToken);
+        await CreateCustomerAsync(client, accessToken, "Cliente Novo 2", $"novo2-{Guid.NewGuid():N}@example.com", cancellationToken);
+
+        var novoResponse = await AuthorizedRequestHelpers.PostAuthorizedAsync(
+            client, accessToken, "/api/marketing/campanhas",
+            new { subject = "Bem-vindo", body = "Ola!", channel = "Email", targetSegment = "Novo" }, cancellationToken);
+        novoResponse.StatusCode.ShouldBe(HttpStatusCode.Created);
+        var novoBody = await novoResponse.Content.ReadFromJsonAsync<JsonElement>(cancellationToken);
+        novoBody.GetProperty("recipientCount").GetInt32().ShouldBe(2);
+
+        // Nenhum cliente tem visita concluida ainda — ninguem cai em VIP.
+        var vipResponse = await AuthorizedRequestHelpers.PostAuthorizedAsync(
+            client, accessToken, "/api/marketing/campanhas",
+            new { subject = "Oferta VIP", body = "Ola!", channel = "Email", targetSegment = "Vip" }, cancellationToken);
+        vipResponse.StatusCode.ShouldBe(HttpStatusCode.Created);
+        var vipBody = await vipResponse.Content.ReadFromJsonAsync<JsonElement>(cancellationToken);
+        vipBody.GetProperty("recipientCount").GetInt32().ShouldBe(0);
+    }
+
+    [Fact]
+    public async Task Sending_A_WhatsApp_Campaign_Without_Tenant_Configuration_Should_Be_Rejected()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var client = fixture.CreateClient();
+        var accessToken = await CreateTenantWithOwnerAndLoginAsync(client, cancellationToken);
+
+        await CreateCustomerAsync(client, accessToken, "Cliente", $"cliente-{Guid.NewGuid():N}@example.com", cancellationToken);
+
+        var response = await AuthorizedRequestHelpers.PostAuthorizedAsync(
+            client, accessToken, "/api/marketing/campanhas",
+            new { subject = "Promocao", body = "Corpo", channel = "WhatsApp", targetSegment = (string?)null }, cancellationToken);
+        response.StatusCode.ShouldBe(HttpStatusCode.BadRequest);
+
+        var listResponse = await AuthorizedRequestHelpers.GetAuthorizedAsync(client, accessToken, "/api/marketing/campanhas", cancellationToken);
+        var listBody = await listResponse.Content.ReadFromJsonAsync<JsonElement>(cancellationToken);
+        listBody.GetProperty("totalCount").GetInt32().ShouldBe(0);
+    }
+
+    [Fact]
+    public async Task Sending_A_WhatsApp_Campaign_Should_Only_Count_Customers_With_Phone()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var client = fixture.CreateClient();
+        var accessToken = await CreateTenantWithOwnerAndLoginAsync(client, cancellationToken);
+
+        (await AuthorizedRequestHelpers.PutAuthorizedAsync(
+            client, accessToken, "/api/tenants/whatsapp-settings",
+            new
+            {
+                enabled = true,
+                phoneNumberId = "1234567890",
+                accessToken = "meta-cloud-api-secret-token",
+                scheduledTemplate = (string?)null,
+                reminderTemplate = (string?)null,
+                cancelledTemplate = (string?)null,
+                rescheduledTemplate = (string?)null,
+                confirmedTemplate = (string?)null,
+                completedTemplate = (string?)null,
+            },
+            cancellationToken))
+            .StatusCode.ShouldBe(HttpStatusCode.NoContent);
+
+        // Com telefone — conta.
+        await CreateCustomerWithPhoneAsync(client, accessToken, "Cliente Com Telefone", "11999998888", cancellationToken);
+        // Sem telefone — nao conta (canal WhatsApp exige contato por telefone).
+        await CreateCustomerAsync(client, accessToken, "Cliente Sem Telefone", $"semtel-{Guid.NewGuid():N}@example.com", cancellationToken);
+
+        var response = await AuthorizedRequestHelpers.PostAuthorizedAsync(
+            client, accessToken, "/api/marketing/campanhas",
+            new { subject = "Promocao", body = "Corpo", channel = "WhatsApp", targetSegment = (string?)null }, cancellationToken);
+        response.StatusCode.ShouldBe(HttpStatusCode.Created);
+
+        var body = await response.Content.ReadFromJsonAsync<JsonElement>(cancellationToken);
+        body.GetProperty("recipientCount").GetInt32().ShouldBe(1);
+
+        var listResponse = await AuthorizedRequestHelpers.GetAuthorizedAsync(client, accessToken, "/api/marketing/campanhas", cancellationToken);
+        var listBody = await listResponse.Content.ReadFromJsonAsync<JsonElement>(cancellationToken);
+        listBody.GetProperty("items")[0].GetProperty("channel").GetString().ShouldBe("WhatsApp");
+    }
+
+    [Fact]
     public async Task Campaigns_Are_Isolated_Between_Tenants()
     {
         var cancellationToken = TestContext.Current.CancellationToken;
@@ -146,6 +236,16 @@ public class MarketingTests(IntegrationTestFixture fixture)
     {
         var response = await AuthorizedRequestHelpers.PostAuthorizedAsync(
             client, accessToken, "/api/customers", new { fullName, email }, cancellationToken);
+        response.StatusCode.ShouldBe(HttpStatusCode.Created);
+        var body = await response.Content.ReadFromJsonAsync<JsonElement>(cancellationToken);
+        return body.GetProperty("id").GetGuid();
+    }
+
+    private static async Task<Guid> CreateCustomerWithPhoneAsync(
+        HttpClient client, string accessToken, string fullName, string phone, CancellationToken cancellationToken)
+    {
+        var response = await AuthorizedRequestHelpers.PostAuthorizedAsync(
+            client, accessToken, "/api/customers", new { fullName, phone }, cancellationToken);
         response.StatusCode.ShouldBe(HttpStatusCode.Created);
         var body = await response.Content.ReadFromJsonAsync<JsonElement>(cancellationToken);
         return body.GetProperty("id").GetGuid();

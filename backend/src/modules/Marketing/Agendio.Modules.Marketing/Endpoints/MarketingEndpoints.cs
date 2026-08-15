@@ -1,6 +1,8 @@
 using Agendio.Infrastructure.Endpoints;
+using Agendio.Modules.Customers.Contracts;
 using Agendio.Modules.Marketing.Application.ListCampaigns;
 using Agendio.Modules.Marketing.Application.SendCampaign;
+using Agendio.Modules.Marketing.Domain;
 using Agendio.SharedKernel.Messaging;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
@@ -16,7 +18,7 @@ public sealed class MarketingEndpoints : IEndpointModule
 
         group.MapPost("/campanhas", async (SendCampaignRequest request, IDispatcher dispatcher, CancellationToken cancellationToken) =>
         {
-            var command = new SendCampaignCommand(request.Subject, request.Body);
+            var command = new SendCampaignCommand(request.Subject, request.Body, request.Channel, request.TargetSegment);
             var result = await dispatcher.Send(command, cancellationToken);
 
             return result.IsSuccess
@@ -24,7 +26,7 @@ public sealed class MarketingEndpoints : IEndpointModule
                 : result.Error.ToProblemResult();
         })
         .WithName("SendCampaign")
-        .WithSummary("Envia uma campanha de e-mail para todos os clientes ativos com e-mail cadastrado.");
+        .WithSummary("Envia uma campanha (e-mail ou WhatsApp) para os clientes ativos do publico-alvo selecionado.");
 
         group.MapGet("/campanhas", async (IDispatcher dispatcher, CancellationToken cancellationToken, int page = 1, int pageSize = 20) =>
         {
@@ -35,5 +37,5 @@ public sealed class MarketingEndpoints : IEndpointModule
         .WithSummary("Historico de campanhas enviadas.");
     }
 
-    private sealed record SendCampaignRequest(string Subject, string Body);
+    private sealed record SendCampaignRequest(string Subject, string Body, CampaignChannel Channel, CustomerSegment? TargetSegment);
 }

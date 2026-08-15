@@ -1,4 +1,5 @@
 using Agendio.Modules.Customers.Application.ListCustomers;
+using Agendio.Modules.Customers.Contracts;
 using Agendio.Modules.Scheduling.Contracts;
 
 namespace Agendio.UnitTests.Customers;

@@ -1,4 +1,5 @@
 using Agendio.Infrastructure.Persistence;
+using Agendio.Modules.Customers.Contracts;
 using Agendio.Modules.Customers.Infrastructure.Persistence;
 using Agendio.Modules.Scheduling.Contracts;
 using Agendio.SharedKernel.Messaging;
