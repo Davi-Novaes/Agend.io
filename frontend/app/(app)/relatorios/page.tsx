@@ -75,15 +75,26 @@ function FinanceiroSection({ from, to, accessToken }: { from: string; to: string
     queryKey: ["relatorios", "financeiro", from, to],
     queryFn: () => getCashFlowSummary({ from, to }, accessToken),
   });
+  const statsQuery = useQuery({
+    queryKey: ["relatorios", "agenda", from, to],
+    queryFn: () => getAppointmentStats({ from, to }, accessToken),
+  });
   const summary = query.data;
+  const stats = statsQuery.data;
+  const averageTicket = summary && stats && stats.completedCount > 0 ? summary.totalReceived / stats.completedCount : 0;
 
   return (
     <section className="flex flex-col gap-4">
       <SectionHeading title="Financeiro" description="Entradas, saidas e saldo no periodo selecionado." />
-      <div className="grid gap-4 sm:grid-cols-3">
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <KpiCard label="Entradas" value={summary ? formatCurrency(summary.totalReceived) : "—"} isLoading={query.isLoading} />
         <KpiCard label="Saidas" value={summary ? formatCurrency(summary.totalPaid) : "—"} isLoading={query.isLoading} />
-        <KpiCard label="Saldo" value={summary ? formatCurrency(summary.netBalance) : "—"} isLoading={query.isLoading} />
+        <KpiCard label="Lucro estimado" value={summary ? formatCurrency(summary.netBalance) : "—"} isLoading={query.isLoading} />
+        <KpiCard
+          label="Ticket medio"
+          value={summary && stats ? formatCurrency(averageTicket) : "—"}
+          isLoading={query.isLoading || statsQuery.isLoading}
+        />
       </div>
       {summary && <CashFlowChart seriesByMonth={summary.seriesByMonth} categoryBreakdown={summary.categoryBreakdown} />}
     </section>

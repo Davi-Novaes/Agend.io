@@ -6,6 +6,15 @@ export function startOfMonth(date: Date): Date {
   return new Date(date.getFullYear(), date.getMonth(), 1);
 }
 
+/** Segunda-feira da semana de `date` — convencao de semana comercial usada nos filtros de periodo. */
+export function startOfWeek(date: Date): Date {
+  const dayOfWeek = date.getDay();
+  const diffToMonday = dayOfWeek === 0 ? -6 : 1 - dayOfWeek;
+  const monday = new Date(date);
+  monday.setDate(date.getDate() + diffToMonday);
+  return monday;
+}
+
 export function daysAgo(days: number): Date {
   const date = new Date();
   date.setDate(date.getDate() - days);
