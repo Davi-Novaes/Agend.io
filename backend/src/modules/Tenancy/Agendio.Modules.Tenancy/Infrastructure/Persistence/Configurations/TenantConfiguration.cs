@@ -110,6 +110,13 @@ public sealed class TenantConfiguration : IEntityTypeConfiguration<Tenant>
         builder.Property(t => t.RequireDepositAfterNoShows).IsRequired().HasDefaultValue(false);
         builder.Property(t => t.NoShowThresholdForDeposit).IsRequired().HasDefaultValue(2);
 
+        builder.Property(t => t.PaymentRequirement)
+            .HasConversion<string>()
+            .HasMaxLength(20)
+            .IsRequired()
+            .HasDefaultValue(PaymentRequirement.None);
+        builder.Property(t => t.DepositPercentage).IsRequired().HasDefaultValue(30);
+
         // Colecao de Value Objects sem identidade propria — tabela filha, FK
         // sombra gerada pelo EF, sem repositorio separado (mesmo padrao de
         // Resource.WorkingHours no modulo Resources).

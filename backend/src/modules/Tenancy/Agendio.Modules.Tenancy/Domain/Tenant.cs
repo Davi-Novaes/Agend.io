@@ -152,6 +152,17 @@ public sealed class Tenant : AggregateRoot<TenantId>, IAuditable, ISoftDeletable
     /// <summary>Quantidade de faltas (no-show) a partir da qual o aviso de sinal aparece.</summary>
     public int NoShowThresholdForDeposit { get; private set; } = 2;
 
+    /// <summary>
+    /// Desligado por padrao (Fase 16) — agendamento publico funciona sem cobranca
+    /// nenhuma ate o dono optar por exigir sinal. Quando "Deposit", o cliente
+    /// precisa pagar DepositPercentage% do valor do servico (via Asaas/PIX) para
+    /// o agendamento ser criado.
+    /// </summary>
+    public PaymentRequirement PaymentRequirement { get; private set; } = PaymentRequirement.None;
+
+    /// <summary>Percentual do preco do servico cobrado como sinal quando PaymentRequirement e Deposit. 100 = cobranca integral.</summary>
+    public int DepositPercentage { get; private set; } = 30;
+
     public DateTimeOffset CreatedAtUtc { get; set; }
 
     public string? CreatedBy { get; set; }
@@ -458,6 +469,19 @@ public sealed class Tenant : AggregateRoot<TenantId>, IAuditable, ISoftDeletable
 
         RequireDepositAfterNoShows = requireDepositAfterNoShows;
         NoShowThresholdForDeposit = noShowThresholdForDeposit;
+
+        return Result.Success();
+    }
+
+    public Result UpdatePaymentSettings(PaymentRequirement paymentRequirement, int depositPercentage)
+    {
+        if (paymentRequirement == PaymentRequirement.Deposit && (depositPercentage < 1 || depositPercentage > 100))
+        {
+            return Result.Failure(Error.Validation("Tenant.InvalidDepositPercentage", "O percentual do sinal deve estar entre 1 e 100."));
+        }
+
+        PaymentRequirement = paymentRequirement;
+        DepositPercentage = depositPercentage;
 
         return Result.Success();
     }

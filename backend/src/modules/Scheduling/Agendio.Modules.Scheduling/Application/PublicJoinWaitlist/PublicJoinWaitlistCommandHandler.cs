@@ -54,7 +54,7 @@ public sealed class PublicJoinWaitlistCommandHandler(
         }
 
         var customerResult = await customerRegistration.FindOrRegisterByEmailAsync(
-            request.CustomerFullName, request.CustomerEmail, request.CustomerPhone, cancellationToken);
+            request.CustomerFullName, request.CustomerEmail, request.CustomerPhone, cancellationToken: cancellationToken);
         if (customerResult.IsFailure)
         {
             return Result.Failure<Guid>(customerResult.Error);

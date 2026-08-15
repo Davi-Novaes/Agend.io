@@ -51,4 +51,6 @@ public sealed record TenantProfile(
     int LoyaltyVisitsForReward,
     string LoyaltyRewardDescription,
     bool RequireDepositAfterNoShows,
-    int NoShowThresholdForDeposit);
+    int NoShowThresholdForDeposit,
+    bool PaymentRequired,
+    int DepositPercentage);

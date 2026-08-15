@@ -12,4 +12,10 @@ public sealed record PublicScheduleAppointmentCommand(
     string CustomerFullName,
     string CustomerEmail,
     string? CustomerPhone,
-    string? Notes) : ICommand<Guid>, IHasExplicitTenant;
+    string? Notes,
+    // So obrigatorio quando o tenant exige sinal (Fase 16) — validado no handler,
+    // nao no validator, porque depende de config do tenant carregada em runtime.
+    string? CustomerCpf = null) : ICommand<PublicScheduleAppointmentResult>, IHasExplicitTenant;
+
+/// <summary>PaymentUrl vem preenchido so quando o tenant exige sinal E a cobranca foi gerada com sucesso.</summary>
+public sealed record PublicScheduleAppointmentResult(Guid AppointmentId, string? PaymentUrl);

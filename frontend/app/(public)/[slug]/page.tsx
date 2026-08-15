@@ -358,7 +358,12 @@ export default async function TenantPortalPage({ params, searchParams }: PagePro
             </div>
             <Card className="mx-auto w-full max-w-lg">
               <CardContent>
-                <BookingFlow tenantId={tenant.id} buttonRadiusClassName={buttonRadiusClassName} />
+                <BookingFlow
+                  tenantId={tenant.id}
+                  buttonRadiusClassName={buttonRadiusClassName}
+                  paymentRequired={tenant.paymentRequired}
+                  depositPercentage={tenant.depositPercentage}
+                />
               </CardContent>
             </Card>
           </section>

@@ -75,6 +75,8 @@ export type TenantPublicProfile = {
   showHoursSection: boolean;
   showContactSection: boolean;
   businessHours: WorkingHourEntry[];
+  paymentRequired: boolean;
+  depositPercentage: number;
 };
 
 /** Resolve um logoUrl relativo (ex.: "/uploads/tenant-logos/x.png") para a origem da API. */
@@ -291,6 +293,8 @@ export type TenantProfile = {
   loyaltyRewardDescription: string;
   requireDepositAfterNoShows: boolean;
   noShowThresholdForDeposit: number;
+  paymentRequired: boolean;
+  depositPercentage: number;
 };
 
 export type ClosedDate = {
@@ -376,6 +380,15 @@ export type UpdateTenantNoShowPolicyInput = {
 
 export function updateTenantNoShowPolicy(input: UpdateTenantNoShowPolicyInput, accessToken: string): Promise<void> {
   return request("/api/tenants/no-show-policy", { method: "PUT", body: JSON.stringify(input) }, accessToken);
+}
+
+export type UpdateTenantPaymentSettingsInput = {
+  paymentRequired: boolean;
+  depositPercentage: number;
+};
+
+export function updateTenantPaymentSettings(input: UpdateTenantPaymentSettingsInput, accessToken: string): Promise<void> {
+  return request("/api/tenants/payment-settings", { method: "PUT", body: JSON.stringify(input) }, accessToken);
 }
 
 export function redeemCustomerLoyaltyReward(customerId: string, accessToken: string): Promise<void> {
@@ -972,6 +985,18 @@ export type AppointmentChangeLogItem = {
   occurredAtUtc: string;
 };
 
+export type AppointmentDepositSummary = {
+  amount: number;
+  currency: string;
+  status: "Pending" | "Paid" | "Failed";
+  invoiceUrl: string | null;
+  paidAtUtc: string | null;
+};
+
+export function getAppointmentDeposit(appointmentId: string, accessToken: string): Promise<AppointmentDepositSummary | null> {
+  return request(`/api/appointments/${appointmentId}/deposit`, {}, accessToken);
+}
+
 export function listAppointmentChangeLog(
   params: { appointmentId?: string; customerId?: string; page?: number; pageSize?: number },
   accessToken: string
@@ -1020,6 +1045,8 @@ export type PublicScheduleAppointmentInput = {
   customerEmail: string;
   customerPhone?: string | null;
   notes?: string | null;
+  // So obrigatorio quando o tenant exige sinal (TenantPublicProfile.paymentRequired) — a API valida.
+  customerCpf?: string | null;
 };
 
 export function publicListServices(tenantId: string): Promise<PublicServiceSummary[]> {
@@ -1038,7 +1065,10 @@ export function getAvailableSlots(
   return request(`/api/public/tenants/${tenantId}/availability?${query.toString()}`);
 }
 
-export function publicScheduleAppointment(tenantId: string, input: PublicScheduleAppointmentInput): Promise<{ id: string }> {
+export function publicScheduleAppointment(
+  tenantId: string,
+  input: PublicScheduleAppointmentInput
+): Promise<{ id: string; paymentUrl: string | null }> {
   return request(`/api/public/tenants/${tenantId}/appointments`, { method: "POST", body: JSON.stringify(input) });
 }
 

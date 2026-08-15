@@ -99,6 +99,19 @@ internal sealed class TenantLookupService(TenancyDbContext dbContext) : ITenantL
         return new TenantLoyaltySettings(tenant.LoyaltyProgramEnabled, tenant.LoyaltyVisitsForReward, tenant.LoyaltyRewardDescription);
     }
 
+    public async Task<TenantPaymentSettings?> GetPaymentSettingsAsync(TenantId tenantId, CancellationToken cancellationToken = default)
+    {
+        var tenant = await dbContext.Tenants.AsNoTracking()
+            .SingleOrDefaultAsync(t => t.Id == tenantId, cancellationToken);
+
+        if (tenant is null)
+        {
+            return null;
+        }
+
+        return new TenantPaymentSettings(tenant.PaymentRequirement == PaymentRequirement.Deposit, tenant.DepositPercentage);
+    }
+
     private static TenantLookupResult Map(Tenant tenant) =>
         new(tenant.Id, tenant.Name, tenant.Slug.Value, tenant.TimeZoneId, tenant.IsActive, tenant.PrimaryColorHex, tenant.LogoUrl);
 }

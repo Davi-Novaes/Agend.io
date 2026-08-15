@@ -18,6 +18,7 @@ import {
   Bell,
   Gift,
   Hourglass,
+  Banknote,
 } from "lucide-react";
 
 export type NavItem = {
@@ -53,6 +54,7 @@ export const NAV_GROUPS: NavGroup[] = [
     items: [
       { href: "/financeiro", label: "Financeiro", icon: Wallet },
       { href: "/estoque", label: "Estoque", icon: Package },
+      { href: "/settings/payments", label: "Pagamentos", icon: Banknote },
     ],
   },
   {

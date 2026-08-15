@@ -1,5 +1,6 @@
 using System.Globalization;
 using Agendio.Infrastructure.Multitenancy;
+using Agendio.Infrastructure.Payments;
 using Agendio.Infrastructure.Security;
 using Agendio.Modules.Billing.Infrastructure.Asaas;
 using Agendio.Modules.Billing.Infrastructure.Persistence;
@@ -236,6 +237,7 @@ public sealed class IntegrationTestFixture : WebApplicationFactory<Program>, IAs
         builder.UseSetting("Asaas:BaseUrl", "https://asaas.invalid/v3");
         builder.UseSetting("Asaas:ApiKey", "integration-test-fake-key");
         builder.UseSetting(AsaasWebhookSecretSettingKey, AsaasWebhookSecretForTests);
+        builder.UseSetting(AppointmentDepositWebhookSecretSettingKey, AppointmentDepositWebhookSecretForTests);
 
         // FakeAsaasClient no lugar do AsaasClient real: a Asaas e um servico
         // hospedado sem container local equivalente (ao contrario de
@@ -244,11 +246,18 @@ public sealed class IntegrationTestFixture : WebApplicationFactory<Program>, IAs
         // externa). O fluxo webhook-driven inteiro (assinar -> pagamento
         // pendente -> webhook confirma -> assinatura ativa) e testado igual,
         // so a chamada HTTP de saida e substituida por ids deterministicos.
-        builder.ConfigureTestServices(services => services.AddSingleton<IAsaasClient, FakeAsaasClient>());
+        builder.ConfigureTestServices(services =>
+        {
+            services.AddSingleton<IAsaasClient, FakeAsaasClient>();
+            services.AddSingleton<IPaymentChargeClient, FakePaymentChargeClient>();
+        });
     }
 
     public const string AsaasWebhookSecretSettingKey = "Asaas:WebhookSecret";
     public const string AsaasWebhookSecretForTests = "integration-test-webhook-secret";
+
+    public const string AppointmentDepositWebhookSecretSettingKey = "Asaas:AppointmentDepositWebhookSecret";
+    public const string AppointmentDepositWebhookSecretForTests = "integration-test-appointment-deposit-webhook-secret";
 
     private TenancyDbContext CreateTenancyDbContext()
     {

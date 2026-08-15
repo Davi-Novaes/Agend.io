@@ -19,6 +19,7 @@ import {
   cancelAppointment,
   rescheduleAppointment,
   listAppointmentChangeLog,
+  getAppointmentDeposit,
   listResources,
   listCustomers,
   listServices,
@@ -333,6 +334,12 @@ export default function AgendaPage() {
   const changeLogQuery = useQuery({
     queryKey: ["appointment-history", selectedAppointmentId],
     queryFn: () => listAppointmentChangeLog({ appointmentId: selectedAppointmentId!, pageSize: 10 }, accessToken),
+    enabled: Boolean(selectedAppointmentId),
+  });
+
+  const depositQuery = useQuery({
+    queryKey: ["appointment-deposit", selectedAppointmentId],
+    queryFn: () => getAppointmentDeposit(selectedAppointmentId!, accessToken),
     enabled: Boolean(selectedAppointmentId),
   });
 
@@ -919,6 +926,31 @@ export default function AgendaPage() {
                     </>
                   )}
                 </DialogFooter>
+              )}
+
+              {!reschedulingOpen && !cancelingOpen && depositQuery.data && (
+                <div className="flex flex-col gap-2 border-t pt-3">
+                  <h3 className="text-muted-foreground text-xs font-medium tracking-wide uppercase">Sinal</h3>
+                  <div className="flex items-center gap-2 text-xs">
+                    <Badge
+                      variant={
+                        depositQuery.data.status === "Paid" ? "success" : depositQuery.data.status === "Failed" ? "destructive" : "secondary"
+                      }
+                    >
+                      {depositQuery.data.status === "Paid" ? "Pago" : depositQuery.data.status === "Failed" ? "Falhou" : "Pendente"}
+                    </Badge>
+                    <span>
+                      {new Intl.NumberFormat("pt-BR", { style: "currency", currency: depositQuery.data.currency }).format(
+                        depositQuery.data.amount
+                      )}
+                    </span>
+                    {depositQuery.data.invoiceUrl && depositQuery.data.status === "Pending" && (
+                      <a href={depositQuery.data.invoiceUrl} target="_blank" rel="noopener noreferrer" className="text-primary underline">
+                        Ver link de pagamento
+                      </a>
+                    )}
+                  </div>
+                </div>
               )}
 
               {!reschedulingOpen && !cancelingOpen && (changeLogQuery.data?.items.length ?? 0) > 0 && (
