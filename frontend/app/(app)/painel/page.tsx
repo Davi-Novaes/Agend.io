@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import { useQuery } from "@tanstack/react-query";
-import { CalendarCheck, Receipt, Users, Wallet } from "lucide-react";
+import { ArrowDownCircle, CalendarCheck, PiggyBank, Receipt, Users, Wallet } from "lucide-react";
 
 import { getAppointmentStats, getCashFlowSummary, listCustomers } from "@/lib/api/client";
 import { useSession } from "@/lib/auth/session-context";
@@ -91,12 +91,24 @@ export default function DashboardPage() {
         <PeriodFilter from={from} to={to} onFromChange={setFrom} onToChange={setTo} />
       </div>
 
-      <div className="mb-8 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      <div className="mb-8 grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
         <MetricCard
           icon={Wallet}
           title="Faturamento"
           value={cashFlow ? formatCurrency(cashFlow.totalReceived) : "—"}
           delta={cashFlow && previousCashFlow ? percentDelta(cashFlow.totalReceived, previousCashFlow.totalReceived) : undefined}
+        />
+        <MetricCard
+          icon={ArrowDownCircle}
+          title="Despesas"
+          value={cashFlow ? formatCurrency(cashFlow.totalPaid) : "—"}
+          delta={cashFlow && previousCashFlow ? percentDelta(cashFlow.totalPaid, previousCashFlow.totalPaid) : undefined}
+        />
+        <MetricCard
+          icon={PiggyBank}
+          title="Lucro estimado"
+          value={cashFlow ? formatCurrency(cashFlow.netBalance) : "—"}
+          delta={cashFlow && previousCashFlow ? percentDelta(cashFlow.netBalance, previousCashFlow.netBalance) : undefined}
         />
         <MetricCard
           icon={CalendarCheck}
