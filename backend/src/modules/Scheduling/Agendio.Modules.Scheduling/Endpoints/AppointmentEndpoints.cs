@@ -1,7 +1,9 @@
 using Agendio.Infrastructure.Endpoints;
 using Agendio.Modules.Scheduling.Application.CancelAppointment;
+using Agendio.Modules.Scheduling.Application.CancelWaitlistEntry;
 using Agendio.Modules.Scheduling.Application.CompleteAppointment;
 using Agendio.Modules.Scheduling.Application.ConfirmAppointment;
+using Agendio.Modules.Scheduling.Application.ConvertWaitlistEntry;
 using Agendio.Modules.Scheduling.Application.GetAppointmentById;
 using Agendio.Modules.Scheduling.Application.GetAppointmentStats;
 using Agendio.Modules.Scheduling.Application.GetCustomerAppointmentHistory;
@@ -9,10 +11,12 @@ using Agendio.Modules.Scheduling.Application.GetCustomerRecoveryCandidates;
 using Agendio.Modules.Scheduling.Application.GetReviewsSummary;
 using Agendio.Modules.Scheduling.Application.ListAppointments;
 using Agendio.Modules.Scheduling.Application.ListNotificationLog;
+using Agendio.Modules.Scheduling.Application.ListWaitlist;
 using Agendio.Modules.Scheduling.Application.MarkAppointmentNoShow;
 using Agendio.Modules.Scheduling.Application.RescheduleAppointment;
 using Agendio.Modules.Scheduling.Application.ScheduleAppointment;
 using Agendio.Modules.Scheduling.Application.StartAppointment;
+using Agendio.Modules.Scheduling.Domain;
 using Agendio.SharedKernel.Messaging;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
@@ -141,6 +145,35 @@ public sealed class AppointmentEndpoints : IEndpointModule
         })
         .WithName("RescheduleAppointment")
         .WithSummary("Remarca um agendamento, preservando a duracao original. Rejeita com 409 se o novo horario ja estiver ocupado.");
+
+        var waitlistGroup = endpoints.MapGroup("/api/waitlist").WithTags("Scheduling").RequireAuthorization();
+
+        waitlistGroup.MapGet("/", async (
+            WaitlistStatus? status, Guid? serviceId, Guid? resourceId, IDispatcher dispatcher, CancellationToken cancellationToken, int page = 1, int pageSize = 20) =>
+        {
+            var result = await dispatcher.Query(new ListWaitlistQuery(page, pageSize, status, serviceId, resourceId), cancellationToken);
+            return result.IsSuccess ? Results.Ok(result.Value) : result.Error.ToProblemResult();
+        })
+        .WithName("ListWaitlist")
+        .WithSummary("Lista a fila de espera, paginada, opcionalmente filtrada por status/servico/profissional (Fase 13).");
+
+        waitlistGroup.MapPost("/{id:guid}/convert", async (Guid id, ConvertWaitlistEntryRequest request, IDispatcher dispatcher, CancellationToken cancellationToken) =>
+        {
+            var result = await dispatcher.Send(new ConvertWaitlistEntryCommand(id, request.ResourceId, request.StartAtUtc), cancellationToken);
+            return result.IsSuccess
+                ? Results.Created($"/api/appointments/{result.Value}", new { id = result.Value })
+                : result.Error.ToProblemResult();
+        })
+        .WithName("ConvertWaitlistEntry")
+        .WithSummary("A equipe confirma uma entrada da fila, criando o agendamento no horario escolhido (Fase 13).");
+
+        waitlistGroup.MapPost("/{id:guid}/cancel", async (Guid id, IDispatcher dispatcher, CancellationToken cancellationToken) =>
+        {
+            var result = await dispatcher.Send(new CancelWaitlistEntryCommand(id), cancellationToken);
+            return result.IsSuccess ? Results.NoContent() : result.Error.ToProblemResult();
+        })
+        .WithName("CancelWaitlistEntry")
+        .WithSummary("A equipe remove uma entrada da fila de espera (Fase 13).");
     }
 
     private sealed record ScheduleAppointmentRequest(Guid CustomerId, Guid ResourceId, Guid ServiceId, DateTimeOffset StartAtUtc, string? Notes);
@@ -148,4 +181,6 @@ public sealed class AppointmentEndpoints : IEndpointModule
     private sealed record CancelAppointmentRequest(bool ByStaff);
 
     private sealed record RescheduleAppointmentRequest(DateTimeOffset NewStartAtUtc);
+
+    private sealed record ConvertWaitlistEntryRequest(Guid ResourceId, DateTimeOffset StartAtUtc);
 }

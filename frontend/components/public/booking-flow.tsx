@@ -7,6 +7,7 @@ import {
   publicListResources,
   getAvailableSlots,
   publicScheduleAppointment,
+  joinWaitlist,
   ApiError,
   type PublicServiceSummary,
   type PublicResourceSummary,
@@ -62,6 +63,7 @@ export function BookingFlow({
   const [phone, setPhone] = React.useState("");
   const [notes, setNotes] = React.useState("");
   const [formError, setFormError] = React.useState<string | null>(null);
+  const [showWaitlistForm, setShowWaitlistForm] = React.useState(false);
 
   const servicesQuery = useQuery({
     queryKey: ["public-services", tenantId],
@@ -94,6 +96,22 @@ export function BookingFlow({
     onSuccess: () => setStep("confirmed"),
     onError: (error) => {
       setFormError(error instanceof ApiError ? error.message : "Nao foi possivel concluir o agendamento. Tente novamente.");
+    },
+  });
+
+  const waitlistMutation = useMutation({
+    mutationFn: () =>
+      joinWaitlist(tenantId, {
+        serviceId: selectedService!.id,
+        resourceId: selectedResource?.id ?? null,
+        preferredDate: selectedDate,
+        customerFullName: fullName.trim(),
+        customerEmail: email.trim(),
+        customerPhone: phone.trim() === "" ? null : phone.trim(),
+        notes: notes.trim() === "" ? null : notes.trim(),
+      }),
+    onError: (error) => {
+      setFormError(error instanceof ApiError ? error.message : "Nao foi possivel entrar na lista de espera. Tente novamente.");
     },
   });
 
@@ -226,29 +244,93 @@ export function BookingFlow({
             type="date"
             value={selectedDate}
             min={toDateInputValue(new Date())}
-            onChange={(event) => setSelectedDate(event.target.value)}
+            onChange={(event) => {
+              setSelectedDate(event.target.value);
+              setShowWaitlistForm(false);
+              waitlistMutation.reset();
+            }}
             className="mb-4 max-w-48"
           />
 
           {slotsQuery.isLoading && <p className="text-muted-foreground text-sm">Carregando horarios...</p>}
-          {slotsQuery.data?.length === 0 && (
-            <p className="text-muted-foreground text-sm">Nenhum horario disponivel nesta data. Tente outra data.</p>
+          {slotsQuery.data && slotsQuery.data.length > 0 && (
+            <div className="grid grid-cols-3 gap-2 sm:grid-cols-4">
+              {slotsQuery.data.map((slot) => (
+                <button
+                  key={slot.startUtc}
+                  type="button"
+                  onClick={() => selectSlot(slot)}
+                  className={cn(
+                    "hover:border-primary focus-visible:outline-primary rounded-lg border p-2 text-sm focus-visible:outline-2",
+                    buttonRadiusClassName
+                  )}
+                >
+                  {formatTime(slot.startUtc)}
+                </button>
+              ))}
+            </div>
           )}
-          <div className="grid grid-cols-3 gap-2 sm:grid-cols-4">
-            {(slotsQuery.data ?? []).map((slot) => (
-              <button
-                key={slot.startUtc}
-                type="button"
-                onClick={() => selectSlot(slot)}
-                className={cn(
-                  "hover:border-primary focus-visible:outline-primary rounded-lg border p-2 text-sm focus-visible:outline-2",
-                  buttonRadiusClassName
-                )}
-              >
-                {formatTime(slot.startUtc)}
-              </button>
-            ))}
-          </div>
+
+          {slotsQuery.data?.length === 0 && (
+            <div>
+              <p className="text-muted-foreground text-sm">Nenhum horario disponivel nesta data. Tente outra data.</p>
+
+              {waitlistMutation.isSuccess ? (
+                <p className="text-sm mt-3">Voce entrou na lista de espera! Avisaremos por e-mail se uma vaga abrir.</p>
+              ) : showWaitlistForm ? (
+                <form
+                  className="mt-3 flex flex-col gap-3"
+                  onSubmit={(event) => {
+                    event.preventDefault();
+                    setFormError(null);
+                    if (!fullName.trim() || !email.trim()) {
+                      setFormError("Preencha nome e e-mail para entrar na lista de espera.");
+                      return;
+                    }
+                    waitlistMutation.mutate();
+                  }}
+                >
+                  <div>
+                    <label htmlFor="waitlist-name" className="mb-1 block text-sm font-medium">
+                      Nome completo
+                    </label>
+                    <Input id="waitlist-name" value={fullName} onChange={(event) => setFullName(event.target.value)} required autoComplete="name" />
+                  </div>
+                  <div>
+                    <label htmlFor="waitlist-email" className="mb-1 block text-sm font-medium">
+                      E-mail
+                    </label>
+                    <Input
+                      id="waitlist-email"
+                      type="email"
+                      value={email}
+                      onChange={(event) => setEmail(event.target.value)}
+                      required
+                      autoComplete="email"
+                    />
+                  </div>
+                  <div>
+                    <label htmlFor="waitlist-phone" className="mb-1 block text-sm font-medium">
+                      Telefone (opcional)
+                    </label>
+                    <Input id="waitlist-phone" value={phone} onChange={(event) => setPhone(event.target.value)} autoComplete="tel" />
+                  </div>
+                  {formError && (
+                    <p role="alert" className="text-destructive text-sm">
+                      {formError}
+                    </p>
+                  )}
+                  <Button type="submit" className={buttonRadiusClassName} disabled={waitlistMutation.isPending}>
+                    {waitlistMutation.isPending ? "Enviando..." : "Entrar na lista de espera"}
+                  </Button>
+                </form>
+              ) : (
+                <Button type="button" variant="outline" className={cn("mt-3", buttonRadiusClassName)} onClick={() => setShowWaitlistForm(true)}>
+                  Entrar na lista de espera para este dia
+                </Button>
+              )}
+            </div>
+          )}
         </section>
       )}
 

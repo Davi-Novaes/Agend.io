@@ -1000,6 +1000,20 @@ export function publicScheduleAppointment(tenantId: string, input: PublicSchedul
   return request(`/api/public/tenants/${tenantId}/appointments`, { method: "POST", body: JSON.stringify(input) });
 }
 
+export type JoinWaitlistInput = {
+  serviceId: string;
+  resourceId?: string | null;
+  preferredDate: string;
+  customerFullName: string;
+  customerEmail: string;
+  customerPhone?: string | null;
+  notes?: string | null;
+};
+
+export function joinWaitlist(tenantId: string, input: JoinWaitlistInput): Promise<{ id: string }> {
+  return request(`/api/public/tenants/${tenantId}/waitlist`, { method: "POST", body: JSON.stringify(input) });
+}
+
 // ---------- Platform (Super Admin) ----------
 // Autoridade separada de qualquer tenant: token proprio, nunca reaproveita
 // AuthTokens/login/useSession do painel do estabelecimento.
@@ -1406,6 +1420,52 @@ export function submitReview(
     method: "POST",
     body: JSON.stringify(input),
   });
+}
+
+// ---------- Waitlist (fila de espera) ----------
+
+export type WaitlistStatus = "Waiting" | "Notified" | "Converted" | "Cancelled";
+
+export type WaitlistEntry = {
+  id: string;
+  customerId: string;
+  customerName: string;
+  customerEmail: string | null;
+  customerPhone: string | null;
+  resourceId: string | null;
+  resourceName: string | null;
+  serviceId: string;
+  serviceName: string;
+  preferredDate: string;
+  notes: string | null;
+  status: WaitlistStatus;
+  createdAtUtc: string;
+  notifiedAtUtc: string | null;
+};
+
+export function listWaitlist(
+  params: { status?: WaitlistStatus; serviceId?: string; resourceId?: string; page?: number; pageSize?: number },
+  accessToken: string
+): Promise<PagedResult<WaitlistEntry>> {
+  const query = new URLSearchParams();
+  if (params.status) query.set("status", params.status);
+  if (params.serviceId) query.set("serviceId", params.serviceId);
+  if (params.resourceId) query.set("resourceId", params.resourceId);
+  query.set("page", String(params.page ?? 1));
+  query.set("pageSize", String(params.pageSize ?? 20));
+  return request(`/api/waitlist?${query.toString()}`, {}, accessToken);
+}
+
+export function convertWaitlistEntry(
+  id: string,
+  input: { resourceId: string; startAtUtc: string },
+  accessToken: string
+): Promise<{ id: string }> {
+  return request(`/api/waitlist/${id}/convert`, { method: "POST", body: JSON.stringify(input) }, accessToken);
+}
+
+export function cancelWaitlistEntry(id: string, accessToken: string): Promise<void> {
+  return request(`/api/waitlist/${id}/cancel`, { method: "POST", body: JSON.stringify({}) }, accessToken);
 }
 
 export type StockValueByCurrency = { currency: string; total: number };
