@@ -25,6 +25,8 @@
     <ProjectReference Include="..\Agendio.Modules.Customers.Contracts\Agendio.Modules.Customers.Contracts.csproj" />
     <!-- Fase 9: auto-segmentacao le agregados de visitas via Scheduling.Contracts, nunca o modulo inteiro. -->
     <ProjectReference Include="..\..\Scheduling\Agendio.Modules.Scheduling.Contracts\Agendio.Modules.Scheduling.Contracts.csproj" />
+    <!-- Fase 11: programa de fidelidade le a configuracao (ligado/desligado, limiar) via Tenancy.Contracts. -->
+    <ProjectReference Include="..\..\Tenancy\Agendio.Modules.Tenancy.Contracts\Agendio.Modules.Tenancy.Contracts.csproj" />
   </ItemGroup>
 
 </Project>

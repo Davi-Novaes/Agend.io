@@ -21,7 +21,7 @@ public sealed class GetCustomerByIdQueryHandler(CustomersDbContext dbContext) : 
         var details = new CustomerDetails(
             customer.Id.Value, customer.FullName, customer.Email?.Value, customer.Phone?.Value,
             customer.Notes, customer.DateOfBirth, customer.CustomData, customer.IsActive, customer.CreatedAtUtc,
-            customer.Cpf, customer.HealthNotes);
+            customer.Cpf, customer.HealthNotes, customer.LoyaltyPoints);
 
         return Result.Success(details);
     }

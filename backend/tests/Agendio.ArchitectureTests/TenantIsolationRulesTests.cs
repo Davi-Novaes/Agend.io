@@ -55,7 +55,7 @@ public class TenantIsolationRulesTests
     }
 
     [Fact]
-    public void Customers_Module_Should_Have_Exactly_One_TenantOwned_Entity_With_A_Query_Filter()
+    public void Customers_Module_Should_Have_Exactly_Two_TenantOwned_Entities_All_With_A_Query_Filter()
     {
         using var dbContext = CreateCustomersDbContext();
 
@@ -63,7 +63,7 @@ public class TenantIsolationRulesTests
             .Where(entityType => typeof(ITenantOwned).IsAssignableFrom(entityType.ClrType))
             .ToList();
 
-        tenantOwnedEntityTypes.Select(e => e.ClrType).ShouldBe([typeof(Customer)]);
+        tenantOwnedEntityTypes.Select(e => e.ClrType).ShouldBe([typeof(Customer), typeof(LoyaltyPointsLedgerEntry)], ignoreOrder: true);
 
         foreach (var entityType in tenantOwnedEntityTypes)
         {

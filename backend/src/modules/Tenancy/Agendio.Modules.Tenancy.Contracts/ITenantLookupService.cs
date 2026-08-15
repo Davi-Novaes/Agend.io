@@ -21,4 +21,7 @@ public interface ITenantLookupService
 
     /// <summary>Quais lembretes automaticos estao ligados — usado pelo Scheduling antes de cada envio (Fase 7).</summary>
     Task<TenantNotificationSettings?> GetNotificationSettingsAsync(TenantId tenantId, CancellationToken cancellationToken = default);
+
+    /// <summary>Configuracao do programa de fidelidade — usado pelo Customers ao creditar/resgatar pontos (Fase 11).</summary>
+    Task<TenantLoyaltySettings?> GetLoyaltySettingsAsync(TenantId tenantId, CancellationToken cancellationToken = default);
 }

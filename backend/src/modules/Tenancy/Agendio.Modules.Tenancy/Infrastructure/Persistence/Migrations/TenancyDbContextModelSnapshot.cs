@@ -212,6 +212,26 @@ namespace Agendio.Modules.Tenancy.Infrastructure.Persistence.Migrations
                         .HasColumnType("character varying(500)")
                         .HasColumnName("logo_url");
 
+                    b.Property<bool>("LoyaltyProgramEnabled")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(true)
+                        .HasColumnName("loyalty_program_enabled");
+
+                    b.Property<string>("LoyaltyRewardDescription")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasDefaultValue("Um agradecimento especial")
+                        .HasColumnName("loyalty_reward_description");
+
+                    b.Property<int>("LoyaltyVisitsForReward")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasDefaultValue(10)
+                        .HasColumnName("loyalty_visits_for_reward");
+
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasMaxLength(200)

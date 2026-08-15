@@ -10,6 +10,7 @@ using Agendio.Modules.Tenancy.Application.SetUnitActiveStatus;
 using Agendio.Modules.Tenancy.Application.UpdateTenantBanner;
 using Agendio.Modules.Tenancy.Application.UpdateTenantBranding;
 using Agendio.Modules.Tenancy.Application.UpdateTenantLogo;
+using Agendio.Modules.Tenancy.Application.UpdateTenantLoyaltySettings;
 using Agendio.Modules.Tenancy.Application.UpdateTenantPageCustomization;
 using Agendio.Modules.Tenancy.Application.UpdateTenantProfile;
 using Agendio.Modules.Tenancy.Application.UpdateTenantReminderSettings;
@@ -186,6 +187,18 @@ public sealed class TenancyEndpoints : IEndpointModule
         .WithName("UpdateTenantReminderSettings")
         .WithSummary("Liga/desliga os lembretes automaticos (24h antes, 2h antes, pos-atendimento) do estabelecimento (Fase 7).");
 
+        group.MapPut("/loyalty-settings", async (UpdateLoyaltySettingsRequest request, IDispatcher dispatcher, CancellationToken cancellationToken) =>
+        {
+            var command = new UpdateTenantLoyaltySettingsCommand(
+                request.LoyaltyProgramEnabled, request.LoyaltyVisitsForReward, request.LoyaltyRewardDescription);
+            var result = await dispatcher.Send(command, cancellationToken);
+
+            return result.IsSuccess ? Results.NoContent() : result.Error.ToProblemResult();
+        })
+        .RequireAuthorization(policy => policy.RequireRole("Owner"))
+        .WithName("UpdateTenantLoyaltySettings")
+        .WithSummary("Configura o programa de fidelidade (ligado/desligado, visitas para a recompensa, descricao da recompensa) (Fase 11).");
+
         group.MapPut("/business-hours", async (SetBusinessHoursRequest request, IDispatcher dispatcher, CancellationToken cancellationToken) =>
         {
             var entries = request.Entries.Select(e => new BusinessHoursEntryDto(e.DayOfWeek, e.StartTime, e.EndTime)).ToList();
@@ -296,4 +309,6 @@ public sealed class TenancyEndpoints : IEndpointModule
         string? CompletedTemplate);
 
     private sealed record UpdateReminderSettingsRequest(bool Reminder24hEnabled, bool Reminder2hEnabled, bool PostServiceThankYouEnabled);
+
+    private sealed record UpdateLoyaltySettingsRequest(bool LoyaltyProgramEnabled, int LoyaltyVisitsForReward, string LoyaltyRewardDescription);
 }

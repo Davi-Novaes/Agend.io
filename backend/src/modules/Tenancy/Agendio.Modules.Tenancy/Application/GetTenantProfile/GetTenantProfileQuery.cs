@@ -46,4 +46,7 @@ public sealed record TenantProfile(
     string? WhatsAppCompletedTemplate,
     bool Reminder24hEnabled,
     bool Reminder2hEnabled,
-    bool PostServiceThankYouEnabled);
+    bool PostServiceThankYouEnabled,
+    bool LoyaltyProgramEnabled,
+    int LoyaltyVisitsForReward,
+    string LoyaltyRewardDescription);

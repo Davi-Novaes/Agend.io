@@ -5,6 +5,7 @@ using Agendio.Modules.Customers.Application.GetCustomerAuditLog;
 using Agendio.Modules.Customers.Application.GetCustomerById;
 using Agendio.Modules.Customers.Application.ImportCustomersFromCsv;
 using Agendio.Modules.Customers.Application.ListCustomers;
+using Agendio.Modules.Customers.Application.RedeemCustomerLoyaltyReward;
 using Agendio.Modules.Customers.Application.SendCustomerMessage;
 using Agendio.Modules.Customers.Application.UpdateCustomer;
 using Agendio.SharedKernel.Messaging;
@@ -89,6 +90,14 @@ public sealed class CustomerEndpoints : IEndpointModule
         })
         .WithName("SendCustomerMessage")
         .WithSummary("Envia uma mensagem avulsa por e-mail a um cliente especifico (Fase 10 — recuperacao de clientes).");
+
+        group.MapPost("/{id:guid}/redeem-loyalty-reward", async (Guid id, IDispatcher dispatcher, CancellationToken cancellationToken) =>
+        {
+            var result = await dispatcher.Send(new RedeemCustomerLoyaltyRewardCommand(id), cancellationToken);
+            return result.IsSuccess ? Results.NoContent() : result.Error.ToProblemResult();
+        })
+        .WithName("RedeemCustomerLoyaltyReward")
+        .WithSummary("Resgata a recompensa de fidelidade de um cliente, debitando os pontos necessarios (Fase 11).");
 
         group.MapPost("/import", async (IFormFile file, IDispatcher dispatcher, CancellationToken cancellationToken) =>
         {
