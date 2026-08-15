@@ -1,3 +1,4 @@
+using System.Linq;
 using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
@@ -189,6 +190,119 @@ public class FinanceiroTests(IntegrationTestFixture fixture)
         summary.GetProperty("totalReceived").GetDecimal().ShouldBe(45.90m);
         summary.GetProperty("totalPaid").GetDecimal().ShouldBe(30m);
         summary.GetProperty("netBalance").GetDecimal().ShouldBe(15.90m);
+    }
+
+    [Fact]
+    public async Task Commission_Report_Should_Aggregate_Pending_And_Paid_Amounts_By_Professional()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var client = fixture.CreateClient();
+        var accessToken = await CreateTenantWithOwnerAndLoginAsync(client, cancellationToken);
+        var tenantId = await GetTenantIdFromTokenAsync(client, accessToken, cancellationToken);
+
+        var (customerId, resourceAId, serviceId) = await CreateBookingPrerequisitesAsync(client, accessToken, cancellationToken);
+        (await AuthorizedRequestHelpers.PutAuthorizedAsync(
+            client, accessToken, $"/api/financeiro/comissoes/{resourceAId}", new { calculationType = "Percentage", value = 20m }, cancellationToken))
+            .StatusCode.ShouldBe(HttpStatusCode.NoContent);
+        var appointmentAId = await ScheduleConfirmStartCompleteAsync(client, accessToken, customerId, resourceAId, serviceId, cancellationToken);
+
+        var resourceBResponse = await AuthorizedRequestHelpers.PostAuthorizedAsync(
+            client, accessToken, "/api/resources", new { name = "Barbeiro 2", type = "Person", capacity = 1, description = (string?)null },
+            cancellationToken);
+        var resourceBId = (await resourceBResponse.Content.ReadFromJsonAsync<JsonElement>(cancellationToken)).GetProperty("id").GetGuid();
+        (await AuthorizedRequestHelpers.PutAuthorizedAsync(
+            client, accessToken, $"/api/financeiro/comissoes/{resourceBId}", new { calculationType = "Percentage", value = 10m }, cancellationToken))
+            .StatusCode.ShouldBe(HttpStatusCode.NoContent);
+        var appointmentBId = await ScheduleConfirmStartCompleteAsync(client, accessToken, customerId, resourceBId, serviceId, cancellationToken);
+
+        var payableA = await PollAsync(
+            tenantId, dbContext => dbContext.AccountsPayable.SingleOrDefaultAsync(a => a.SourceAppointmentId == appointmentAId, cancellationToken),
+            cancellationToken);
+        payableA.ShouldNotBeNull();
+        var payableB = await PollAsync(
+            tenantId, dbContext => dbContext.AccountsPayable.SingleOrDefaultAsync(a => a.SourceAppointmentId == appointmentBId, cancellationToken),
+            cancellationToken);
+        payableB.ShouldNotBeNull();
+
+        // A recebe pagamento confirmado, B fica pendente — o relatorio precisa
+        // refletir os dois estados separadamente, por profissional.
+        (await AuthorizedRequestHelpers.PatchAuthorizedAsync(
+            client, accessToken, $"/api/financeiro/contas-a-pagar/{payableA.Id.Value}/pagar", new { }, cancellationToken))
+            .StatusCode.ShouldBe(HttpStatusCode.NoContent);
+
+        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        var reportResponse = await AuthorizedRequestHelpers.GetAuthorizedAsync(
+            client, accessToken,
+            $"/api/financeiro/comissoes/relatorio?from={AuthorizedRequestHelpers.Iso(today.AddDays(-1))}&to={AuthorizedRequestHelpers.Iso(today.AddDays(1))}",
+            cancellationToken);
+        reportResponse.StatusCode.ShouldBe(HttpStatusCode.OK);
+
+        var entries = await reportResponse.Content.ReadFromJsonAsync<JsonElement>(cancellationToken);
+        entries.GetArrayLength().ShouldBe(2);
+
+        var entryA = entries.EnumerateArray().Single(e => e.GetProperty("resourceId").GetGuid() == resourceAId);
+        entryA.GetProperty("resourceName").GetString().ShouldBe("Barbeiro 1");
+        entryA.GetProperty("pendingAmount").GetDecimal().ShouldBe(0m);
+        entryA.GetProperty("paidAmount").GetDecimal().ShouldBe(9.18m); // 20% de 45.90
+        entryA.GetProperty("totalAmount").GetDecimal().ShouldBe(9.18m);
+
+        var entryB = entries.EnumerateArray().Single(e => e.GetProperty("resourceId").GetGuid() == resourceBId);
+        entryB.GetProperty("resourceName").GetString().ShouldBe("Barbeiro 2");
+        entryB.GetProperty("pendingAmount").GetDecimal().ShouldBe(4.59m); // 10% de 45.90
+        entryB.GetProperty("paidAmount").GetDecimal().ShouldBe(0m);
+        entryB.GetProperty("totalAmount").GetDecimal().ShouldBe(4.59m);
+    }
+
+    [Fact]
+    public async Task Commission_Report_For_A_Period_With_No_Commissions_Should_Return_An_Empty_List()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var client = fixture.CreateClient();
+        var accessToken = await CreateTenantWithOwnerAndLoginAsync(client, cancellationToken);
+
+        // Agendamento concluido sem CommissionRule configurada: gera receita,
+        // nunca comissao (ver teste analogo de fluxo de caixa acima).
+        await CreateAndCompleteAppointmentAsync(client, accessToken, cancellationToken);
+
+        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        var reportResponse = await AuthorizedRequestHelpers.GetAuthorizedAsync(
+            client, accessToken,
+            $"/api/financeiro/comissoes/relatorio?from={AuthorizedRequestHelpers.Iso(today.AddDays(-1))}&to={AuthorizedRequestHelpers.Iso(today.AddDays(1))}",
+            cancellationToken);
+        reportResponse.StatusCode.ShouldBe(HttpStatusCode.OK);
+
+        var entries = await reportResponse.Content.ReadFromJsonAsync<JsonElement>(cancellationToken);
+        entries.GetArrayLength().ShouldBe(0);
+    }
+
+    [Fact]
+    public async Task Commission_Report_Is_Isolated_Between_Tenants()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var client = fixture.CreateClient();
+
+        var tenantAToken = await CreateTenantWithOwnerAndLoginAsync(client, cancellationToken);
+        var tenantAId = await GetTenantIdFromTokenAsync(client, tenantAToken, cancellationToken);
+        var (customerId, resourceId, serviceId) = await CreateBookingPrerequisitesAsync(client, tenantAToken, cancellationToken);
+        (await AuthorizedRequestHelpers.PutAuthorizedAsync(
+            client, tenantAToken, $"/api/financeiro/comissoes/{resourceId}", new { calculationType = "Percentage", value = 20m }, cancellationToken))
+            .StatusCode.ShouldBe(HttpStatusCode.NoContent);
+        var appointmentId = await ScheduleConfirmStartCompleteAsync(client, tenantAToken, customerId, resourceId, serviceId, cancellationToken);
+        await PollAsync(
+            tenantAId, dbContext => dbContext.AccountsPayable.SingleOrDefaultAsync(a => a.SourceAppointmentId == appointmentId, cancellationToken),
+            cancellationToken);
+
+        var tenantBToken = await CreateTenantWithOwnerAndLoginAsync(client, cancellationToken);
+
+        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        var reportResponse = await AuthorizedRequestHelpers.GetAuthorizedAsync(
+            client, tenantBToken,
+            $"/api/financeiro/comissoes/relatorio?from={AuthorizedRequestHelpers.Iso(today.AddDays(-1))}&to={AuthorizedRequestHelpers.Iso(today.AddDays(1))}",
+            cancellationToken);
+        reportResponse.StatusCode.ShouldBe(HttpStatusCode.OK);
+
+        var entries = await reportResponse.Content.ReadFromJsonAsync<JsonElement>(cancellationToken);
+        entries.GetArrayLength().ShouldBe(0);
     }
 
     [Fact]
