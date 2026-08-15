@@ -2,7 +2,7 @@
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { daysAgo, startOfMonth, startOfWeek, toDateOnly } from "@/lib/date-utils";
+import { daysAgo, startOfMonth, startOfWeek, startOfYear, toDateOnly } from "@/lib/date-utils";
 
 export function PeriodFilter({
   from,
@@ -15,13 +15,15 @@ export function PeriodFilter({
   onFromChange: (value: string) => void;
   onToChange: (value: string) => void;
 }) {
-  function applyPreset(preset: "today" | "week" | "month" | "30" | "90") {
+  function applyPreset(preset: "today" | "week" | "month" | "year" | "30" | "90") {
     if (preset === "today") {
       onFromChange(toDateOnly(new Date()));
     } else if (preset === "week") {
       onFromChange(toDateOnly(startOfWeek(new Date())));
     } else if (preset === "month") {
       onFromChange(toDateOnly(startOfMonth(new Date())));
+    } else if (preset === "year") {
+      onFromChange(toDateOnly(startOfYear(new Date())));
     } else if (preset === "30") {
       onFromChange(toDateOnly(daysAgo(30)));
     } else {
@@ -41,6 +43,9 @@ export function PeriodFilter({
         </Button>
         <Button type="button" variant="outline" size="sm" onClick={() => applyPreset("month")}>
           Este mes
+        </Button>
+        <Button type="button" variant="outline" size="sm" onClick={() => applyPreset("year")}>
+          Este ano
         </Button>
         <Button type="button" variant="outline" size="sm" onClick={() => applyPreset("30")}>
           Ultimos 30 dias
