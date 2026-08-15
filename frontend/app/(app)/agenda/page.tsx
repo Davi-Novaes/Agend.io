@@ -18,6 +18,7 @@ import {
   markAppointmentNoShow,
   cancelAppointment,
   rescheduleAppointment,
+  listAppointmentChangeLog,
   listResources,
   listCustomers,
   listServices,
@@ -131,9 +132,20 @@ type CreateAppointmentFormValues = z.infer<typeof createAppointmentSchema>;
 
 const rescheduleSchema = z.object({
   newStartAtLocal: z.string().min(1, "Informe o novo horario."),
+  reason: z.string(),
 });
 
 type RescheduleFormValues = z.infer<typeof rescheduleSchema>;
+
+const cancelSchema = z.object({
+  reason: z.string(),
+});
+
+type CancelFormValues = z.infer<typeof cancelSchema>;
+
+function formatChangeLogDateTime(value: string): string {
+  return new Date(value).toLocaleString("pt-BR");
+}
 
 export default function AgendaPage() {
   const { session } = useSession();
@@ -146,6 +158,7 @@ export default function AgendaPage() {
   const [createDialogState, setCreateDialogState] = React.useState<{ resourceId: string; start: Date } | null>(null);
   const [selectedAppointmentId, setSelectedAppointmentId] = React.useState<string | null>(null);
   const [reschedulingOpen, setReschedulingOpen] = React.useState(false);
+  const [cancelingOpen, setCancelingOpen] = React.useState(false);
   const [draggingId, setDraggingId] = React.useState<string | null>(null);
 
   const accessToken = session?.accessToken ?? "";
@@ -249,7 +262,12 @@ export default function AgendaPage() {
 
   const rescheduleForm = useForm<RescheduleFormValues>({
     resolver: zodResolver(rescheduleSchema),
-    defaultValues: { newStartAtLocal: "" },
+    defaultValues: { newStartAtLocal: "", reason: "" },
+  });
+
+  const cancelForm = useForm<CancelFormValues>({
+    resolver: zodResolver(cancelSchema),
+    defaultValues: { reason: "" },
   });
 
   const scheduleMutation = useMutation({
@@ -312,21 +330,30 @@ export default function AgendaPage() {
     onError: (error) => toast.error(error instanceof ApiError ? error.message : "Nao foi possivel marcar."),
   });
 
+  const changeLogQuery = useQuery({
+    queryKey: ["appointment-history", selectedAppointmentId],
+    queryFn: () => listAppointmentChangeLog({ appointmentId: selectedAppointmentId!, pageSize: 10 }, accessToken),
+    enabled: Boolean(selectedAppointmentId),
+  });
+
   const cancelMutation = useMutation({
-    mutationFn: (id: string) => cancelAppointment(id, true, accessToken),
+    mutationFn: ({ id, reason }: { id: string; reason: string | null }) => cancelAppointment(id, true, reason, accessToken),
     onSuccess: () => {
       toast.success("Agendamento cancelado.");
       invalidateAppointments();
+      setCancelingOpen(false);
       setSelectedAppointmentId(null);
     },
     onError: (error) => toast.error(error instanceof ApiError ? error.message : "Nao foi possivel cancelar."),
   });
 
   const rescheduleMutation = useMutation({
-    mutationFn: ({ id, newStartAtUtc }: { id: string; newStartAtUtc: string }) => rescheduleAppointment(id, newStartAtUtc, accessToken),
+    mutationFn: ({ id, newStartAtUtc, reason }: { id: string; newStartAtUtc: string; reason: string | null }) =>
+      rescheduleAppointment(id, newStartAtUtc, reason, accessToken),
     onSuccess: () => {
       toast.success("Agendamento remarcado.");
       invalidateAppointments();
+      queryClient.invalidateQueries({ queryKey: ["appointment-history"] });
       setReschedulingOpen(false);
       setSelectedAppointmentId(null);
     },
@@ -341,6 +368,7 @@ export default function AgendaPage() {
   function openDetailDialog(appointmentId: string) {
     setSelectedAppointmentId(appointmentId);
     setReschedulingOpen(false);
+    setCancelingOpen(false);
   }
 
   function handleDropOnSlot(resourceId: string, start: Date) {
@@ -359,7 +387,7 @@ export default function AgendaPage() {
       toast.error("Arraste apenas dentro da mesma coluna para remarcar o horario.");
       return;
     }
-    rescheduleMutation.mutate({ id: draggingId, newStartAtUtc: start.toISOString() });
+    rescheduleMutation.mutate({ id: draggingId, newStartAtUtc: start.toISOString(), reason: null });
   }
 
   const selectedAppointment = appointmentsQuery.data?.find((a) => a.id === selectedAppointmentId) ?? null;
@@ -771,7 +799,11 @@ export default function AgendaPage() {
                 <Form {...rescheduleForm}>
                   <form
                     onSubmit={rescheduleForm.handleSubmit((values) =>
-                      rescheduleMutation.mutate({ id: selectedAppointment.id, newStartAtUtc: new Date(values.newStartAtLocal).toISOString() })
+                      rescheduleMutation.mutate({
+                        id: selectedAppointment.id,
+                        newStartAtUtc: new Date(values.newStartAtLocal).toISOString(),
+                        reason: values.reason.trim() === "" ? null : values.reason.trim(),
+                      })
                     )}
                     className="flex flex-col gap-3"
                   >
@@ -788,12 +820,56 @@ export default function AgendaPage() {
                         </FormItem>
                       )}
                     />
+                    <FormField
+                      control={rescheduleForm.control}
+                      name="reason"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Motivo (opcional)</FormLabel>
+                          <FormControl>
+                            <Textarea rows={2} {...field} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
                     <div className="flex gap-2">
                       <Button type="submit" size="sm" disabled={rescheduleMutation.isPending}>
                         {rescheduleMutation.isPending ? "Salvando..." : "Confirmar nova data"}
                       </Button>
                       <Button type="button" variant="ghost" size="sm" onClick={() => setReschedulingOpen(false)}>
                         Cancelar
+                      </Button>
+                    </div>
+                  </form>
+                </Form>
+              ) : cancelingOpen ? (
+                <Form {...cancelForm}>
+                  <form
+                    onSubmit={cancelForm.handleSubmit((values) =>
+                      cancelMutation.mutate({ id: selectedAppointment.id, reason: values.reason.trim() === "" ? null : values.reason.trim() })
+                    )}
+                    className="flex flex-col gap-3"
+                  >
+                    <FormField
+                      control={cancelForm.control}
+                      name="reason"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Motivo do cancelamento (opcional)</FormLabel>
+                          <FormControl>
+                            <Textarea rows={2} {...field} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <div className="flex gap-2">
+                      <Button type="submit" size="sm" variant="destructive" disabled={cancelMutation.isPending}>
+                        {cancelMutation.isPending ? "Cancelando..." : "Confirmar cancelamento"}
+                      </Button>
+                      <Button type="button" variant="ghost" size="sm" onClick={() => setCancelingOpen(false)}>
+                        Voltar
                       </Button>
                     </div>
                   </form>
@@ -817,18 +893,54 @@ export default function AgendaPage() {
                   )}
                   {RESCHEDULABLE_STATUSES.includes(selectedAppointment.status) && (
                     <>
-                      <Button size="sm" variant="outline" onClick={() => setReschedulingOpen(true)}>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => {
+                          rescheduleForm.reset({ newStartAtLocal: "", reason: "" });
+                          setReschedulingOpen(true);
+                        }}
+                      >
                         Remarcar
                       </Button>
                       <Button size="sm" variant="outline" onClick={() => noShowMutation.mutate(selectedAppointment.id)}>
                         Nao compareceu
                       </Button>
-                      <Button size="sm" variant="destructive" onClick={() => cancelMutation.mutate(selectedAppointment.id)}>
+                      <Button
+                        size="sm"
+                        variant="destructive"
+                        onClick={() => {
+                          cancelForm.reset({ reason: "" });
+                          setCancelingOpen(true);
+                        }}
+                      >
                         Cancelar
                       </Button>
                     </>
                   )}
                 </DialogFooter>
+              )}
+
+              {!reschedulingOpen && !cancelingOpen && (changeLogQuery.data?.items.length ?? 0) > 0 && (
+                <div className="flex flex-col gap-2 border-t pt-3">
+                  <h3 className="text-muted-foreground text-xs font-medium tracking-wide uppercase">Historico</h3>
+                  <ul className="flex flex-col gap-2 text-xs">
+                    {changeLogQuery.data!.items.map((entry) => (
+                      <li key={entry.id} className="border-border/60 border-l-2 pl-2">
+                        <p>
+                          <span className="font-medium">{entry.changeType === "Cancelled" ? "Cancelado" : "Remarcado"}</span>{" "}
+                          <span className="text-muted-foreground">em {formatChangeLogDateTime(entry.occurredAtUtc)}</span>
+                        </p>
+                        {entry.changeType === "Rescheduled" && entry.newStartUtc && (
+                          <p className="text-muted-foreground">
+                            {formatChangeLogDateTime(entry.previousStartUtc)} {"->"} {formatChangeLogDateTime(entry.newStartUtc)}
+                          </p>
+                        )}
+                        {entry.reason && <p className="italic">&ldquo;{entry.reason}&rdquo;</p>}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
               )}
             </>
           )}

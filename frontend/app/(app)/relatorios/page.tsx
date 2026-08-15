@@ -100,10 +100,11 @@ function AgendaSection({ from, to, accessToken }: { from: string; to: string; ac
   return (
     <section className="flex flex-col gap-4">
       <SectionHeading title="Agenda" description="Conclusao, no-show e faturamento dos agendamentos no periodo." />
-      <div className="grid gap-4 sm:grid-cols-3">
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <KpiCard label="Concluidos" value={stats ? stats.completedCount : "—"} isLoading={query.isLoading} />
         <KpiCard label="Taxa de no-show" value={stats ? `${stats.noShowRate}%` : "—"} isLoading={query.isLoading} />
         <KpiCard label="Taxa de cancelamento" value={stats ? `${stats.cancellationRate}%` : "—"} isLoading={query.isLoading} />
+        <KpiCard label="Taxa de remarcacao" value={stats ? `${stats.rescheduleRate}%` : "—"} isLoading={query.isLoading} />
       </div>
       {stats && (
         <div className="grid gap-4 lg:grid-cols-2">

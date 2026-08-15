@@ -32,6 +32,17 @@ public sealed class GetAppointmentStatsQueryHandler(SchedulingDbContext dbContex
         var noShowRate = totalCount == 0 ? 0m : Math.Round(noShowCount * 100m / totalCount, 1);
         var cancellationRate = totalCount == 0 ? 0m : Math.Round(cancelledCount * 100m / totalCount, 1);
 
+        // Diferente de completed/no-show/cancelled (contam o AGENDAMENTO em si,
+        // filtrado por Slot.StartUtc no periodo), remarcacao e um EVENTO — o
+        // mesmo agendamento pode ser remarcado varias vezes, e o horario atual
+        // dele pode nem estar mais dentro do periodo pedido. Por isso conta do
+        // change log por OccorredAtUtc (quando a remarcacao aconteceu), nao do
+        // Appointment por Slot.StartUtc.
+        var rescheduledCount = await dbContext.AppointmentChangeLogEntries.AsNoTracking()
+            .CountAsync(e => e.ChangeType == AppointmentChangeType.Rescheduled && e.OccurredAtUtc >= fromUtc && e.OccurredAtUtc < toUtcExclusive,
+                cancellationToken);
+        var rescheduleRate = totalCount == 0 ? 0m : Math.Round(rescheduledCount * 100m / totalCount, 1);
+
         var completed = appointments.Where(a => a.Status == AppointmentStatus.Completed).ToList();
 
         var revenueByService = completed
@@ -54,6 +65,7 @@ public sealed class GetAppointmentStatsQueryHandler(SchedulingDbContext dbContex
         }
 
         return Result.Success(new AppointmentStats(
-            totalCount, completedCount, noShowCount, cancelledCount, noShowRate, cancellationRate, revenueByService, revenueByProfessional));
+            totalCount, completedCount, noShowCount, cancelledCount, rescheduledCount, noShowRate, cancellationRate, rescheduleRate,
+            revenueByService, revenueByProfessional));
     }
 }
