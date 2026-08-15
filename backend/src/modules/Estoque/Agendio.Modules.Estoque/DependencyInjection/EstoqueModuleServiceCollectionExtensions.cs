@@ -1,7 +1,9 @@
 using System.Reflection;
 using Agendio.Infrastructure.DependencyInjection;
 using Agendio.Infrastructure.Endpoints;
+using Agendio.Modules.Estoque.Contracts;
 using Agendio.Modules.Estoque.Endpoints;
+using Agendio.Modules.Estoque.Infrastructure;
 using Agendio.Modules.Estoque.Infrastructure.Persistence;
 using Agendio.SharedKernel.Messaging;
 using FluentValidation;
@@ -23,6 +25,8 @@ public static class EstoqueModuleServiceCollectionExtensions
         services.AddHandlersFromAssembly(moduleAssembly);
 
         services.AddSingleton<IEndpointModule, EstoqueEndpoints>();
+
+        services.AddScoped<IInventorySummaryLookupService, InventorySummaryLookupService>();
 
         return services;
     }

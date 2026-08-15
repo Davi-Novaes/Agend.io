@@ -30,6 +30,8 @@ public static class SchedulingModuleServiceCollectionExtensions
         services.AddSingleton<IEndpointModule, AppointmentDepositWebhookEndpoints>();
         services.AddScoped<AppointmentNotificationJobs>();
         services.AddScoped<ICustomerVisitStatsLookupService, CustomerVisitStatsLookupService>();
+        services.AddScoped<IAppointmentStatsLookupService, AppointmentStatsLookupService>();
+        services.AddScoped<IReviewsSummaryLookupService, ReviewsSummaryLookupService>();
 
         return services;
     }

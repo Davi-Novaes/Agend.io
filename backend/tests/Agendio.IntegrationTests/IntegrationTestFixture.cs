@@ -1,4 +1,5 @@
 using System.Globalization;
+using Agendio.Infrastructure.AiAssistant;
 using Agendio.Infrastructure.Multitenancy;
 using Agendio.Infrastructure.Payments;
 using Agendio.Infrastructure.Security;
@@ -229,6 +230,10 @@ public sealed class IntegrationTestFixture : WebApplicationFactory<Program>, IAs
         // baixo) so nas classes que precisam exercitar o 429 de verdade.
         builder.UseSetting("RateLimiting:AuthPermitLimit", "100000");
 
+        // Mesmo raciocinio para "ai-assistant" (Fase 22) — cada teste de
+        // Assistant.ask conta contra a mesma particao de tenant.
+        builder.UseSetting("RateLimiting:AiAssistantPermitLimit", "100000");
+
         builder.UseSetting("Smtp:Host", _mailHog.Hostname);
         builder.UseSetting("Smtp:Port", _mailHog.GetMappedPublicPort(1025).ToString(CultureInfo.InvariantCulture));
         builder.UseSetting("Smtp:FromAddress", "no-reply@agendio.test");
@@ -238,6 +243,13 @@ public sealed class IntegrationTestFixture : WebApplicationFactory<Program>, IAs
         builder.UseSetting("Asaas:ApiKey", "integration-test-fake-key");
         builder.UseSetting(AsaasWebhookSecretSettingKey, AsaasWebhookSecretForTests);
         builder.UseSetting(AppointmentDepositWebhookSecretSettingKey, AppointmentDepositWebhookSecretForTests);
+
+        // Fase 22 — chave nao-vazia so pra passar do pre-check de "nao
+        // configurado" no handler; a chamada de saida em si e sempre
+        // substituida por FakeAiChatClient abaixo, entao o provedor escolhido
+        // aqui e irrelevante (nunca sai HTTP de verdade nos testes).
+        builder.UseSetting("AiAssistant:Provider", "Anthropic");
+        builder.UseSetting("AiAssistant:ApiKey", "integration-test-fake-key");
 
         // FakeAsaasClient no lugar do AsaasClient real: a Asaas e um servico
         // hospedado sem container local equivalente (ao contrario de
@@ -250,6 +262,7 @@ public sealed class IntegrationTestFixture : WebApplicationFactory<Program>, IAs
         {
             services.AddSingleton<IAsaasClient, FakeAsaasClient>();
             services.AddSingleton<IPaymentChargeClient, FakePaymentChargeClient>();
+            services.AddSingleton<IAiChatClient, FakeAiChatClient>();
         });
     }
 

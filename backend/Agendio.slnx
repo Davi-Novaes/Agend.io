@@ -14,12 +14,17 @@
   </Folder>
   <Folder Name="/src/modules/Financeiro/">
     <Project Path="src/modules/Financeiro/Agendio.Modules.Financeiro/Agendio.Modules.Financeiro.csproj" />
+    <Project Path="src/modules/Financeiro/Agendio.Modules.Financeiro.Contracts/Agendio.Modules.Financeiro.Contracts.csproj" />
   </Folder>
   <Folder Name="/src/modules/Estoque/">
     <Project Path="src/modules/Estoque/Agendio.Modules.Estoque/Agendio.Modules.Estoque.csproj" />
+    <Project Path="src/modules/Estoque/Agendio.Modules.Estoque.Contracts/Agendio.Modules.Estoque.Contracts.csproj" />
   </Folder>
   <Folder Name="/src/modules/Marketing/">
     <Project Path="src/modules/Marketing/Agendio.Modules.Marketing/Agendio.Modules.Marketing.csproj" />
+  </Folder>
+  <Folder Name="/src/modules/Assistant/">
+    <Project Path="src/modules/Assistant/Agendio.Modules.Assistant/Agendio.Modules.Assistant.csproj" />
   </Folder>
   <Folder Name="/src/modules/Customers/">
     <Project Path="src/modules/Customers/Agendio.Modules.Customers/Agendio.Modules.Customers.csproj" />

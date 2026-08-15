@@ -24,6 +24,10 @@ public class ModuleDependencyRulesTests
     private static readonly Assembly EstoqueAssembly = typeof(Agendio.Modules.Estoque.Domain.Product).Assembly;
     private static readonly Assembly MarketingAssembly = typeof(Agendio.Modules.Marketing.Domain.Campaign).Assembly;
 
+    // Sem tipo em .Domain (Assistant nao tem entidade persistida — Fase 22) ->
+    // ancorado por um tipo de Application mesmo.
+    private static readonly Assembly AssistantAssembly = typeof(Agendio.Modules.Assistant.Application.AskAssistant.AskAssistantCommand).Assembly;
+
     [Theory]
     [InlineData("Agendio.Modules.Identity.Domain")]
     [InlineData("Agendio.Modules.Tenancy.Domain")]
@@ -421,6 +425,84 @@ public class ModuleDependencyRulesTests
 
         result.IsSuccessful.ShouldBeTrue(
             "Customers so pode depender do .Contracts de Tenancy, nunca do modulo inteiro. " +
+            "Tipos violando a regra: " + string.Join(", ", result.FailingTypeNames ?? []));
+    }
+
+    [Fact]
+    public void Assistant_Module_Should_Not_Depend_On_Any_Module_Internals_Except_Financeiro_Estoque_Scheduling_And_Tenancy_Contracts()
+    {
+        // Assistente (Fase 22) so orquestra leituras agregadas — resolve caixa e
+        // comissoes via IFinanceSummaryLookupService, estoque via
+        // IInventorySummaryLookupService, agendamentos/avaliacoes via
+        // IAppointmentStatsLookupService/IReviewsSummaryLookupService, e
+        // nome/fuso do tenant via ITenantLookupService — nunca deveria enxergar
+        // nenhum modulo inteiro nem ler tabela diretamente.
+        var forbiddenNamespaces = new[]
+        {
+            "Agendio.Modules.Identity.Domain",
+            "Agendio.Modules.Identity.Application",
+            "Agendio.Modules.Identity.Infrastructure",
+            "Agendio.Modules.Identity.Endpoints",
+            "Agendio.Modules.Identity.DependencyInjection",
+            "Agendio.Modules.Customers.Domain",
+            "Agendio.Modules.Customers.Application",
+            "Agendio.Modules.Customers.Infrastructure",
+            "Agendio.Modules.Customers.Endpoints",
+            "Agendio.Modules.Customers.DependencyInjection",
+            "Agendio.Modules.Catalog.Domain",
+            "Agendio.Modules.Catalog.Application",
+            "Agendio.Modules.Catalog.Infrastructure",
+            "Agendio.Modules.Catalog.Endpoints",
+            "Agendio.Modules.Catalog.DependencyInjection",
+            "Agendio.Modules.Resources.Domain",
+            "Agendio.Modules.Resources.Application",
+            "Agendio.Modules.Resources.Infrastructure",
+            "Agendio.Modules.Resources.Endpoints",
+            "Agendio.Modules.Resources.DependencyInjection",
+            "Agendio.Modules.Scheduling.Domain",
+            "Agendio.Modules.Scheduling.Application",
+            "Agendio.Modules.Scheduling.Infrastructure",
+            "Agendio.Modules.Scheduling.Endpoints",
+            "Agendio.Modules.Scheduling.DependencyInjection",
+            "Agendio.Modules.Financeiro.Domain",
+            "Agendio.Modules.Financeiro.Application",
+            "Agendio.Modules.Financeiro.Infrastructure",
+            "Agendio.Modules.Financeiro.Endpoints",
+            "Agendio.Modules.Financeiro.DependencyInjection",
+            "Agendio.Modules.Estoque.Domain",
+            "Agendio.Modules.Estoque.Application",
+            "Agendio.Modules.Estoque.Infrastructure",
+            "Agendio.Modules.Estoque.Endpoints",
+            "Agendio.Modules.Estoque.DependencyInjection",
+            "Agendio.Modules.Marketing.Domain",
+            "Agendio.Modules.Marketing.Application",
+            "Agendio.Modules.Marketing.Infrastructure",
+            "Agendio.Modules.Marketing.Endpoints",
+            "Agendio.Modules.Marketing.DependencyInjection",
+            "Agendio.Modules.Platform.Domain",
+            "Agendio.Modules.Platform.Application",
+            "Agendio.Modules.Platform.Infrastructure",
+            "Agendio.Modules.Platform.Endpoints",
+            "Agendio.Modules.Platform.DependencyInjection",
+            "Agendio.Modules.Billing.Domain",
+            "Agendio.Modules.Billing.Application",
+            "Agendio.Modules.Billing.Infrastructure",
+            "Agendio.Modules.Billing.Endpoints",
+            "Agendio.Modules.Billing.DependencyInjection",
+            "Agendio.Modules.Tenancy.Domain",
+            "Agendio.Modules.Tenancy.Application",
+            "Agendio.Modules.Tenancy.Infrastructure",
+            "Agendio.Modules.Tenancy.Endpoints",
+            "Agendio.Modules.Tenancy.DependencyInjection",
+        };
+
+        var result = Types.InAssembly(AssistantAssembly)
+            .That().ResideInNamespace("Agendio.Modules.Assistant")
+            .ShouldNot().HaveDependencyOnAny(forbiddenNamespaces)
+            .GetResult();
+
+        result.IsSuccessful.ShouldBeTrue(
+            "Assistant so pode depender dos .Contracts de Financeiro/Estoque/Scheduling/Tenancy, nunca de nenhum modulo inteiro. " +
             "Tipos violando a regra: " + string.Join(", ", result.FailingTypeNames ?? []));
     }
 }

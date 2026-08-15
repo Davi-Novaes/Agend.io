@@ -21,6 +21,8 @@
     <ProjectReference Include="..\..\..\shared\Agendio.Infrastructure\Agendio.Infrastructure.csproj" />
     <ProjectReference Include="..\..\Resources\Agendio.Modules.Resources.Contracts\Agendio.Modules.Resources.Contracts.csproj" />
     <ProjectReference Include="..\..\Scheduling\Agendio.Modules.Scheduling.Contracts\Agendio.Modules.Scheduling.Contracts.csproj" />
+    <!-- Contracts do proprio modulo (implementado na Infrastructure) — leitura agregada usada pelo Assistente (Fase 22). -->
+    <ProjectReference Include="..\Agendio.Modules.Financeiro.Contracts\Agendio.Modules.Financeiro.Contracts.csproj" />
   </ItemGroup>
 
 </Project>

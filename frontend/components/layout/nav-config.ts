@@ -19,6 +19,7 @@ import {
   Gift,
   Hourglass,
   Banknote,
+  Bot,
 } from "lucide-react";
 
 export type NavItem = {
@@ -37,7 +38,10 @@ export type NavGroup = {
 export const NAV_GROUPS: NavGroup[] = [
   {
     label: "Visão Geral",
-    items: [{ href: "/painel", label: "Painel", icon: LayoutDashboard }],
+    items: [
+      { href: "/painel", label: "Painel", icon: LayoutDashboard },
+      { href: "/assistente", label: "Assistente", icon: Bot },
+    ],
   },
   {
     label: "Gestão",

@@ -19,8 +19,11 @@
   <ItemGroup>
     <ProjectReference Include="..\..\..\shared\Agendio.SharedKernel\Agendio.SharedKernel.csproj" />
     <ProjectReference Include="..\..\..\shared\Agendio.Infrastructure\Agendio.Infrastructure.csproj" />
-    <!-- Contracts do proprio modulo (implementado na Infrastructure) — leitura agregada usada pelo Assistente (Fase 22). -->
-    <ProjectReference Include="..\Agendio.Modules.Estoque.Contracts\Agendio.Modules.Estoque.Contracts.csproj" />
+    <!-- Comunicacao entre modulos so via .Contracts (leitura sincrona) — nunca o modulo inteiro. -->
+    <ProjectReference Include="..\..\Financeiro\Agendio.Modules.Financeiro.Contracts\Agendio.Modules.Financeiro.Contracts.csproj" />
+    <ProjectReference Include="..\..\Estoque\Agendio.Modules.Estoque.Contracts\Agendio.Modules.Estoque.Contracts.csproj" />
+    <ProjectReference Include="..\..\Scheduling\Agendio.Modules.Scheduling.Contracts\Agendio.Modules.Scheduling.Contracts.csproj" />
+    <ProjectReference Include="..\..\Tenancy\Agendio.Modules.Tenancy.Contracts\Agendio.Modules.Tenancy.Contracts.csproj" />
   </ItemGroup>
 
 </Project>
