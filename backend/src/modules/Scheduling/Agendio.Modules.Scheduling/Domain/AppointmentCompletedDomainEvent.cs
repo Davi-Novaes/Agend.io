@@ -6,4 +6,4 @@ namespace Agendio.Modules.Scheduling.Domain;
 
 /// <summary>Consumido pelo modulo Financeiro para gerar a conta a receber (e, se houver regra de comissao, a conta a pagar) do atendimento.</summary>
 public sealed record AppointmentCompletedDomainEvent(
-    AppointmentId AppointmentId, TenantId TenantId, Guid ResourceId, string ServiceName, Money Price, DateTimeOffset CompletedAtUtc) : DomainEvent;
+    AppointmentId AppointmentId, TenantId TenantId, Guid ResourceId, Guid CustomerId, string ServiceName, Money Price, DateTimeOffset CompletedAtUtc) : DomainEvent;

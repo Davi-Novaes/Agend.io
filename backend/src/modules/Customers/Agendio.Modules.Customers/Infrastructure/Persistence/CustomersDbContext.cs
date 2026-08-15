@@ -16,6 +16,8 @@ public sealed class CustomersDbContext(
 
     public DbSet<Customer> Customers => Set<Customer>();
 
+    public DbSet<LoyaltyPointsLedgerEntry> LoyaltyPointsLedgerEntries => Set<LoyaltyPointsLedgerEntry>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.HasDefaultSchema("customers");
@@ -25,6 +27,7 @@ public sealed class CustomersDbContext(
         modelBuilder.ApplyConfigurationsFromAssembly(typeof(CustomersDbContext).Assembly);
 
         modelBuilder.Entity<Customer>().HasQueryFilter(c => c.TenantId == CurrentTenantId() && !c.IsDeleted);
+        modelBuilder.Entity<LoyaltyPointsLedgerEntry>().HasQueryFilter(e => e.TenantId == CurrentTenantId());
 
         // IEntityTypeConfiguration e instanciado sem parametro por
         // ApplyConfigurationsFromAssembly — o conversor criptografado (que

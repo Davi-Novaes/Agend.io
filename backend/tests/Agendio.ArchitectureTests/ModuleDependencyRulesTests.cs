@@ -396,4 +396,29 @@ public class ModuleDependencyRulesTests
             "Customers so pode depender do .Contracts de Scheduling, nunca do modulo inteiro. " +
             "Tipos violando a regra: " + string.Join(", ", result.FailingTypeNames ?? []));
     }
+
+    [Fact]
+    public void Customers_Module_Should_Not_Depend_On_Tenancy_Internals()
+    {
+        // Fase 11 (fidelidade): Customers le limiar/descricao da recompensa via
+        // ITenantLookupService.GetLoyaltySettingsAsync — nunca deveria enxergar
+        // Tenant (Tenancy.Domain) diretamente.
+        var forbiddenNamespaces = new[]
+        {
+            "Agendio.Modules.Tenancy.Domain",
+            "Agendio.Modules.Tenancy.Application",
+            "Agendio.Modules.Tenancy.Infrastructure",
+            "Agendio.Modules.Tenancy.Endpoints",
+            "Agendio.Modules.Tenancy.DependencyInjection",
+        };
+
+        var result = Types.InAssembly(CustomersAssembly)
+            .That().ResideInNamespace("Agendio.Modules.Customers")
+            .ShouldNot().HaveDependencyOnAny(forbiddenNamespaces)
+            .GetResult();
+
+        result.IsSuccessful.ShouldBeTrue(
+            "Customers so pode depender do .Contracts de Tenancy, nunca do modulo inteiro. " +
+            "Tipos violando a regra: " + string.Join(", ", result.FailingTypeNames ?? []));
+    }
 }

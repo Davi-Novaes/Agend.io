@@ -16,6 +16,7 @@ import {
   ShieldCheck,
   MessageCircle,
   Bell,
+  Gift,
 } from "lucide-react";
 
 export type NavItem = {
@@ -62,6 +63,7 @@ export const NAV_GROUPS: NavGroup[] = [
       { href: "/marketing", label: "Marketing", icon: Megaphone },
       { href: "/settings/whatsapp", label: "WhatsApp", icon: MessageCircle },
       { href: "/settings/notifications", label: "Notificações", icon: Bell },
+      { href: "/settings/loyalty", label: "Fidelidade", icon: Gift },
     ],
   },
   {

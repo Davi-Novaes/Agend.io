@@ -15,4 +15,5 @@ public sealed record CustomerDetails(
     bool IsActive,
     DateTimeOffset CreatedAtUtc,
     string? Cpf,
-    string? HealthNotes);
+    string? HealthNotes,
+    int LoyaltyPoints);

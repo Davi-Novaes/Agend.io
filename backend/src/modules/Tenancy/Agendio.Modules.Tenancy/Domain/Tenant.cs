@@ -129,6 +129,19 @@ public sealed class Tenant : AggregateRoot<TenantId>, IAuditable, ISoftDeletable
 
     public bool PostServiceThankYouEnabled { get; private set; } = true;
 
+    /// <summary>
+    /// Ligado por padrao (Fase 11) — 1 ponto por visita concluida, sem o dono
+    /// configurar nada. So controla se o cliente VE o rastreador/acumula ponto
+    /// novo; pontos ja creditados nunca somem se for desligado depois.
+    /// </summary>
+    public bool LoyaltyProgramEnabled { get; private set; } = true;
+
+    /// <summary>Quantas visitas concluidas dao direito a resgatar a recompensa.</summary>
+    public int LoyaltyVisitsForReward { get; private set; } = 10;
+
+    /// <summary>Texto livre — "corte gratis", "10% de desconto" etc. Sem valor monetario estruturado de proposito (MVP).</summary>
+    public string LoyaltyRewardDescription { get; private set; } = "Um agradecimento especial";
+
     public DateTimeOffset CreatedAtUtc { get; set; }
 
     public string? CreatedBy { get; set; }
@@ -403,6 +416,25 @@ public sealed class Tenant : AggregateRoot<TenantId>, IAuditable, ISoftDeletable
         Reminder24hEnabled = reminder24hEnabled;
         Reminder2hEnabled = reminder2hEnabled;
         PostServiceThankYouEnabled = postServiceThankYouEnabled;
+
+        return Result.Success();
+    }
+
+    public Result UpdateLoyaltySettings(bool enabled, int visitsForReward, string rewardDescription)
+    {
+        if (visitsForReward <= 0)
+        {
+            return Result.Failure(Error.Validation("Tenant.InvalidLoyaltyVisitsForReward", "A quantidade de visitas para a recompensa deve ser maior que zero."));
+        }
+
+        if (string.IsNullOrWhiteSpace(rewardDescription))
+        {
+            return Result.Failure(Error.Validation("Tenant.InvalidLoyaltyRewardDescription", "A descricao da recompensa nao pode ser vazia."));
+        }
+
+        LoyaltyProgramEnabled = enabled;
+        LoyaltyVisitsForReward = visitsForReward;
+        LoyaltyRewardDescription = rewardDescription.Trim();
 
         return Result.Success();
     }

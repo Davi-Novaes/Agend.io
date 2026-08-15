@@ -1,13 +1,17 @@
 "use client";
 
 import * as React from "react";
-import { useQuery } from "@tanstack/react-query";
-import { CalendarDays, Mail, MessageCircle, Scissors, User, Wallet } from "lucide-react";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { toast } from "sonner";
+import { CalendarDays, Gift, Mail, MessageCircle, Scissors, User, Wallet } from "lucide-react";
 
 import {
   getCustomerById,
   getCustomerAppointmentHistory,
+  getTenantProfile,
   listNotificationHistory,
+  redeemCustomerLoyaltyReward,
+  ApiError,
   type AppointmentStatus,
   type CustomerAppointmentHistoryItem,
   type NotificationLogItem,
@@ -21,8 +25,19 @@ import {
   SheetDescription,
 } from "@/components/ui/sheet";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { EmptyState } from "@/components/ui/empty-state";
+import {
+  AlertDialog,
+  AlertDialogContent,
+  AlertDialogHeader,
+  AlertDialogFooter,
+  AlertDialogTitle,
+  AlertDialogDescription,
+  AlertDialogAction,
+  AlertDialogCancel,
+} from "@/components/ui/alert-dialog";
 
 const STATUS_LABELS: Record<AppointmentStatus, string> = {
   Scheduled: "Agendado",
@@ -114,6 +129,12 @@ function CustomerProfileContent({
     enabled: Boolean(accessToken),
   });
 
+  const tenantProfileQuery = useQuery({
+    queryKey: ["tenant", "profile"],
+    queryFn: () => getTenantProfile(accessToken),
+    enabled: Boolean(accessToken),
+  });
+
   const isLoading = customerQuery.isLoading || historyQuery.isLoading || notificationsQuery.isLoading;
 
   const timeline: TimelineEntry[] = React.useMemo(() => {
@@ -194,6 +215,16 @@ function CustomerProfileContent({
         </div>
       ) : null}
 
+      {tenantProfileQuery.data?.loyaltyProgramEnabled ? (
+        <LoyaltySection
+          customerId={customerId}
+          accessToken={accessToken}
+          loyaltyPoints={customer.loyaltyPoints}
+          loyaltyVisitsForReward={tenantProfileQuery.data.loyaltyVisitsForReward}
+          loyaltyRewardDescription={tenantProfileQuery.data.loyaltyRewardDescription}
+        />
+      ) : null}
+
       {customer.notes ? (
         <div className="flex flex-col gap-1">
           <p className="text-sm font-medium">Observações</p>
@@ -243,6 +274,78 @@ function CustomerProfileContent({
         )}
       </div>
     </div>
+  );
+}
+
+function LoyaltySection({
+  customerId,
+  accessToken,
+  loyaltyPoints,
+  loyaltyVisitsForReward,
+  loyaltyRewardDescription,
+}: {
+  customerId: string;
+  accessToken: string;
+  loyaltyPoints: number;
+  loyaltyVisitsForReward: number;
+  loyaltyRewardDescription: string;
+}) {
+  const queryClient = useQueryClient();
+  const [confirmOpen, setConfirmOpen] = React.useState(false);
+  const canRedeem = loyaltyPoints >= loyaltyVisitsForReward;
+
+  const redeemMutation = useMutation({
+    mutationFn: () => redeemCustomerLoyaltyReward(customerId, accessToken),
+    onSuccess: () => {
+      toast.success("Recompensa resgatada.");
+      queryClient.invalidateQueries({ queryKey: ["customers", "detail", customerId] });
+      setConfirmOpen(false);
+    },
+    onError: (error) => toast.error(error instanceof ApiError ? error.message : "Não foi possível resgatar a recompensa."),
+  });
+
+  return (
+    <>
+      <div className="flex flex-col gap-2 rounded-lg border border-border p-3">
+        <div className="flex items-center justify-between gap-2">
+          <div className="flex items-center gap-2 text-sm font-medium">
+            <Gift className="size-4" />
+            Fidelidade
+          </div>
+          <span className="text-sm text-muted-foreground">
+            {loyaltyPoints} / {loyaltyVisitsForReward} visitas
+          </span>
+        </div>
+        <p className="text-xs text-muted-foreground">Recompensa: {loyaltyRewardDescription}</p>
+        <Button
+          type="button"
+          size="sm"
+          variant="outline"
+          className="w-fit"
+          disabled={!canRedeem}
+          onClick={() => setConfirmOpen(true)}
+        >
+          Resgatar recompensa
+        </Button>
+      </div>
+
+      <AlertDialog open={confirmOpen} onOpenChange={setConfirmOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Resgatar recompensa?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Isso debita {loyaltyVisitsForReward} pontos do cliente e não pode ser desfeito.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction disabled={redeemMutation.isPending} onClick={() => redeemMutation.mutate()}>
+              {redeemMutation.isPending ? "Resgatando..." : "Confirmar"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </>
   );
 }
 

@@ -29,6 +29,7 @@ import {
 import { TenantThemeProvider } from "@/lib/tenant/tenant-theme-provider";
 import { DEFAULT_TENANT_THEME } from "@/lib/tenant/tenant-theme";
 import { BookingFlow } from "@/components/public/booking-flow";
+import { LoyaltyLookup } from "@/components/public/loyalty-lookup";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
@@ -358,6 +359,20 @@ export default async function TenantPortalPage({ params, searchParams }: PagePro
             <Card className="mx-auto w-full max-w-lg">
               <CardContent>
                 <BookingFlow tenantId={tenant.id} buttonRadiusClassName={buttonRadiusClassName} />
+              </CardContent>
+            </Card>
+          </section>
+
+          <section aria-labelledby="fidelidade-heading" className="flex flex-col gap-6">
+            <div className="text-center">
+              <h2 id="fidelidade-heading" className="text-2xl font-semibold tracking-tight sm:text-3xl">
+                Consultar meus pontos
+              </h2>
+              <p className="text-muted-foreground mt-1 text-sm">Ja e cliente? Veja quantos pontos de fidelidade voce tem.</p>
+            </div>
+            <Card className="mx-auto w-full max-w-lg">
+              <CardContent>
+                <LoyaltyLookup tenantId={tenant.id} buttonRadiusClassName={buttonRadiusClassName} />
               </CardContent>
             </Card>
           </section>

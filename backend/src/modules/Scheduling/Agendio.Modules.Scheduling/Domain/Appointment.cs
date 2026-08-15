@@ -113,7 +113,7 @@ public sealed class Appointment : AggregateRoot<AppointmentId>, ITenantOwned, IA
         }
 
         Status = AppointmentStatus.Completed;
-        Raise(new AppointmentCompletedDomainEvent(Id, TenantId, ResourceId, ServiceName, Price, nowUtc));
+        Raise(new AppointmentCompletedDomainEvent(Id, TenantId, ResourceId, CustomerId, ServiceName, Price, nowUtc));
         return Result.Success();
     }
 

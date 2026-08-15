@@ -286,6 +286,9 @@ export type TenantProfile = {
   reminder24hEnabled: boolean;
   reminder2hEnabled: boolean;
   postServiceThankYouEnabled: boolean;
+  loyaltyProgramEnabled: boolean;
+  loyaltyVisitsForReward: number;
+  loyaltyRewardDescription: string;
 };
 
 export type ClosedDate = {
@@ -352,6 +355,31 @@ export type UpdateTenantReminderSettingsInput = {
 
 export function updateTenantReminderSettings(input: UpdateTenantReminderSettingsInput, accessToken: string): Promise<void> {
   return request("/api/tenants/reminder-settings", { method: "PUT", body: JSON.stringify(input) }, accessToken);
+}
+
+export type UpdateTenantLoyaltySettingsInput = {
+  loyaltyProgramEnabled: boolean;
+  loyaltyVisitsForReward: number;
+  loyaltyRewardDescription: string;
+};
+
+export function updateTenantLoyaltySettings(input: UpdateTenantLoyaltySettingsInput, accessToken: string): Promise<void> {
+  return request("/api/tenants/loyalty-settings", { method: "PUT", body: JSON.stringify(input) }, accessToken);
+}
+
+export function redeemCustomerLoyaltyReward(customerId: string, accessToken: string): Promise<void> {
+  return request(`/api/customers/${customerId}/redeem-loyalty-reward`, { method: "POST" }, accessToken);
+}
+
+export type PublicLoyaltyStatus = {
+  customerName: string;
+  loyaltyPoints: number;
+  loyaltyVisitsForReward: number;
+  loyaltyRewardDescription: string;
+};
+
+export function getPublicLoyaltyStatus(tenantId: string, email: string): Promise<PublicLoyaltyStatus> {
+  return request(`/api/public/tenants/${tenantId}/loyalty?email=${encodeURIComponent(email)}`);
 }
 
 export type NotificationLogItem = {
@@ -482,6 +510,7 @@ export type CustomerDetails = CustomerSummary & {
   customData: Record<string, string>;
   cpf: string | null;
   healthNotes: string | null;
+  loyaltyPoints: number;
 };
 
 export type CustomerInput = {

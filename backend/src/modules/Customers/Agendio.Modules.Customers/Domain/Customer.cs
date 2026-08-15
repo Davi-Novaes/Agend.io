@@ -38,6 +38,9 @@ public sealed class Customer : AggregateRoot<CustomerId>, ITenantOwned, IAuditab
 
     public bool IsActive { get; private set; }
 
+    /// <summary>Saldo atual do programa de fidelidade (Fase 11) — a soma dos lancamentos em LoyaltyPointsLedgerEntry, mantida aqui como projecao para leitura rapida.</summary>
+    public int LoyaltyPoints { get; private set; }
+
     public DateTimeOffset CreatedAtUtc { get; set; }
 
     public string? CreatedBy { get; set; }
@@ -163,6 +166,33 @@ public sealed class Customer : AggregateRoot<CustomerId>, ITenantOwned, IAuditab
     public void Deactivate() => IsActive = false;
 
     public void Activate() => IsActive = true;
+
+    public Result EarnLoyaltyPoints(int points)
+    {
+        if (points <= 0)
+        {
+            return Result.Failure(Error.Validation("Customer.InvalidLoyaltyPoints", "A quantidade de pontos deve ser maior que zero."));
+        }
+
+        LoyaltyPoints += points;
+        return Result.Success();
+    }
+
+    public Result RedeemLoyaltyReward(int cost)
+    {
+        if (cost <= 0)
+        {
+            return Result.Failure(Error.Validation("Customer.InvalidLoyaltyPoints", "A quantidade de pontos deve ser maior que zero."));
+        }
+
+        if (LoyaltyPoints < cost)
+        {
+            return Result.Failure(Error.Validation("Customer.InsufficientLoyaltyPoints", "O cliente nao tem pontos suficientes para resgatar essa recompensa."));
+        }
+
+        LoyaltyPoints -= cost;
+        return Result.Success();
+    }
 
     private static Result<Email?> ParseOptionalEmail(string? email)
     {
