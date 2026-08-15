@@ -11,4 +11,11 @@ public interface ICustomerLookupService
 
     /// <summary>Clientes ativos com e-mail cadastrado — usado por Marketing para montar a lista de destinatarios de uma campanha.</summary>
     Task<IReadOnlyList<CustomerLookupResult>> ListActiveWithEmailAsync(CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Clientes ativos, opcionalmente filtrados por segmento (Fase 21 — publico-alvo
+    /// de campanha). Segmento null = todos os clientes ativos. Quem chama decide
+    /// qual canal usar por cliente, filtrando por Email/Phone != null no resultado.
+    /// </summary>
+    Task<IReadOnlyList<CustomerLookupResult>> ListActiveBySegmentAsync(CustomerSegment? segment, CancellationToken cancellationToken = default);
 }

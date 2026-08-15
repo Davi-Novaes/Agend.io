@@ -1,4 +1,5 @@
 using Agendio.Infrastructure.Endpoints;
+using Agendio.Modules.Customers.Contracts;
 using Agendio.Modules.Customers.Application.CreateCustomer;
 using Agendio.Modules.Customers.Application.DeactivateCustomer;
 using Agendio.Modules.Customers.Application.GetCustomerAuditLog;

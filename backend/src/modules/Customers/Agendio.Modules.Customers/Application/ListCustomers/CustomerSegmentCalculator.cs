@@ -1,3 +1,4 @@
+using Agendio.Modules.Customers.Contracts;
 using Agendio.Modules.Scheduling.Contracts;
 
 namespace Agendio.Modules.Customers.Application.ListCustomers;

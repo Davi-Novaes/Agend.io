@@ -1576,9 +1576,13 @@ export function getInventorySummary(accessToken: string): Promise<InventorySumma
 
 // ---------- Marketing ----------
 
+export type CampaignChannel = "Email" | "WhatsApp";
+
 export type CampaignSummary = {
   id: string;
   subject: string;
+  channel: CampaignChannel;
+  targetSegment: CustomerSegment | null;
   recipientCount: number;
   sentAtUtc: string;
 };
@@ -1586,6 +1590,8 @@ export type CampaignSummary = {
 export type SendCampaignInput = {
   subject: string;
   body: string;
+  channel: CampaignChannel;
+  targetSegment?: CustomerSegment | null;
 };
 
 export function sendCampaign(input: SendCampaignInput, accessToken: string): Promise<{ id: string; recipientCount: number }> {

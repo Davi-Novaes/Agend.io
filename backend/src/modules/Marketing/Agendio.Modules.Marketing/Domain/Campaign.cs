@@ -6,11 +6,15 @@ using Agendio.SharedKernel.Results;
 namespace Agendio.Modules.Marketing.Domain;
 
 /// <summary>
-/// Registro de uma campanha de e-mail ja disparada — o envio e sincrono do
-/// ponto de vista do dominio (SendCampaignCommandHandler ja resolveu os
-/// destinatarios e persistiu isto antes de enfileirar os jobs de e-mail
+/// Registro de uma campanha (e-mail ou WhatsApp) ja disparada — o envio e
+/// sincrono do ponto de vista do dominio (SendCampaignCommandHandler ja
+/// resolveu os destinatarios e persistiu isto antes de enfileirar os jobs
 /// individuais), entao nao ha maquina de estado aqui: o registro so existe
 /// depois de "enviado". Sem ISoftDeletable — e um log imutavel, nunca editado.
+/// TargetSegment e string (nao o enum CustomerSegment de Customers.Contracts)
+/// de proposito: Domain nunca referencia outro modulo, nem seu .Contracts —
+/// so SharedKernel (ver CLAUDE.md). E um snapshot do nome do segmento no
+/// momento do envio, null quando a campanha foi para todos os clientes ativos.
 /// </summary>
 public sealed class Campaign : AggregateRoot<CampaignId>, ITenantOwned, IAuditable
 {
@@ -19,6 +23,10 @@ public sealed class Campaign : AggregateRoot<CampaignId>, ITenantOwned, IAuditab
     public string Subject { get; private set; } = string.Empty;
 
     public string Body { get; private set; } = string.Empty;
+
+    public CampaignChannel Channel { get; private set; }
+
+    public string? TargetSegment { get; private set; }
 
     public int RecipientCount { get; private set; }
 
@@ -36,17 +44,23 @@ public sealed class Campaign : AggregateRoot<CampaignId>, ITenantOwned, IAuditab
     {
     }
 
-    private Campaign(TenantId tenantId, string subject, string body, int recipientCount, DateTimeOffset sentAtUtc)
+    private Campaign(
+        TenantId tenantId, string subject, string body, CampaignChannel channel, string? targetSegment, int recipientCount,
+        DateTimeOffset sentAtUtc)
         : base(CampaignId.New())
     {
         TenantId = tenantId;
         Subject = subject;
         Body = body;
+        Channel = channel;
+        TargetSegment = targetSegment;
         RecipientCount = recipientCount;
         SentAtUtc = sentAtUtc;
     }
 
-    public static Result<Campaign> Create(TenantId tenantId, string? subject, string? body, int recipientCount, DateTimeOffset sentAtUtc)
+    public static Result<Campaign> Create(
+        TenantId tenantId, string? subject, string? body, CampaignChannel channel, string? targetSegment, int recipientCount,
+        DateTimeOffset sentAtUtc)
     {
         if (string.IsNullOrWhiteSpace(subject))
         {
@@ -63,6 +77,6 @@ public sealed class Campaign : AggregateRoot<CampaignId>, ITenantOwned, IAuditab
             return Result.Failure<Campaign>(Error.Validation("Campaign.InvalidRecipientCount", "Quantidade de destinatarios invalida."));
         }
 
-        return Result.Success(new Campaign(tenantId, subject.Trim(), body.Trim(), recipientCount, sentAtUtc));
+        return Result.Success(new Campaign(tenantId, subject.Trim(), body.Trim(), channel, targetSegment, recipientCount, sentAtUtc));
     }
 }

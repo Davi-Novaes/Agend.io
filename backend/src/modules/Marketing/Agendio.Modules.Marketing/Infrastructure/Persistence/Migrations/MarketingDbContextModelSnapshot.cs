@@ -132,6 +132,14 @@ namespace Agendio.Modules.Marketing.Infrastructure.Persistence.Migrations
                         .HasColumnType("character varying(10000)")
                         .HasColumnName("body");
 
+                    b.Property<string>("Channel")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasDefaultValue("Email")
+                        .HasColumnName("channel");
+
                     b.Property<DateTimeOffset>("CreatedAtUtc")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("created_at_utc");
@@ -154,6 +162,11 @@ namespace Agendio.Modules.Marketing.Infrastructure.Persistence.Migrations
                         .HasMaxLength(200)
                         .HasColumnType("character varying(200)")
                         .HasColumnName("subject");
+
+                    b.Property<string>("TargetSegment")
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("target_segment");
 
                     b.Property<Guid>("TenantId")
                         .HasColumnType("uuid")

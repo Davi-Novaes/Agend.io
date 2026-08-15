@@ -12,7 +12,7 @@ public sealed class ListCampaignsQueryHandler(MarketingDbContext dbContext) : IQ
     {
         var paged = await dbContext.Campaigns.AsNoTracking()
             .OrderByDescending(c => c.SentAtUtc)
-            .Select(c => new CampaignSummary(c.Id.Value, c.Subject, c.RecipientCount, c.SentAtUtc))
+            .Select(c => new CampaignSummary(c.Id.Value, c.Subject, c.Channel, c.TargetSegment, c.RecipientCount, c.SentAtUtc))
             .ToPagedItemsAsync(request.Page, request.PageSize, cancellationToken);
 
         return Result.Success(new ListCampaignsResult(paged.Items, paged.TotalCount, paged.Page, paged.PageSize));

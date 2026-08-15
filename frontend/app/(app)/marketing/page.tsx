@@ -8,7 +8,7 @@ import { z } from "zod";
 import { toast } from "sonner";
 import { Megaphone, Send } from "lucide-react";
 
-import { sendCampaign, listCampaigns, ApiError } from "@/lib/api/client";
+import { sendCampaign, listCampaigns, ApiError, type CampaignChannel, type CustomerSegment } from "@/lib/api/client";
 import { useSession } from "@/lib/auth/session-context";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -19,6 +19,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 const PAGE_SIZE = 20;
 
@@ -26,12 +27,30 @@ function formatDateTime(value: string): string {
   return new Date(value).toLocaleString("pt-BR");
 }
 
+const CHANNEL_LABEL: Record<CampaignChannel, string> = {
+  Email: "E-mail",
+  WhatsApp: "WhatsApp",
+};
+
+// Mesmos rotulos de /clientes (Fase 9) — auto-segmentacao calculada no backend.
+const SEGMENT_LABEL: Record<CustomerSegment, string> = {
+  Novo: "Novo",
+  Recorrente: "Recorrente",
+  Vip: "VIP",
+  EmRisco: "Em risco",
+  Inativo: "Inativo",
+  NoShow: "Faltas",
+};
+const SEGMENTS: CustomerSegment[] = ["Novo", "Recorrente", "Vip", "EmRisco", "Inativo", "NoShow"];
+
 const campaignSchema = z.object({
   subject: z.string().min(1, "Informe o assunto."),
   body: z.string().min(1, "Informe a mensagem."),
+  channel: z.enum(["Email", "WhatsApp"]),
+  targetSegment: z.union([z.enum(["Novo", "Recorrente", "Vip", "EmRisco", "Inativo", "NoShow"]), z.literal("all")]),
 });
 type CampaignFormValues = z.infer<typeof campaignSchema>;
-const emptyCampaignForm: CampaignFormValues = { subject: "", body: "" };
+const emptyCampaignForm: CampaignFormValues = { subject: "", body: "", channel: "Email", targetSegment: "all" };
 
 export default function MarketingPage() {
   const { session } = useSession();
@@ -57,7 +76,16 @@ export default function MarketingPage() {
   });
 
   const sendMutation = useMutation({
-    mutationFn: (values: CampaignFormValues) => sendCampaign(values, accessToken),
+    mutationFn: (values: CampaignFormValues) =>
+      sendCampaign(
+        {
+          subject: values.subject,
+          body: values.body,
+          channel: values.channel,
+          targetSegment: values.targetSegment === "all" ? null : values.targetSegment,
+        },
+        accessToken
+      ),
     onSuccess: (data) => {
       toast.success(`Campanha enviada para ${data.recipientCount} cliente(s).`);
       queryClient.invalidateQueries({ queryKey: ["marketing", "campanhas"] });
@@ -88,7 +116,7 @@ export default function MarketingPage() {
   return (
     <div className="mx-auto flex w-full max-w-4xl flex-1 flex-col">
       <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
-        <p className="text-muted-foreground text-sm">Campanhas de e-mail para os clientes ativos.</p>
+        <p className="text-muted-foreground text-sm">Campanhas por e-mail ou WhatsApp para os clientes ativos.</p>
         <Button onClick={openCreateDialog}>
           <Send className="size-4" />
           Nova campanha
@@ -101,6 +129,8 @@ export default function MarketingPage() {
             <TableHeader>
               <TableRow>
                 <TableHead>Assunto</TableHead>
+                <TableHead>Canal</TableHead>
+                <TableHead>Publico</TableHead>
                 <TableHead>Enviada em</TableHead>
                 <TableHead className="text-right">Destinatarios</TableHead>
               </TableRow>
@@ -110,17 +140,19 @@ export default function MarketingPage() {
                 Array.from({ length: 5 }).map((_, index) => (
                   <TableRow key={index}>
                     <TableCell><Skeleton className="h-4 w-48" /></TableCell>
+                    <TableCell><Skeleton className="h-4 w-20" /></TableCell>
+                    <TableCell><Skeleton className="h-4 w-20" /></TableCell>
                     <TableCell><Skeleton className="h-4 w-32" /></TableCell>
                     <TableCell className="text-right"><Skeleton className="ml-auto h-4 w-16" /></TableCell>
                   </TableRow>
                 ))
               ) : listQuery.data?.items.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={3} className="p-0">
+                  <TableCell colSpan={5} className="p-0">
                     <EmptyState
                       icon={Megaphone}
                       title="Nenhuma campanha enviada ainda"
-                      description="Envie sua primeira campanha por e-mail para os clientes ativos."
+                      description="Envie sua primeira campanha por e-mail ou WhatsApp para os clientes ativos."
                       action={
                         <Button size="sm" onClick={openCreateDialog}>
                           <Send className="size-4" />
@@ -134,6 +166,8 @@ export default function MarketingPage() {
                 listQuery.data?.items.map((campaign) => (
                   <TableRow key={campaign.id}>
                     <TableCell className="font-medium">{campaign.subject}</TableCell>
+                    <TableCell>{CHANNEL_LABEL[campaign.channel]}</TableCell>
+                    <TableCell>{campaign.targetSegment ? SEGMENT_LABEL[campaign.targetSegment] : "Todos"}</TableCell>
                     <TableCell>{formatDateTime(campaign.sentAtUtc)}</TableCell>
                     <TableCell className="text-right tabular-nums">{campaign.recipientCount}</TableCell>
                   </TableRow>
@@ -178,6 +212,52 @@ export default function MarketingPage() {
                   </FormItem>
                 )}
               />
+              <div className="grid grid-cols-2 gap-3">
+                <FormField
+                  control={form.control}
+                  name="channel"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Canal</FormLabel>
+                      <Select value={field.value} onValueChange={field.onChange}>
+                        <FormControl>
+                          <SelectTrigger className="w-full">
+                            <SelectValue />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          <SelectItem value="Email">E-mail</SelectItem>
+                          <SelectItem value="WhatsApp">WhatsApp</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="targetSegment"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Publico</FormLabel>
+                      <Select value={field.value} onValueChange={field.onChange}>
+                        <FormControl>
+                          <SelectTrigger className="w-full">
+                            <SelectValue />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          <SelectItem value="all">Todos os clientes</SelectItem>
+                          {SEGMENTS.map((segment) => (
+                            <SelectItem key={segment} value={segment}>
+                              {SEGMENT_LABEL[segment]}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </FormItem>
+                  )}
+                />
+              </div>
               <FormField
                 control={form.control}
                 name="body"
@@ -205,8 +285,14 @@ export default function MarketingPage() {
             <DialogTitle>Confirmar envio</DialogTitle>
           </DialogHeader>
           <p className="text-sm">
-            Enviar a campanha <strong>&ldquo;{pendingCampaign?.subject}&rdquo;</strong> para todos os clientes ativos com e-mail
-            cadastrado? Essa acao nao pode ser desfeita.
+            Enviar a campanha <strong>&ldquo;{pendingCampaign?.subject}&rdquo;</strong> por{" "}
+            <strong>{pendingCampaign ? CHANNEL_LABEL[pendingCampaign.channel] : ""}</strong> para{" "}
+            <strong>
+              {pendingCampaign?.targetSegment && pendingCampaign.targetSegment !== "all"
+                ? `clientes ativos no segmento "${SEGMENT_LABEL[pendingCampaign.targetSegment]}"`
+                : "todos os clientes ativos"}
+            </strong>{" "}
+            elegiveis para o canal escolhido? Essa acao nao pode ser desfeita.
           </p>
           <DialogFooter>
             <Button

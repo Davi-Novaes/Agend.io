@@ -323,11 +323,13 @@ public class ModuleDependencyRulesTests
     }
 
     [Fact]
-    public void Marketing_Module_Should_Not_Depend_On_Any_Module_Internals_Except_Customers_Contracts()
+    public void Marketing_Module_Should_Not_Depend_On_Any_Module_Internals_Except_Customers_And_Tenancy_Contracts()
     {
-        // Marketing so precisa resolver a lista de clientes ativos com e-mail
-        // (ICustomerLookupService.ListActiveWithEmailAsync) — nunca deveria
-        // enxergar Customers.Domain ou qualquer outro modulo diretamente.
+        // Marketing precisa resolver clientes elegiveis por canal/segmento
+        // (ICustomerLookupService) e, para campanhas WhatsApp, as credenciais
+        // do tenant (ITenantLookupService.GetWhatsAppSettingsAsync, Fase 21) —
+        // nunca deveria enxergar Customers.Domain, Tenancy.Domain ou qualquer
+        // outro modulo diretamente.
         var forbiddenNamespaces = new[]
         {
             "Agendio.Modules.Customers.Domain",
@@ -368,7 +370,7 @@ public class ModuleDependencyRulesTests
             .GetResult();
 
         result.IsSuccessful.ShouldBeTrue(
-            "Marketing so pode depender do .Contracts de Customers, nunca de nenhum modulo inteiro. " +
+            "Marketing so pode depender do .Contracts de Customers e Tenancy, nunca de nenhum modulo inteiro. " +
             "Tipos violando a regra: " + string.Join(", ", result.FailingTypeNames ?? []));
     }
 
