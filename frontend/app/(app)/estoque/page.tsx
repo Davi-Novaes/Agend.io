@@ -67,14 +67,25 @@ function toNullable(value: string): string | null {
 const productSchema = z.object({
   name: z.string().min(1, "Informe o nome."),
   sku: z.string(),
+  category: z.string(),
   description: z.string(),
   quantityInStock: z.coerce.number().int("Use um numero inteiro.").min(0, "Nao pode ser negativo."),
   minimumStock: z.coerce.number().int("Use um numero inteiro.").min(0, "Nao pode ser negativo."),
+  costPrice: z.string(),
   salePrice: z.string(),
 });
 type ProductFormInput = z.input<typeof productSchema>;
 type ProductFormValues = z.output<typeof productSchema>;
-const emptyProductForm: ProductFormInput = { name: "", sku: "", description: "", quantityInStock: 0, minimumStock: 0, salePrice: "" };
+const emptyProductForm: ProductFormInput = {
+  name: "",
+  sku: "",
+  category: "",
+  description: "",
+  quantityInStock: 0,
+  minimumStock: 0,
+  costPrice: "",
+  salePrice: "",
+};
 
 const movementSchema = z.object({
   type: z.enum(["Entry", "Exit"]),
@@ -154,9 +165,11 @@ function ProdutosTab({ accessToken }: { accessToken: string }) {
         {
           name: values.name,
           sku: toNullable(values.sku),
+          category: toNullable(values.category),
           description: toNullable(values.description),
           quantityInStock: values.quantityInStock,
           minimumStock: values.minimumStock,
+          costPrice: values.costPrice.trim() === "" ? null : Number(values.costPrice),
           salePrice: values.salePrice.trim() === "" ? null : Number(values.salePrice),
         },
         accessToken
@@ -179,8 +192,10 @@ function ProdutosTab({ accessToken }: { accessToken: string }) {
         {
           name: values.name,
           sku: toNullable(values.sku),
+          category: toNullable(values.category),
           description: toNullable(values.description),
           minimumStock: values.minimumStock,
+          costPrice: values.costPrice.trim() === "" ? null : Number(values.costPrice),
           salePrice: values.salePrice.trim() === "" ? null : Number(values.salePrice),
         },
         accessToken
@@ -234,9 +249,11 @@ function ProdutosTab({ accessToken }: { accessToken: string }) {
       form.reset({
         name: details.name,
         sku: details.sku ?? "",
+        category: details.category ?? "",
         description: details.description ?? "",
         quantityInStock: details.quantityInStock,
         minimumStock: details.minimumStock,
+        costPrice: details.costPrice !== null ? String(details.costPrice) : "",
         salePrice: details.salePrice !== null ? String(details.salePrice) : "",
       });
       setDialogOpen(true);
@@ -304,6 +321,7 @@ function ProdutosTab({ accessToken }: { accessToken: string }) {
               <TableRow>
                 <TableHead>Nome</TableHead>
                 <TableHead>SKU</TableHead>
+                <TableHead>Categoria</TableHead>
                 <TableHead className="text-right">Quantidade</TableHead>
                 <TableHead className="text-right">Preco</TableHead>
                 <TableHead>Status</TableHead>
@@ -316,6 +334,7 @@ function ProdutosTab({ accessToken }: { accessToken: string }) {
                   <TableRow key={index}>
                     <TableCell><Skeleton className="h-4 w-32" /></TableCell>
                     <TableCell><Skeleton className="h-4 w-16" /></TableCell>
+                    <TableCell><Skeleton className="h-4 w-20" /></TableCell>
                     <TableCell className="text-right"><Skeleton className="ml-auto h-4 w-12" /></TableCell>
                     <TableCell className="text-right"><Skeleton className="ml-auto h-4 w-20" /></TableCell>
                     <TableCell><Skeleton className="h-5 w-14 rounded-full" /></TableCell>
@@ -324,7 +343,7 @@ function ProdutosTab({ accessToken }: { accessToken: string }) {
                 ))
               ) : listQuery.data?.items.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={6} className="p-0">
+                  <TableCell colSpan={7} className="p-0">
                     {search || lowStockOnly ? (
                       <EmptyState
                         icon={ListFilter}
@@ -365,6 +384,7 @@ function ProdutosTab({ accessToken }: { accessToken: string }) {
                   <TableRow key={product.id}>
                     <TableCell className="font-medium">{product.name}</TableCell>
                     <TableCell>{product.sku ?? "—"}</TableCell>
+                    <TableCell>{product.category ?? "—"}</TableCell>
                     <TableCell className="text-right tabular-nums">
                       <div className="flex items-center justify-end gap-2">
                         {product.isLowStock && (
@@ -455,6 +475,33 @@ function ProdutosTab({ accessToken }: { accessToken: string }) {
                       <FormControl>
                         <Input {...field} />
                       </FormControl>
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="category"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Categoria</FormLabel>
+                      <FormControl>
+                        <Input {...field} />
+                      </FormControl>
+                    </FormItem>
+                  )}
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <FormField
+                  control={form.control}
+                  name="costPrice"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Preco de custo</FormLabel>
+                      <FormControl>
+                        <Input type="number" min={0} step={0.01} {...field} />
+                      </FormControl>
+                      <FormMessage />
                     </FormItem>
                   )}
                 />

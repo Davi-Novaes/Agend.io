@@ -22,15 +22,23 @@ public sealed class ProductConfiguration : IEntityTypeConfiguration<Product>
 
         builder.Property(p => p.Name).IsRequired().HasMaxLength(200);
         builder.Property(p => p.Sku).HasMaxLength(50);
+        builder.Property(p => p.Category).HasMaxLength(100);
         builder.Property(p => p.Description).HasMaxLength(1000);
         builder.Property(p => p.QuantityInStock).IsRequired();
         builder.Property(p => p.MinimumStock).IsRequired();
         builder.Property(p => p.IsActive).IsRequired();
 
-        // SalePrice e opcional (produto pode nao ter preco de venda cadastrado
-        // ainda) — diferente de todo outro uso de Money no projeto, que e sempre
-        // obrigatorio. IsRequired(false) explicito porque OwnsOne assume
-        // dependente obrigatorio por padrao.
+        // CostPrice/SalePrice sao opcionais (produto pode nao ter preco de custo
+        // ou de venda cadastrado ainda) — diferente de todo outro uso de Money no
+        // projeto, que e sempre obrigatorio. IsRequired(false) explicito porque
+        // OwnsOne assume dependente obrigatorio por padrao.
+        builder.OwnsOne(p => p.CostPrice, costPrice =>
+        {
+            costPrice.Property(m => m.Amount).HasColumnName("cost_price_amount").HasColumnType("numeric(10,2)");
+            costPrice.Property(m => m.Currency).HasColumnName("cost_price_currency").HasMaxLength(3);
+        });
+        builder.Navigation(p => p.CostPrice).IsRequired(false);
+
         builder.OwnsOne(p => p.SalePrice, salePrice =>
         {
             salePrice.Property(m => m.Amount).HasColumnName("sale_price_amount").HasColumnType("numeric(10,2)");

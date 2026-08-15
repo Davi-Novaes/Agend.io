@@ -6,7 +6,7 @@ public sealed record ListProductsQuery(string? Search, bool? IsActive, bool LowS
     : IQuery<ListProductsResult>;
 
 public sealed record ProductSummary(
-    Guid Id, string Name, string? Sku, int QuantityInStock, int MinimumStock, decimal? SalePrice, string? Currency, bool IsActive,
-    bool IsLowStock);
+    Guid Id, string Name, string? Sku, string? Category, int QuantityInStock, int MinimumStock,
+    decimal? CostPrice, decimal? SalePrice, string? Currency, bool IsActive, bool IsLowStock);
 
 public sealed record ListProductsResult(IReadOnlyList<ProductSummary> Items, int TotalCount, int Page, int PageSize);

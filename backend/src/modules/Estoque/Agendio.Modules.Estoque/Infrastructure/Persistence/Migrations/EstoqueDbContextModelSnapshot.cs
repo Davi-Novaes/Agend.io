@@ -126,6 +126,11 @@ namespace Agendio.Modules.Estoque.Infrastructure.Persistence.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("id");
 
+                    b.Property<string>("Category")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("category");
+
                     b.Property<DateTimeOffset>("CreatedAtUtc")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("created_at_utc");
@@ -267,6 +272,31 @@ namespace Agendio.Modules.Estoque.Infrastructure.Persistence.Migrations
 
             modelBuilder.Entity("Agendio.Modules.Estoque.Domain.Product", b =>
                 {
+                    b.OwnsOne("Agendio.SharedKernel.ValueObjects.Money", "CostPrice", b1 =>
+                        {
+                            b1.Property<Guid>("ProductId")
+                                .HasColumnType("uuid")
+                                .HasColumnName("id");
+
+                            b1.Property<decimal>("Amount")
+                                .HasColumnType("numeric(10,2)")
+                                .HasColumnName("cost_price_amount");
+
+                            b1.Property<string>("Currency")
+                                .IsRequired()
+                                .HasMaxLength(3)
+                                .HasColumnType("character varying(3)")
+                                .HasColumnName("cost_price_currency");
+
+                            b1.HasKey("ProductId");
+
+                            b1.ToTable("products", "estoque");
+
+                            b1.WithOwner()
+                                .HasForeignKey("ProductId")
+                                .HasConstraintName("fk_products_products_id");
+                        });
+
                     b.OwnsOne("Agendio.SharedKernel.ValueObjects.Money", "SalePrice", b1 =>
                         {
                             b1.Property<Guid>("ProductId")
@@ -291,6 +321,8 @@ namespace Agendio.Modules.Estoque.Infrastructure.Persistence.Migrations
                                 .HasForeignKey("ProductId")
                                 .HasConstraintName("fk_products_products_id");
                         });
+
+                    b.Navigation("CostPrice");
 
                     b.Navigation("SalePrice");
                 });

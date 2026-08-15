@@ -50,8 +50,8 @@ public sealed class EstoqueEndpoints : IEndpointModule
         group.MapPost("/produtos", async (CreateProductRequest request, IDispatcher dispatcher, CancellationToken cancellationToken) =>
         {
             var command = new CreateProductCommand(
-                request.Name, request.Sku, request.Description, request.QuantityInStock, request.MinimumStock, request.SalePrice,
-                request.Currency);
+                request.Name, request.Sku, request.Category, request.Description, request.QuantityInStock, request.MinimumStock,
+                request.CostPrice, request.SalePrice, request.Currency);
             var result = await dispatcher.Send(command, cancellationToken);
 
             return result.IsSuccess
@@ -65,7 +65,8 @@ public sealed class EstoqueEndpoints : IEndpointModule
             Guid id, UpdateProductRequest request, IDispatcher dispatcher, CancellationToken cancellationToken) =>
         {
             var command = new UpdateProductCommand(
-                id, request.Name, request.Sku, request.Description, request.MinimumStock, request.SalePrice, request.Currency);
+                id, request.Name, request.Sku, request.Category, request.Description, request.MinimumStock,
+                request.CostPrice, request.SalePrice, request.Currency);
             var result = await dispatcher.Send(command, cancellationToken);
             return result.IsSuccess ? Results.NoContent() : result.Error.ToProblemResult();
         })
@@ -108,9 +109,12 @@ public sealed class EstoqueEndpoints : IEndpointModule
     }
 
     private sealed record CreateProductRequest(
-        string Name, string? Sku, string? Description, int QuantityInStock, int MinimumStock, decimal? SalePrice, string? Currency);
+        string Name, string? Sku, string? Category, string? Description, int QuantityInStock, int MinimumStock,
+        decimal? CostPrice, decimal? SalePrice, string? Currency);
 
-    private sealed record UpdateProductRequest(string Name, string? Sku, string? Description, int MinimumStock, decimal? SalePrice, string? Currency);
+    private sealed record UpdateProductRequest(
+        string Name, string? Sku, string? Category, string? Description, int MinimumStock,
+        decimal? CostPrice, decimal? SalePrice, string? Currency);
 
     private sealed record SetActiveStatusRequest(bool IsActive);
 

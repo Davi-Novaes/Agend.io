@@ -23,7 +23,11 @@ public class EstoqueTests(IntegrationTestFixture fixture)
 
         var createResponse = await AuthorizedRequestHelpers.PostAuthorizedAsync(
             client, accessToken, "/api/estoque/produtos",
-            new { name = "Xampu", sku = "SKU-1", description = "Xampu revenda", quantityInStock = 10, minimumStock = 2, salePrice = 29.9m, currency = "BRL" },
+            new
+            {
+                name = "Xampu", sku = "SKU-1", category = "Cosmeticos", description = "Xampu revenda", quantityInStock = 10,
+                minimumStock = 2, costPrice = 12.5m, salePrice = 29.9m, currency = "BRL",
+            },
             cancellationToken);
         createResponse.StatusCode.ShouldBe(HttpStatusCode.Created);
 
@@ -36,10 +40,36 @@ public class EstoqueTests(IntegrationTestFixture fixture)
 
         var getBody = await getResponse.Content.ReadFromJsonAsync<JsonElement>(cancellationToken);
         getBody.GetProperty("name").GetString().ShouldBe("Xampu");
+        getBody.GetProperty("category").GetString().ShouldBe("Cosmeticos");
         getBody.GetProperty("quantityInStock").GetInt32().ShouldBe(10);
         getBody.GetProperty("minimumStock").GetInt32().ShouldBe(2);
+        getBody.GetProperty("costPrice").GetDecimal().ShouldBe(12.5m);
         getBody.GetProperty("salePrice").GetDecimal().ShouldBe(29.9m);
         getBody.GetProperty("isActive").GetBoolean().ShouldBeTrue();
+    }
+
+    [Fact]
+    public async Task Owner_Can_Update_Product_Category_And_Cost_Price()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var client = fixture.CreateClient();
+        var accessToken = await CreateTenantWithOwnerAndLoginAsync(client, cancellationToken);
+        var productId = await CreateProductAsync(client, accessToken, quantityInStock: 10, minimumStock: 2, cancellationToken);
+
+        var updateResponse = await AuthorizedRequestHelpers.PutAuthorizedAsync(
+            client, accessToken, $"/api/estoque/produtos/{productId}",
+            new
+            {
+                name = "Produto Atualizado", sku = (string?)null, category = "Higiene", description = (string?)null,
+                minimumStock = 2, costPrice = 8.0m, salePrice = 19.9m, currency = "BRL",
+            },
+            cancellationToken);
+        updateResponse.StatusCode.ShouldBe(HttpStatusCode.NoContent);
+
+        var product = await GetProductAsync(client, accessToken, productId, cancellationToken);
+        product.GetProperty("category").GetString().ShouldBe("Higiene");
+        product.GetProperty("costPrice").GetDecimal().ShouldBe(8.0m);
+        product.GetProperty("salePrice").GetDecimal().ShouldBe(19.9m);
     }
 
     [Fact]

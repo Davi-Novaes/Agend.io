@@ -19,7 +19,7 @@ public sealed class GetProductByIdQueryHandler(EstoqueDbContext dbContext) : IQu
         }
 
         return Result.Success(new ProductDetails(
-            product.Id.Value, product.Name, product.Sku, product.Description, product.QuantityInStock, product.MinimumStock,
-            product.SalePrice?.Amount, product.SalePrice?.Currency, product.IsActive));
+            product.Id.Value, product.Name, product.Sku, product.Category, product.Description, product.QuantityInStock,
+            product.MinimumStock, product.CostPrice?.Amount, product.SalePrice?.Amount, product.SalePrice?.Currency, product.IsActive));
     }
 }
