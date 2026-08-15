@@ -156,6 +156,7 @@ export function CategoryBreakdownChart({
   subtitle = "Saidas pagas no periodo",
   emptyMessage = "Nenhuma despesa paga no periodo.",
   categoryLabel = "Categoria",
+  valueFormatter = formatCurrency,
 }: {
   data: CashFlowCategoryPoint[];
   id?: string;
@@ -163,6 +164,8 @@ export function CategoryBreakdownChart({
   subtitle?: string;
   emptyMessage?: string;
   categoryLabel?: string;
+  /** Formata o valor da barra/celula — default e moeda (uso original, Financeiro). Outros consumidores (ex.: media de avaliacao) passam o proprio formatador. */
+  valueFormatter?: (value: number) => string;
 }) {
   const [view, setView] = React.useState<ViewMode>("chart");
   const max = Math.max(1, ...data.map((point) => point.total));
@@ -191,7 +194,7 @@ export function CategoryBreakdownChart({
             {data.map((point) => (
               <TableRow key={point.category}>
                 <TableCell>{CATEGORY_LABELS[point.category] ?? point.category}</TableCell>
-                <TableCell className="text-right tabular-nums">{formatCurrency(point.total)}</TableCell>
+                <TableCell className="text-right tabular-nums">{valueFormatter(point.total)}</TableCell>
               </TableRow>
             ))}
           </TableBody>
@@ -207,7 +210,7 @@ export function CategoryBreakdownChart({
                   style={{ width: `${Math.max(3, (point.total / max) * 100)}%` }}
                 />
               </div>
-              <span className="w-24 shrink-0 text-right text-xs tabular-nums">{formatCurrency(point.total)}</span>
+              <span className="w-24 shrink-0 text-right text-xs tabular-nums">{valueFormatter(point.total)}</span>
             </li>
           ))}
         </ul>

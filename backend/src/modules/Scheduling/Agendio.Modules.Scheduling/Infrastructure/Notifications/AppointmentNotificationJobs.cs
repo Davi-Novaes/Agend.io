@@ -1,4 +1,5 @@
 using System.Globalization;
+using Agendio.Infrastructure;
 using Agendio.Infrastructure.Notifications;
 using Agendio.Modules.Customers.Contracts;
 using Agendio.Modules.Scheduling.Domain;
@@ -8,6 +9,7 @@ using Agendio.SharedKernel.Multitenancy;
 using Agendio.SharedKernel.Time;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 
 namespace Agendio.Modules.Scheduling.Infrastructure.Notifications;
 
@@ -49,6 +51,7 @@ public sealed class AppointmentNotificationJobs(
     ITenantLookupService tenantLookup,
     IEmailSender emailSender,
     IWhatsAppSender whatsAppSender,
+    IOptions<FrontendOptions> frontendOptions,
     ILogger<AppointmentNotificationJobs> logger)
 {
     public async Task SendConfirmationEmailAsync(Guid tenantId, Guid appointmentId, CancellationToken cancellationToken)
@@ -205,14 +208,21 @@ public sealed class AppointmentNotificationJobs(
             }
         }
 
+        // So o pos-atendimento leva link de avaliacao — os outros 5 gatilhos nao fazem sentido pedir review ainda.
+        var reviewUrl = trigger == NotificationTrigger.Completed && tenant is not null
+            ? $"{frontendOptions.Value.BaseUrl}/{tenant.Slug}/avaliar?appointmentId={appointment.Id.Value}"
+            : null;
+
         if (customer.Email is not null)
         {
             var headline = reminderLabel is null ? $"{emailSubjectPrefix}!" : $"Lembrete: seu agendamento e {reminderLabel}!";
+            var reviewHtml = reviewUrl is null ? "" : $"""<p><a href="{reviewUrl}">Avalie seu atendimento</a></p>""";
             var html = $"""
                 <p>{headline}</p>
                 <p><strong>{appointment.ServiceName}</strong></p>
                 <p>{localStart:dddd, dd/MM/yyyy 'as' HH:mm}</p>
                 <p>{tenantName}</p>
+                {reviewHtml}
                 """;
 
             try
@@ -227,7 +237,8 @@ public sealed class AppointmentNotificationJobs(
             }
         }
 
-        await TrySendWhatsAppAsync(appointment, customer.CustomerId, trigger, customer.Phone, customer.FullName, appointment.ServiceName, localStart, tenantName, cancellationToken);
+        await TrySendWhatsAppAsync(
+            appointment, customer.CustomerId, trigger, customer.Phone, customer.FullName, appointment.ServiceName, localStart, tenantName, reviewUrl, cancellationToken);
     }
 
     private async Task TrySendWhatsAppAsync(
@@ -239,6 +250,7 @@ public sealed class AppointmentNotificationJobs(
         string serviceName,
         DateTimeOffset localStart,
         string tenantName,
+        string? reviewUrl,
         CancellationToken cancellationToken)
     {
         if (customerPhone is null)
@@ -253,7 +265,7 @@ public sealed class AppointmentNotificationJobs(
         }
 
         var template = SelectTemplate(settings, trigger) ?? WhatsAppMessageDefaults.For(trigger);
-        var message = RenderTemplate(template, customerName, serviceName, localStart, tenantName);
+        var message = RenderTemplate(template, customerName, serviceName, localStart, tenantName, reviewUrl);
         var credentials = new WhatsAppCredentials(settings.PhoneNumberId, settings.AccessToken);
 
         try
@@ -298,13 +310,15 @@ public sealed class AppointmentNotificationJobs(
         _ => null,
     };
 
-    private static string RenderTemplate(string template, string customerName, string serviceName, DateTimeOffset localStart, string tenantName) =>
+    private static string RenderTemplate(
+        string template, string customerName, string serviceName, DateTimeOffset localStart, string tenantName, string? reviewUrl) =>
         template
             .Replace("{{cliente}}", customerName)
             .Replace("{{servico}}", serviceName)
             .Replace("{{data}}", localStart.ToString("dd/MM/yyyy", CultureInfo.InvariantCulture))
             .Replace("{{hora}}", localStart.ToString("HH:mm", CultureInfo.InvariantCulture))
-            .Replace("{{estabelecimento}}", tenantName);
+            .Replace("{{estabelecimento}}", tenantName)
+            .Replace("{{link_avaliacao}}", reviewUrl ?? "");
 }
 
 /// <summary>Qual dos dois lembretes automaticos — cada um com seu proprio toggle (Tenant.Reminder24hEnabled/Reminder2hEnabled, Fase 7).</summary>
@@ -314,7 +328,11 @@ public enum ReminderLeadTime
     TwoHours,
 }
 
-/// <summary>Texto usado quando o tenant nao customizou o template do gatilho — placeholders: {{cliente}}, {{servico}}, {{data}}, {{hora}}, {{estabelecimento}}.</summary>
+/// <summary>
+/// Texto usado quando o tenant nao customizou o template do gatilho — placeholders:
+/// {{cliente}}, {{servico}}, {{data}}, {{hora}}, {{estabelecimento}}, {{link_avaliacao}}
+/// (Fase 12 — so preenchido no gatilho Completed, vazio nos demais).
+/// </summary>
 internal static class WhatsAppMessageDefaults
 {
     public static string For(NotificationTrigger trigger) => trigger switch
@@ -330,7 +348,7 @@ internal static class WhatsAppMessageDefaults
         NotificationTrigger.Confirmed =>
             "Seu agendamento de {{servico}} em {{estabelecimento}} para {{data}} as {{hora}} esta confirmado. Contamos com voce!",
         NotificationTrigger.Completed =>
-            "Obrigado por visitar {{estabelecimento}}, {{cliente}}! Esperamos que tenha gostado do seu {{servico}}.",
+            "Obrigado por visitar {{estabelecimento}}, {{cliente}}! Esperamos que tenha gostado do seu {{servico}}. Avalie seu atendimento: {{link_avaliacao}}",
         _ => throw new ArgumentOutOfRangeException(nameof(trigger)),
     };
 }

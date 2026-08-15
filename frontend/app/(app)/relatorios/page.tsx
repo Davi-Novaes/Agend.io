@@ -4,13 +4,15 @@ import * as React from "react";
 import Link from "next/link";
 import { useQuery } from "@tanstack/react-query";
 
-import { getCashFlowSummary, getAppointmentStats, getInventorySummary } from "@/lib/api/client";
+import { getCashFlowSummary, getAppointmentStats, getInventorySummary, getReviewsSummary } from "@/lib/api/client";
 import { useSession } from "@/lib/auth/session-context";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { PeriodFilter } from "@/components/shared/period-filter";
 import { CashFlowChart, CategoryBreakdownChart } from "@/components/financeiro/cash-flow-chart";
+import { RatingEvolutionChart } from "@/components/scheduling/rating-evolution-chart";
+import { StarRating } from "@/components/scheduling/star-rating";
 import { toDateOnly, startOfMonth } from "@/lib/date-utils";
 
 function formatCurrency(value: number): string {
@@ -39,6 +41,7 @@ export default function RelatoriosPage() {
       <div className="flex flex-col gap-10">
         <FinanceiroSection from={from} to={to} accessToken={session.accessToken} />
         <AgendaSection from={from} to={to} accessToken={session.accessToken} />
+        <AvaliacoesSection from={from} to={to} accessToken={session.accessToken} />
         <EstoqueSection accessToken={session.accessToken} />
       </div>
     </div>
@@ -121,6 +124,88 @@ function AgendaSection({ from, to, accessToken }: { from: string; to: string; ac
             data={stats.revenueByProfessional.map((point) => ({ category: point.resourceName, total: point.total }))}
           />
         </div>
+      )}
+    </section>
+  );
+}
+
+function formatDateTime(value: string): string {
+  return new Date(value).toLocaleString("pt-BR");
+}
+
+function AvaliacoesSection({ from, to, accessToken }: { from: string; to: string; accessToken: string }) {
+  const query = useQuery({
+    queryKey: ["relatorios", "avaliacoes", from, to],
+    queryFn: () => getReviewsSummary({ from, to }, accessToken),
+  });
+  const summary = query.data;
+
+  return (
+    <section className="flex flex-col gap-4">
+      <SectionHeading title="Avaliacoes" description="Nota media, evolucao e comentarios recentes dos clientes no periodo." />
+      <div className="grid gap-4 sm:grid-cols-2">
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-muted-foreground text-sm font-normal">Media geral</CardTitle>
+          </CardHeader>
+          <CardContent>
+            {query.isLoading ? (
+              <Skeleton className="h-8 w-24" />
+            ) : summary && summary.totalCount > 0 ? (
+              <div className="flex items-center gap-2">
+                <span className="text-2xl font-semibold">{summary.averageRating.toFixed(1)}</span>
+                <StarRating value={summary.averageRating} readOnly size="sm" />
+              </div>
+            ) : (
+              <p className="text-2xl font-semibold">—</p>
+            )}
+          </CardContent>
+        </Card>
+        <KpiCard label="Total de avaliacoes" value={summary ? summary.totalCount : "—"} isLoading={query.isLoading} />
+      </div>
+
+      {summary && summary.totalCount > 0 && (
+        <>
+          <RatingEvolutionChart data={summary.seriesByMonth} />
+          <div className="grid gap-4 lg:grid-cols-2">
+            <CategoryBreakdownChart
+              id="rating-by-service"
+              title="Media por servico"
+              subtitle="Avaliacoes no periodo"
+              emptyMessage="Nenhuma avaliacao no periodo."
+              categoryLabel="Servico"
+              valueFormatter={(value) => `${value.toFixed(1)} ★`}
+              data={summary.byService.map((point) => ({ category: point.serviceName, total: point.averageRating }))}
+            />
+            <CategoryBreakdownChart
+              id="rating-by-professional"
+              title="Media por profissional"
+              subtitle="Avaliacoes no periodo"
+              emptyMessage="Nenhuma avaliacao no periodo."
+              categoryLabel="Profissional"
+              valueFormatter={(value) => `${value.toFixed(1)} ★`}
+              data={summary.byProfessional.map((point) => ({ category: point.resourceName, total: point.averageRating }))}
+            />
+          </div>
+
+          {summary.recentReviews.length > 0 && (
+            <div className="flex flex-col gap-3">
+              <h3 className="text-sm font-semibold">Avaliacoes recentes</h3>
+              <div className="flex flex-col gap-3">
+                {summary.recentReviews.map((review) => (
+                  <div key={review.id} className="rounded-lg border border-border p-3">
+                    <div className="flex items-center justify-between gap-2">
+                      <StarRating value={review.rating} readOnly size="sm" />
+                      <span className="text-muted-foreground text-xs">{formatDateTime(review.createdAtUtc)}</span>
+                    </div>
+                    <p className="text-muted-foreground mt-1 text-xs">{review.serviceName}</p>
+                    {review.comment && <p className="mt-1 text-sm">{review.comment}</p>}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </>
       )}
     </section>
   );
