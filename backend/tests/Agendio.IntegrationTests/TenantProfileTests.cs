@@ -335,6 +335,47 @@ public class TenantProfileTests(IntegrationTestFixture fixture)
     }
 
     [Fact]
+    public async Task Owner_Can_Update_And_Read_Back_Payment_Settings()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var client = fixture.CreateClient();
+        var accessToken = await CreateTenantWithOwnerAndLoginAsync(client, cancellationToken);
+
+        // Novo tenant nasce sem exigir pagamento (zero-config) — confirma isso
+        // antes de ligar, pra provar o default sensato e nao so o resultado do teste.
+        var initialProfileResponse = await AuthorizedRequestHelpers.GetAuthorizedAsync(client, accessToken, "/api/tenants/profile", cancellationToken);
+        var initialProfile = await initialProfileResponse.Content.ReadFromJsonAsync<JsonElement>(cancellationToken);
+        initialProfile.GetProperty("paymentRequired").GetBoolean().ShouldBeFalse();
+        initialProfile.GetProperty("depositPercentage").GetInt32().ShouldBe(30);
+
+        var updateResponse = await AuthorizedRequestHelpers.PutAuthorizedAsync(
+            client, accessToken, "/api/tenants/payment-settings",
+            new { paymentRequired = true, depositPercentage = 40 },
+            cancellationToken);
+        updateResponse.StatusCode.ShouldBe(HttpStatusCode.NoContent);
+
+        var profileResponse = await AuthorizedRequestHelpers.GetAuthorizedAsync(client, accessToken, "/api/tenants/profile", cancellationToken);
+        var profile = await profileResponse.Content.ReadFromJsonAsync<JsonElement>(cancellationToken);
+        profile.GetProperty("paymentRequired").GetBoolean().ShouldBeTrue();
+        profile.GetProperty("depositPercentage").GetInt32().ShouldBe(40);
+    }
+
+    [Fact]
+    public async Task Updating_Payment_Settings_With_An_Out_Of_Range_Percentage_Should_Be_Rejected()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var client = fixture.CreateClient();
+        var accessToken = await CreateTenantWithOwnerAndLoginAsync(client, cancellationToken);
+
+        var response = await AuthorizedRequestHelpers.PutAuthorizedAsync(
+            client, accessToken, "/api/tenants/payment-settings",
+            new { paymentRequired = true, depositPercentage = 0 },
+            cancellationToken);
+
+        response.StatusCode.ShouldBe(HttpStatusCode.BadRequest);
+    }
+
+    [Fact]
     public async Task Owner_Can_Connect_WhatsApp_And_Read_Back_Settings_Without_Exposing_The_Raw_Token()
     {
         var cancellationToken = TestContext.Current.CancellationToken;

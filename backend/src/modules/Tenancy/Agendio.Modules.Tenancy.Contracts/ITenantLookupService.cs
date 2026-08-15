@@ -24,4 +24,7 @@ public interface ITenantLookupService
 
     /// <summary>Configuracao do programa de fidelidade — usado pelo Customers ao creditar/resgatar pontos (Fase 11).</summary>
     Task<TenantLoyaltySettings?> GetLoyaltySettingsAsync(TenantId tenantId, CancellationToken cancellationToken = default);
+
+    /// <summary>Se o agendamento publico exige sinal e o percentual — usado pelo Scheduling ao criar um agendamento publico (Fase 16).</summary>
+    Task<TenantPaymentSettings?> GetPaymentSettingsAsync(TenantId tenantId, CancellationToken cancellationToken = default);
 }

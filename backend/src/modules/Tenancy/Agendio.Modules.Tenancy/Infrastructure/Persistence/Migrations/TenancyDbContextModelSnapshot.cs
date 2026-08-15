@@ -171,6 +171,12 @@ namespace Agendio.Modules.Tenancy.Infrastructure.Persistence.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("deleted_at_utc");
 
+                    b.Property<int>("DepositPercentage")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasDefaultValue(30)
+                        .HasColumnName("deposit_percentage");
+
                     b.Property<string>("Description")
                         .HasMaxLength(2000)
                         .HasColumnType("character varying(2000)")
@@ -243,6 +249,14 @@ namespace Agendio.Modules.Tenancy.Infrastructure.Persistence.Migrations
                         .HasColumnType("integer")
                         .HasDefaultValue(2)
                         .HasColumnName("no_show_threshold_for_deposit");
+
+                    b.Property<string>("PaymentRequirement")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasDefaultValue("None")
+                        .HasColumnName("payment_requirement");
 
                     b.Property<string>("Phone")
                         .HasMaxLength(20)

@@ -5,6 +5,7 @@ using Agendio.Modules.Scheduling.Application.CompleteAppointment;
 using Agendio.Modules.Scheduling.Application.ConfirmAppointment;
 using Agendio.Modules.Scheduling.Application.ConvertWaitlistEntry;
 using Agendio.Modules.Scheduling.Application.GetAppointmentById;
+using Agendio.Modules.Scheduling.Application.GetAppointmentDeposit;
 using Agendio.Modules.Scheduling.Application.GetAppointmentStats;
 using Agendio.Modules.Scheduling.Application.GetCustomerAppointmentHistory;
 using Agendio.Modules.Scheduling.Application.GetCustomerRecoveryCandidates;
@@ -95,6 +96,14 @@ public sealed class AppointmentEndpoints : IEndpointModule
         })
         .WithName("GetAppointmentById")
         .WithSummary("Busca um agendamento pelo Id.");
+
+        group.MapGet("/{id:guid}/deposit", async (Guid id, IDispatcher dispatcher, CancellationToken cancellationToken) =>
+        {
+            var result = await dispatcher.Query(new GetAppointmentDepositQuery(id), cancellationToken);
+            return result.IsSuccess ? Results.Ok(result.Value) : result.Error.ToProblemResult();
+        })
+        .WithName("GetAppointmentDeposit")
+        .WithSummary("Status do sinal de um agendamento, se houver (Fase 16) — null quando o tenant nao exige pagamento.");
 
         group.MapPost("/", async (ScheduleAppointmentRequest request, IDispatcher dispatcher, CancellationToken cancellationToken) =>
         {

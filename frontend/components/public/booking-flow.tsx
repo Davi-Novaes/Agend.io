@@ -47,10 +47,15 @@ function formatDate(iso: string): string {
 export function BookingFlow({
   tenantId,
   buttonRadiusClassName,
+  paymentRequired = false,
+  depositPercentage = 0,
 }: {
   tenantId: string;
   /** Estilo de botao do estabelecimento (Fase 3 — Personalizacao da pagina). */
   buttonRadiusClassName?: string;
+  /** Fase 16 — se o tenant exige sinal, o formulario passa a pedir CPF e a confirmacao mostra o link de pagamento. */
+  paymentRequired?: boolean;
+  depositPercentage?: number;
 }) {
   const [step, setStep] = React.useState<Step>("service");
   const [selectedService, setSelectedService] = React.useState<PublicServiceSummary | null>(null);
@@ -61,9 +66,11 @@ export function BookingFlow({
   const [fullName, setFullName] = React.useState("");
   const [email, setEmail] = React.useState("");
   const [phone, setPhone] = React.useState("");
+  const [cpf, setCpf] = React.useState("");
   const [notes, setNotes] = React.useState("");
   const [formError, setFormError] = React.useState<string | null>(null);
   const [showWaitlistForm, setShowWaitlistForm] = React.useState(false);
+  const [paymentUrl, setPaymentUrl] = React.useState<string | null>(null);
 
   const servicesQuery = useQuery({
     queryKey: ["public-services", tenantId],
@@ -92,8 +99,12 @@ export function BookingFlow({
         customerEmail: email.trim(),
         customerPhone: phone.trim() === "" ? null : phone.trim(),
         notes: notes.trim() === "" ? null : notes.trim(),
+        customerCpf: paymentRequired ? cpf.trim() : null,
       }),
-    onSuccess: () => setStep("confirmed"),
+    onSuccess: (result) => {
+      setPaymentUrl(result.paymentUrl);
+      setStep("confirmed");
+    },
     onError: (error) => {
       setFormError(error instanceof ApiError ? error.message : "Nao foi possivel concluir o agendamento. Tente novamente.");
     },
@@ -145,6 +156,11 @@ export function BookingFlow({
 
     if (!fullName.trim() || !email.trim()) {
       setFormError("Preencha nome e e-mail para confirmar.");
+      return;
+    }
+
+    if (paymentRequired && !cpf.trim()) {
+      setFormError("Este estabelecimento exige sinal para confirmar o agendamento — informe seu CPF.");
       return;
     }
 
@@ -371,6 +387,17 @@ export function BookingFlow({
               </label>
               <Input id="booking-phone" value={phone} onChange={(event) => setPhone(event.target.value)} autoComplete="tel" />
             </div>
+            {paymentRequired && (
+              <div>
+                <label htmlFor="booking-cpf" className="mb-1 block text-sm font-medium">
+                  CPF
+                </label>
+                <Input id="booking-cpf" value={cpf} onChange={(event) => setCpf(event.target.value)} required inputMode="numeric" />
+                <p className="text-muted-foreground mt-1 text-xs">
+                  Este estabelecimento exige um sinal de {depositPercentage}% do valor do serviço para confirmar o agendamento.
+                </p>
+              </div>
+            )}
             <div>
               <label htmlFor="booking-notes" className="mb-1 block text-sm font-medium">
                 Observacoes (opcional)
@@ -392,12 +419,25 @@ export function BookingFlow({
       {step === "confirmed" && selectedService && selectedSlot && (
         <section aria-labelledby="step-confirmed-heading" className="text-center">
           <h2 id="step-confirmed-heading" className="mb-2 text-lg font-medium">
-            Agendamento confirmado!
+            {paymentUrl ? "Falta pouco! Pague o sinal para confirmar" : "Agendamento confirmado!"}
           </h2>
           <p className="text-muted-foreground text-sm capitalize">
             {selectedService.name} em {formatDate(selectedSlot.startUtc)} as {formatTime(selectedSlot.startUtc)}
           </p>
-          <p className="text-muted-foreground mt-4 text-sm">Enviamos os detalhes para {email}.</p>
+          {paymentUrl ? (
+            <>
+              <p className="text-muted-foreground mt-4 text-sm">
+                Seu horário está reservado, mas só é confirmado após o pagamento do sinal.
+              </p>
+              <Button asChild className={cn("mt-4", buttonRadiusClassName)}>
+                <a href={paymentUrl} target="_blank" rel="noopener noreferrer">
+                  Pagar sinal agora
+                </a>
+              </Button>
+            </>
+          ) : (
+            <p className="text-muted-foreground mt-4 text-sm">Enviamos os detalhes para {email}.</p>
+          )}
         </section>
       )}
     </div>

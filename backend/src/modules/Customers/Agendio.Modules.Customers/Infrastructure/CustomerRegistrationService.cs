@@ -11,7 +11,7 @@ namespace Agendio.Modules.Customers.Infrastructure;
 internal sealed class CustomerRegistrationService(CustomersDbContext dbContext, ITenantContext tenantContext) : ICustomerRegistrationService
 {
     public async Task<Result<Guid>> FindOrRegisterByEmailAsync(
-        string fullName, string email, string? phone, CancellationToken cancellationToken = default)
+        string fullName, string email, string? phone, string? cpf = null, CancellationToken cancellationToken = default)
     {
         var emailResult = Email.Create(email);
         if (emailResult.IsFailure)
@@ -30,7 +30,7 @@ internal sealed class CustomerRegistrationService(CustomersDbContext dbContext, 
             return existing.Id.Value;
         }
 
-        var customerResult = Customer.Create(tenantContext.TenantId, fullName, email, phone, notes: null, dateOfBirth: null);
+        var customerResult = Customer.Create(tenantContext.TenantId, fullName, email, phone, notes: null, dateOfBirth: null, cpf: cpf);
         if (customerResult.IsFailure)
         {
             return Result.Failure<Guid>(customerResult.Error);

@@ -1,6 +1,11 @@
 using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
+using Agendio.Modules.Scheduling.Domain;
+using Agendio.Modules.Scheduling.Infrastructure.Persistence;
+using Agendio.SharedKernel.Multitenancy;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace Agendio.IntegrationTests;
 
@@ -386,6 +391,194 @@ public class PublicPortalTests(IntegrationTestFixture fixture)
 
         response.StatusCode.ShouldBe(HttpStatusCode.NotFound);
         tenantBId.ShouldNotBe(tenantAId);
+    }
+
+    [Fact]
+    public async Task Booking_Without_Payment_Requirement_Should_Not_Ask_For_Cpf_Nor_Create_A_Deposit()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var client = fixture.CreateClient();
+        var (tenantId, accessToken) = await CreateTenantWithOwnerAndLoginAsync(client, cancellationToken);
+        var (resourceId, serviceId) = await SetUpBookableResourceAndServiceAsync(client, accessToken, cancellationToken);
+
+        var bookingResponse = await client.PostAsJsonAsync($"/api/public/tenants/{tenantId}/appointments", new
+        {
+            resourceId,
+            serviceId,
+            startAtUtc = DateTimeOffset.UtcNow.AddDays(3),
+            customerFullName = "Sem Sinal",
+            customerEmail = $"sem-sinal-{Guid.NewGuid():N}@example.com",
+            customerPhone = (string?)null,
+            notes = (string?)null,
+        }, cancellationToken);
+        bookingResponse.StatusCode.ShouldBe(HttpStatusCode.Created, await bookingResponse.Content.ReadAsStringAsync(cancellationToken));
+
+        var body = await bookingResponse.Content.ReadFromJsonAsync<JsonElement>(cancellationToken);
+        body.GetProperty("paymentUrl").ValueKind.ShouldBe(JsonValueKind.Null);
+
+        var appointmentId = body.GetProperty("id").GetGuid();
+        var depositResponse = await AuthorizedRequestHelpers.GetAuthorizedAsync(
+            client, accessToken, $"/api/appointments/{appointmentId}/deposit", cancellationToken);
+        depositResponse.StatusCode.ShouldBe(HttpStatusCode.OK);
+        var depositBody = await depositResponse.Content.ReadAsStringAsync(cancellationToken);
+        depositBody.Trim().ShouldBeOneOf(string.Empty, "null");
+    }
+
+    [Fact]
+    public async Task Booking_With_Payment_Requirement_Without_Cpf_Should_Be_Rejected()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var client = fixture.CreateClient();
+        var (tenantId, accessToken) = await CreateTenantWithOwnerAndLoginAsync(client, cancellationToken);
+        var (resourceId, serviceId) = await SetUpBookableResourceAndServiceAsync(client, accessToken, cancellationToken);
+        await EnableDepositRequirementAsync(client, accessToken, 30, cancellationToken);
+
+        var response = await client.PostAsJsonAsync($"/api/public/tenants/{tenantId}/appointments", new
+        {
+            resourceId,
+            serviceId,
+            startAtUtc = DateTimeOffset.UtcNow.AddDays(3),
+            customerFullName = "Sem Cpf",
+            customerEmail = $"sem-cpf-{Guid.NewGuid():N}@example.com",
+            customerPhone = (string?)null,
+            notes = (string?)null,
+        }, cancellationToken);
+
+        response.StatusCode.ShouldBe(HttpStatusCode.BadRequest);
+    }
+
+    [Fact]
+    public async Task Booking_With_Payment_Requirement_And_Cpf_Should_Create_A_Pending_Deposit_With_A_Payment_Url()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var client = fixture.CreateClient();
+        var (tenantId, accessToken) = await CreateTenantWithOwnerAndLoginAsync(client, cancellationToken);
+        var (resourceId, serviceId) = await SetUpBookableResourceAndServiceAsync(client, accessToken, cancellationToken);
+        await EnableDepositRequirementAsync(client, accessToken, 50, cancellationToken);
+
+        var bookingResponse = await client.PostAsJsonAsync($"/api/public/tenants/{tenantId}/appointments", new
+        {
+            resourceId,
+            serviceId,
+            startAtUtc = DateTimeOffset.UtcNow.AddDays(3),
+            customerFullName = "Com Sinal",
+            customerEmail = $"com-sinal-{Guid.NewGuid():N}@example.com",
+            customerPhone = (string?)null,
+            notes = (string?)null,
+            customerCpf = "52998224725",
+        }, cancellationToken);
+        bookingResponse.StatusCode.ShouldBe(HttpStatusCode.Created, await bookingResponse.Content.ReadAsStringAsync(cancellationToken));
+
+        var body = await bookingResponse.Content.ReadFromJsonAsync<JsonElement>(cancellationToken);
+        body.GetProperty("paymentUrl").GetString().ShouldNotBeNullOrWhiteSpace();
+        var appointmentId = body.GetProperty("id").GetGuid();
+
+        var depositResponse = await AuthorizedRequestHelpers.GetAuthorizedAsync(
+            client, accessToken, $"/api/appointments/{appointmentId}/deposit", cancellationToken);
+        var deposit = await depositResponse.Content.ReadFromJsonAsync<JsonElement>(cancellationToken);
+        deposit.GetProperty("status").GetString().ShouldBe("Pending");
+        deposit.GetProperty("amount").GetDecimal().ShouldBe(40.00m); // 50% de 80,00 (preco do servico de SetUpBookableResourceAndServiceAsync)
+        deposit.GetProperty("invoiceUrl").GetString().ShouldNotBeNullOrWhiteSpace();
+    }
+
+    [Fact]
+    public async Task Appointment_Deposit_Webhook_Should_Mark_The_Deposit_As_Paid()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var client = fixture.CreateClient();
+        var (tenantId, accessToken) = await CreateTenantWithOwnerAndLoginAsync(client, cancellationToken);
+        var (resourceId, serviceId) = await SetUpBookableResourceAndServiceAsync(client, accessToken, cancellationToken);
+        await EnableDepositRequirementAsync(client, accessToken, 30, cancellationToken);
+
+        var bookingResponse = await client.PostAsJsonAsync($"/api/public/tenants/{tenantId}/appointments", new
+        {
+            resourceId,
+            serviceId,
+            startAtUtc = DateTimeOffset.UtcNow.AddDays(3),
+            customerFullName = "Vai Pagar",
+            customerEmail = $"vai-pagar-{Guid.NewGuid():N}@example.com",
+            customerPhone = (string?)null,
+            notes = (string?)null,
+            customerCpf = "52998224725",
+        }, cancellationToken);
+        var body = await bookingResponse.Content.ReadFromJsonAsync<JsonElement>(cancellationToken);
+        var appointmentId = body.GetProperty("id").GetGuid();
+
+        var depositBeforeWebhook = await AuthorizedRequestHelpers.GetAuthorizedAsync(
+            client, accessToken, $"/api/appointments/{appointmentId}/deposit", cancellationToken);
+        var depositId = (await depositBeforeWebhook.Content.ReadFromJsonAsync<JsonElement>(cancellationToken));
+        depositId.GetProperty("status").GetString().ShouldBe("Pending");
+
+        // O endpoint de deposito nao expoe o Id do AppointmentDeposit (so status/valor/link),
+        // entao o externalReference ({tenantId}:{depositId}) e reconstruido lendo direto do banco.
+        using var webhookRequest = new HttpRequestMessage(HttpMethod.Post, "/api/webhooks/asaas-appointment-deposits")
+        {
+            Content = JsonContent.Create(new
+            {
+                @event = "PAYMENT_CONFIRMED",
+                payment = new { id = "fake-charge-id", status = "CONFIRMED", externalReference = await GetDepositExternalReferenceAsync(fixture, tenantId, appointmentId, cancellationToken) },
+            }),
+        };
+        webhookRequest.Headers.Add("asaas-access-token", IntegrationTestFixture.AppointmentDepositWebhookSecretForTests);
+        var webhookResponse = await client.SendAsync(webhookRequest, cancellationToken);
+        webhookResponse.StatusCode.ShouldBe(HttpStatusCode.OK);
+
+        var depositAfterWebhook = await AuthorizedRequestHelpers.GetAuthorizedAsync(
+            client, accessToken, $"/api/appointments/{appointmentId}/deposit", cancellationToken);
+        (await depositAfterWebhook.Content.ReadFromJsonAsync<JsonElement>(cancellationToken))
+            .GetProperty("status").GetString().ShouldBe("Paid");
+    }
+
+    [Fact]
+    public async Task Appointment_Deposit_Is_Isolated_Between_Tenants()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var client = fixture.CreateClient();
+        var (tenantAId, tenantAToken) = await CreateTenantWithOwnerAndLoginAsync(client, cancellationToken);
+        var (resourceId, serviceId) = await SetUpBookableResourceAndServiceAsync(client, tenantAToken, cancellationToken);
+        await EnableDepositRequirementAsync(client, tenantAToken, 30, cancellationToken);
+
+        var bookingResponse = await client.PostAsJsonAsync($"/api/public/tenants/{tenantAId}/appointments", new
+        {
+            resourceId,
+            serviceId,
+            startAtUtc = DateTimeOffset.UtcNow.AddDays(3),
+            customerFullName = "Cliente A",
+            customerEmail = $"cliente-a-{Guid.NewGuid():N}@example.com",
+            customerPhone = (string?)null,
+            notes = (string?)null,
+            customerCpf = "52998224725",
+        }, cancellationToken);
+        var appointmentId = (await bookingResponse.Content.ReadFromJsonAsync<JsonElement>(cancellationToken)).GetProperty("id").GetGuid();
+
+        var (_, tenantBToken) = await CreateTenantWithOwnerAndLoginAsync(client, cancellationToken);
+        var depositResponse = await AuthorizedRequestHelpers.GetAuthorizedAsync(
+            client, tenantBToken, $"/api/appointments/{appointmentId}/deposit", cancellationToken);
+        depositResponse.StatusCode.ShouldBe(HttpStatusCode.OK);
+        var depositBody = await depositResponse.Content.ReadAsStringAsync(cancellationToken);
+        depositBody.Trim().ShouldBeOneOf(string.Empty, "null");
+    }
+
+    private static async Task EnableDepositRequirementAsync(HttpClient client, string accessToken, int depositPercentage, CancellationToken cancellationToken)
+    {
+        var response = await AuthorizedRequestHelpers.PutAuthorizedAsync(
+            client, accessToken, "/api/tenants/payment-settings",
+            new { paymentRequired = true, depositPercentage }, cancellationToken);
+        response.StatusCode.ShouldBe(HttpStatusCode.NoContent);
+    }
+
+    private static async Task<string> GetDepositExternalReferenceAsync(
+        IntegrationTestFixture testFixture, Guid tenantId, Guid appointmentId, CancellationToken cancellationToken)
+    {
+        await using var scope = testFixture.Services.CreateAsyncScope();
+        var dbContext = scope.ServiceProvider.GetRequiredService<SchedulingDbContext>();
+        var tenantContext = scope.ServiceProvider.GetRequiredService<ITenantContext>();
+        tenantContext.SetTenant(TenantId.From(tenantId));
+
+        var deposit = await dbContext.AppointmentDeposits.AsNoTracking().SingleAsync(
+            d => d.AppointmentId == AppointmentId.From(appointmentId), cancellationToken);
+
+        return $"{tenantId}:{deposit.Id.Value}";
     }
 
     [Fact]

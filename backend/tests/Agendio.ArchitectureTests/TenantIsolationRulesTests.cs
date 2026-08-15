@@ -109,7 +109,7 @@ public class TenantIsolationRulesTests
     }
 
     [Fact]
-    public void Scheduling_Module_Should_Have_Exactly_Five_TenantOwned_Entities_With_A_Query_Filter()
+    public void Scheduling_Module_Should_Have_Exactly_Six_TenantOwned_Entities_With_A_Query_Filter()
     {
         using var dbContext = CreateSchedulingDbContext();
 
@@ -118,7 +118,7 @@ public class TenantIsolationRulesTests
             .ToList();
 
         tenantOwnedEntityTypes.Select(e => e.ClrType).ShouldBe(
-            [typeof(Appointment), typeof(NotificationLogEntry), typeof(Review), typeof(WaitlistEntry), typeof(AppointmentChangeLogEntry)],
+            [typeof(Appointment), typeof(NotificationLogEntry), typeof(Review), typeof(WaitlistEntry), typeof(AppointmentChangeLogEntry), typeof(AppointmentDeposit)],
             ignoreOrder: true);
 
         foreach (var entityType in tenantOwnedEntityTypes)

@@ -32,4 +32,6 @@ public sealed record PublicTenantProfile(
     bool ShowTeamSection,
     bool ShowHoursSection,
     bool ShowContactSection,
-    IReadOnlyList<PublicBusinessHoursEntry> BusinessHours);
+    IReadOnlyList<PublicBusinessHoursEntry> BusinessHours,
+    bool PaymentRequired,
+    int DepositPercentage);

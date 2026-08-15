@@ -12,7 +12,11 @@ namespace Agendio.Modules.Customers.Contracts;
 /// </summary>
 public interface ICustomerRegistrationService
 {
-    /// <summary>Reaproveita um cliente existente pelo e-mail (case-insensitive) ou cria um novo.</summary>
+    /// <summary>
+    /// Reaproveita um cliente existente pelo e-mail (case-insensitive) ou cria
+    /// um novo. cpf so e usado na CRIACAO (Fase 16, cobranca de sinal) — um
+    /// cliente ja existente sem CPF nao e retroativamente atualizado aqui.
+    /// </summary>
     Task<Result<Guid>> FindOrRegisterByEmailAsync(
-        string fullName, string email, string? phone, CancellationToken cancellationToken = default);
+        string fullName, string email, string? phone, string? cpf = null, CancellationToken cancellationToken = default);
 }

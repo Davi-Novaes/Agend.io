@@ -1,3 +1,4 @@
+using Agendio.Modules.Tenancy.Domain;
 using Agendio.Modules.Tenancy.Infrastructure.Persistence;
 using Agendio.SharedKernel.Messaging;
 using Agendio.SharedKernel.Results;
@@ -51,7 +52,9 @@ public sealed class GetPublicTenantProfileQueryHandler(TenancyDbContext dbContex
             tenant.ShowTeamSection,
             tenant.ShowHoursSection,
             tenant.ShowContactSection,
-            businessHours);
+            businessHours,
+            tenant.PaymentRequirement == PaymentRequirement.Deposit,
+            tenant.DepositPercentage);
 
         return Result.Success(profile);
     }

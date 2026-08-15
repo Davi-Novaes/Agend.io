@@ -2,6 +2,7 @@ using Agendio.Infrastructure.Behaviors;
 using Agendio.Infrastructure.Messaging;
 using Agendio.Infrastructure.Multitenancy;
 using Agendio.Infrastructure.Notifications;
+using Agendio.Infrastructure.Payments;
 using Agendio.Infrastructure.Persistence.Interceptors;
 using Agendio.Infrastructure.Security;
 using Agendio.Infrastructure.Storage;
@@ -53,6 +54,15 @@ public static class InfrastructureServiceCollectionExtensions
         {
             var options = serviceProvider.GetRequiredService<IOptions<WhatsAppOptions>>().Value;
             httpClient.BaseAddress = new Uri(options.BaseUrl);
+        });
+
+        services.Configure<PaymentGatewayOptions>(configuration.GetSection(PaymentGatewayOptions.SectionName));
+        services.AddHttpClient<IPaymentChargeClient, AsaasPaymentChargeClient>((serviceProvider, httpClient) =>
+        {
+            var options = serviceProvider.GetRequiredService<IOptions<PaymentGatewayOptions>>().Value;
+            httpClient.BaseAddress = new Uri(options.BaseUrl.TrimEnd('/') + "/");
+            httpClient.DefaultRequestHeaders.Add("access_token", options.ApiKey);
+            httpClient.DefaultRequestHeaders.Add("User-Agent", "Agendio");
         });
 
         services.AddSingleton<IFileStorage, LocalFileStorage>();

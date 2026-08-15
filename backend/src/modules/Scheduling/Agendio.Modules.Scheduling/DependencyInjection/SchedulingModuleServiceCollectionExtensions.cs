@@ -27,6 +27,7 @@ public static class SchedulingModuleServiceCollectionExtensions
 
         services.AddSingleton<IEndpointModule, AppointmentEndpoints>();
         services.AddSingleton<IEndpointModule, PublicAppointmentEndpoints>();
+        services.AddSingleton<IEndpointModule, AppointmentDepositWebhookEndpoints>();
         services.AddScoped<AppointmentNotificationJobs>();
         services.AddScoped<ICustomerVisitStatsLookupService, CustomerVisitStatsLookupService>();
 

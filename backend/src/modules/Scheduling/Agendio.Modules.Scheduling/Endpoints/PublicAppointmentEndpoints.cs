@@ -29,15 +29,17 @@ public sealed class PublicAppointmentEndpoints : IEndpointModule
         {
             var command = new PublicScheduleAppointmentCommand(
                 tenantId, request.ResourceId, request.ServiceId, request.StartAtUtc,
-                request.CustomerFullName, request.CustomerEmail, request.CustomerPhone, request.Notes);
+                request.CustomerFullName, request.CustomerEmail, request.CustomerPhone, request.Notes, request.CustomerCpf);
             var result = await dispatcher.Send(command, cancellationToken);
 
             return result.IsSuccess
-                ? Results.Created($"/api/public/tenants/{tenantId}/appointments/{result.Value}", new { id = result.Value })
+                ? Results.Created(
+                    $"/api/public/tenants/{tenantId}/appointments/{result.Value.AppointmentId}",
+                    new { id = result.Value.AppointmentId, paymentUrl = result.Value.PaymentUrl })
                 : result.Error.ToProblemResult();
         })
         .WithName("PublicScheduleAppointment")
-        .WithSummary("Cria um agendamento pelo portal publico, sem exigir login previo do cliente.");
+        .WithSummary("Cria um agendamento pelo portal publico, sem exigir login previo do cliente. Se o tenant exigir sinal, devolve paymentUrl.");
 
         group.MapPost("/appointments/{appointmentId:guid}/review", async (
             Guid tenantId, Guid appointmentId, SubmitReviewRequest request, IDispatcher dispatcher, CancellationToken cancellationToken) =>
@@ -66,7 +68,8 @@ public sealed class PublicAppointmentEndpoints : IEndpointModule
     }
 
     private sealed record PublicScheduleAppointmentRequest(
-        Guid ResourceId, Guid ServiceId, DateTimeOffset StartAtUtc, string CustomerFullName, string CustomerEmail, string? CustomerPhone, string? Notes);
+        Guid ResourceId, Guid ServiceId, DateTimeOffset StartAtUtc, string CustomerFullName, string CustomerEmail, string? CustomerPhone, string? Notes,
+        string? CustomerCpf = null);
 
     private sealed record SubmitReviewRequest(string CustomerEmail, int Rating, string? Comment);
 

@@ -1,3 +1,4 @@
+using Agendio.Modules.Tenancy.Domain;
 using Agendio.Modules.Tenancy.Infrastructure.Persistence;
 using Agendio.SharedKernel.Messaging;
 using Agendio.SharedKernel.Multitenancy;
@@ -65,7 +66,9 @@ public sealed class GetTenantProfileQueryHandler(TenancyDbContext dbContext, ITe
             tenant.LoyaltyVisitsForReward,
             tenant.LoyaltyRewardDescription,
             tenant.RequireDepositAfterNoShows,
-            tenant.NoShowThresholdForDeposit);
+            tenant.NoShowThresholdForDeposit,
+            tenant.PaymentRequirement == PaymentRequirement.Deposit,
+            tenant.DepositPercentage);
 
         return Result.Success(profile);
     }

@@ -275,6 +275,71 @@ namespace Agendio.Modules.Scheduling.Infrastructure.Persistence.Migrations
                     b.ToTable("appointment_change_log_entries", "scheduling");
                 });
 
+            modelBuilder.Entity("Agendio.Modules.Scheduling.Domain.AppointmentDeposit", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<Guid>("AppointmentId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("appointment_id");
+
+                    b.Property<DateTimeOffset>("CreatedAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at_utc");
+
+                    b.Property<string>("CreatedBy")
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)")
+                        .HasColumnName("created_by");
+
+                    b.Property<string>("GatewayChargeId")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("gateway_charge_id");
+
+                    b.Property<string>("InvoiceUrl")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("invoice_url");
+
+                    b.Property<DateTimeOffset?>("PaidAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("paid_at_utc");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("status");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("tenant_id");
+
+                    b.Property<DateTimeOffset?>("UpdatedAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at_utc");
+
+                    b.Property<string>("UpdatedBy")
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)")
+                        .HasColumnName("updated_by");
+
+                    b.HasKey("Id")
+                        .HasName("pk_appointment_deposits");
+
+                    b.HasIndex("AppointmentId")
+                        .IsUnique()
+                        .HasDatabaseName("ix_appointment_deposits_appointment_id");
+
+                    b.HasIndex("TenantId", "GatewayChargeId")
+                        .HasDatabaseName("ix_appointment_deposits_tenant_id_gateway_charge_id");
+
+                    b.ToTable("appointment_deposits", "scheduling");
+                });
+
             modelBuilder.Entity("Agendio.Modules.Scheduling.Domain.NotificationLogEntry", b =>
                 {
                     b.Property<Guid>("Id")
@@ -556,6 +621,37 @@ namespace Agendio.Modules.Scheduling.Infrastructure.Persistence.Migrations
                         .IsRequired();
 
                     b.Navigation("Slot")
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("Agendio.Modules.Scheduling.Domain.AppointmentDeposit", b =>
+                {
+                    b.OwnsOne("Agendio.SharedKernel.ValueObjects.Money", "Amount", b1 =>
+                        {
+                            b1.Property<Guid>("AppointmentDepositId")
+                                .HasColumnType("uuid")
+                                .HasColumnName("id");
+
+                            b1.Property<decimal>("Amount")
+                                .HasColumnType("numeric(10,2)")
+                                .HasColumnName("amount");
+
+                            b1.Property<string>("Currency")
+                                .IsRequired()
+                                .HasMaxLength(3)
+                                .HasColumnType("character varying(3)")
+                                .HasColumnName("currency");
+
+                            b1.HasKey("AppointmentDepositId");
+
+                            b1.ToTable("appointment_deposits", "scheduling");
+
+                            b1.WithOwner()
+                                .HasForeignKey("AppointmentDepositId")
+                                .HasConstraintName("fk_appointment_deposits_appointment_deposits_id");
+                        });
+
+                    b.Navigation("Amount")
                         .IsRequired();
                 });
 #pragma warning restore 612, 618

@@ -1,3 +1,4 @@
+using Agendio.SharedKernel.ValueObjects;
 using FluentValidation;
 
 namespace Agendio.Modules.Scheduling.Application.PublicScheduleAppointment;
@@ -13,5 +14,11 @@ public sealed class PublicScheduleAppointmentCommandValidator : AbstractValidato
         RuleFor(c => c.CustomerEmail).NotEmpty().EmailAddress().MaximumLength(320);
         RuleFor(c => c.CustomerPhone).MaximumLength(30);
         RuleFor(c => c.Notes).MaximumLength(2000);
+
+        // So valida o FORMATO se foi informado — obrigatoriedade (quando o
+        // tenant exige sinal) e checada no handler, que conhece a config do tenant.
+        RuleFor(c => c.CustomerCpf)
+            .Must(cpf => string.IsNullOrWhiteSpace(cpf) || CpfCnpj.Create(cpf).IsSuccess)
+            .WithMessage("CPF invalido.");
     }
 }
