@@ -3,6 +3,7 @@ using System;
 using Agendio.Modules.Estoque.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
@@ -11,9 +12,11 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace Agendio.Modules.Estoque.Infrastructure.Persistence.Migrations
 {
     [DbContext(typeof(EstoqueDbContext))]
-    partial class EstoqueDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260815190106_AddProductCategoryAndCostPrice")]
+    partial class AddProductCategoryAndCostPrice
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder

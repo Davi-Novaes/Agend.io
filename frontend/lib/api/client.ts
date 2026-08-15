@@ -1343,8 +1343,10 @@ export type ProductSummary = {
   id: string;
   name: string;
   sku: string | null;
+  category: string | null;
   quantityInStock: number;
   minimumStock: number;
+  costPrice: number | null;
   salePrice: number | null;
   currency: string | null;
   isActive: boolean;
@@ -1358,9 +1360,11 @@ export type ProductDetails = ProductSummary & {
 export type CreateProductInput = {
   name: string;
   sku?: string | null;
+  category?: string | null;
   description?: string | null;
   quantityInStock: number;
   minimumStock: number;
+  costPrice?: number | null;
   salePrice?: number | null;
   currency?: string | null;
 };
@@ -1368,8 +1372,10 @@ export type CreateProductInput = {
 export type UpdateProductInput = {
   name: string;
   sku?: string | null;
+  category?: string | null;
   description?: string | null;
   minimumStock: number;
+  costPrice?: number | null;
   salePrice?: number | null;
   currency?: string | null;
 };

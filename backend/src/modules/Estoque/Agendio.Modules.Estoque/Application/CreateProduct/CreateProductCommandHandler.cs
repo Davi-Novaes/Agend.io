@@ -11,6 +11,18 @@ public sealed class CreateProductCommandHandler(EstoqueDbContext dbContext, ITen
 {
     public async Task<Result<Guid>> Handle(CreateProductCommand request, CancellationToken cancellationToken)
     {
+        Money? costPrice = null;
+        if (request.CostPrice is not null)
+        {
+            var costPriceResult = Money.Create(request.CostPrice.Value, request.Currency ?? "BRL");
+            if (costPriceResult.IsFailure)
+            {
+                return Result.Failure<Guid>(costPriceResult.Error);
+            }
+
+            costPrice = costPriceResult.Value;
+        }
+
         Money? salePrice = null;
         if (request.SalePrice is not null)
         {
@@ -24,8 +36,8 @@ public sealed class CreateProductCommandHandler(EstoqueDbContext dbContext, ITen
         }
 
         var productResult = Domain.Product.Create(
-            tenantContext.TenantId, request.Name, request.Sku, request.Description, request.QuantityInStock, request.MinimumStock,
-            salePrice);
+            tenantContext.TenantId, request.Name, request.Sku, request.Category, request.Description, request.QuantityInStock,
+            request.MinimumStock, costPrice, salePrice);
 
         if (productResult.IsFailure)
         {

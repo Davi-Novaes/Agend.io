@@ -19,11 +19,15 @@ public sealed class Product : AggregateRoot<ProductId>, ITenantOwned, IAuditable
 
     public string? Sku { get; private set; }
 
+    public string? Category { get; private set; }
+
     public string? Description { get; private set; }
 
     public int QuantityInStock { get; private set; }
 
     public int MinimumStock { get; private set; }
+
+    public Money? CostPrice { get; private set; }
 
     public Money? SalePrice { get; private set; }
 
@@ -46,21 +50,25 @@ public sealed class Product : AggregateRoot<ProductId>, ITenantOwned, IAuditable
     }
 
     private Product(
-        TenantId tenantId, string name, string? sku, string? description, int quantityInStock, int minimumStock, Money? salePrice)
+        TenantId tenantId, string name, string? sku, string? category, string? description, int quantityInStock, int minimumStock,
+        Money? costPrice, Money? salePrice)
         : base(ProductId.New())
     {
         TenantId = tenantId;
         Name = name;
         Sku = sku;
+        Category = category;
         Description = description;
         QuantityInStock = quantityInStock;
         MinimumStock = minimumStock;
+        CostPrice = costPrice;
         SalePrice = salePrice;
         IsActive = true;
     }
 
     public static Result<Product> Create(
-        TenantId tenantId, string? name, string? sku, string? description, int quantityInStock, int minimumStock, Money? salePrice)
+        TenantId tenantId, string? name, string? sku, string? category, string? description, int quantityInStock, int minimumStock,
+        Money? costPrice, Money? salePrice)
     {
         if (string.IsNullOrWhiteSpace(name))
         {
@@ -78,10 +86,11 @@ public sealed class Product : AggregateRoot<ProductId>, ITenantOwned, IAuditable
         }
 
         return Result.Success(new Product(
-            tenantId, name.Trim(), NullIfBlank(sku), NullIfBlank(description), quantityInStock, minimumStock, salePrice));
+            tenantId, name.Trim(), NullIfBlank(sku), NullIfBlank(category), NullIfBlank(description), quantityInStock, minimumStock,
+            costPrice, salePrice));
     }
 
-    public Result Update(string? name, string? sku, string? description, int minimumStock, Money? salePrice)
+    public Result Update(string? name, string? sku, string? category, string? description, int minimumStock, Money? costPrice, Money? salePrice)
     {
         if (string.IsNullOrWhiteSpace(name))
         {
@@ -95,8 +104,10 @@ public sealed class Product : AggregateRoot<ProductId>, ITenantOwned, IAuditable
 
         Name = name.Trim();
         Sku = NullIfBlank(sku);
+        Category = NullIfBlank(category);
         Description = NullIfBlank(description);
         MinimumStock = minimumStock;
+        CostPrice = costPrice;
         SalePrice = salePrice;
         return Result.Success();
     }

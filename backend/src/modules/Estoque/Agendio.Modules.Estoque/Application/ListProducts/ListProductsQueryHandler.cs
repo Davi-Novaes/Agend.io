@@ -31,7 +31,8 @@ public sealed class ListProductsQueryHandler(EstoqueDbContext dbContext) : IQuer
         var paged = await query
             .OrderBy(p => p.Name)
             .Select(p => new ProductSummary(
-                p.Id.Value, p.Name, p.Sku, p.QuantityInStock, p.MinimumStock,
+                p.Id.Value, p.Name, p.Sku, p.Category, p.QuantityInStock, p.MinimumStock,
+                p.CostPrice == null ? null : p.CostPrice.Amount,
                 p.SalePrice == null ? null : p.SalePrice.Amount,
                 p.SalePrice == null ? null : p.SalePrice.Currency,
                 p.IsActive, p.QuantityInStock <= p.MinimumStock))

@@ -17,6 +17,18 @@ public sealed class UpdateProductCommandHandler(EstoqueDbContext dbContext) : IC
             return Result.Failure(Error.NotFound("Product.NotFound", "Produto nao encontrado."));
         }
 
+        Money? costPrice = null;
+        if (request.CostPrice is not null)
+        {
+            var costPriceResult = Money.Create(request.CostPrice.Value, request.Currency ?? "BRL");
+            if (costPriceResult.IsFailure)
+            {
+                return Result.Failure(costPriceResult.Error);
+            }
+
+            costPrice = costPriceResult.Value;
+        }
+
         Money? salePrice = null;
         if (request.SalePrice is not null)
         {
@@ -29,7 +41,7 @@ public sealed class UpdateProductCommandHandler(EstoqueDbContext dbContext) : IC
             salePrice = salePriceResult.Value;
         }
 
-        var updateResult = product.Update(request.Name, request.Sku, request.Description, request.MinimumStock, salePrice);
+        var updateResult = product.Update(request.Name, request.Sku, request.Category, request.Description, request.MinimumStock, costPrice, salePrice);
         if (updateResult.IsFailure)
         {
             return updateResult;
