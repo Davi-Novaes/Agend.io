@@ -11,6 +11,7 @@ using Agendio.Modules.Tenancy.Application.UpdateTenantBanner;
 using Agendio.Modules.Tenancy.Application.UpdateTenantBranding;
 using Agendio.Modules.Tenancy.Application.UpdateTenantLogo;
 using Agendio.Modules.Tenancy.Application.UpdateTenantLoyaltySettings;
+using Agendio.Modules.Tenancy.Application.UpdateTenantNoShowPolicy;
 using Agendio.Modules.Tenancy.Application.UpdateTenantPageCustomization;
 using Agendio.Modules.Tenancy.Application.UpdateTenantProfile;
 using Agendio.Modules.Tenancy.Application.UpdateTenantReminderSettings;
@@ -199,6 +200,17 @@ public sealed class TenancyEndpoints : IEndpointModule
         .WithName("UpdateTenantLoyaltySettings")
         .WithSummary("Configura o programa de fidelidade (ligado/desligado, visitas para a recompensa, descricao da recompensa) (Fase 11).");
 
+        group.MapPut("/no-show-policy", async (UpdateNoShowPolicyRequest request, IDispatcher dispatcher, CancellationToken cancellationToken) =>
+        {
+            var command = new UpdateTenantNoShowPolicyCommand(request.RequireDepositAfterNoShows, request.NoShowThresholdForDeposit);
+            var result = await dispatcher.Send(command, cancellationToken);
+
+            return result.IsSuccess ? Results.NoContent() : result.Error.ToProblemResult();
+        })
+        .RequireAuthorization(policy => policy.RequireRole("Owner"))
+        .WithName("UpdateTenantNoShowPolicy")
+        .WithSummary("Configura o aviso de exigir sinal apos N faltas do cliente (Fase 15) — so sinaliza, nunca bloqueia agendamento sozinho.");
+
         group.MapPut("/business-hours", async (SetBusinessHoursRequest request, IDispatcher dispatcher, CancellationToken cancellationToken) =>
         {
             var entries = request.Entries.Select(e => new BusinessHoursEntryDto(e.DayOfWeek, e.StartTime, e.EndTime)).ToList();
@@ -311,4 +323,6 @@ public sealed class TenancyEndpoints : IEndpointModule
     private sealed record UpdateReminderSettingsRequest(bool Reminder24hEnabled, bool Reminder2hEnabled, bool PostServiceThankYouEnabled);
 
     private sealed record UpdateLoyaltySettingsRequest(bool LoyaltyProgramEnabled, int LoyaltyVisitsForReward, string LoyaltyRewardDescription);
+
+    private sealed record UpdateNoShowPolicyRequest(bool RequireDepositAfterNoShows, int NoShowThresholdForDeposit);
 }

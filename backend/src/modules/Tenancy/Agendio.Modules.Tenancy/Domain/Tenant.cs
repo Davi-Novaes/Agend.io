@@ -142,6 +142,16 @@ public sealed class Tenant : AggregateRoot<TenantId>, IAuditable, ISoftDeletable
     /// <summary>Texto livre — "corte gratis", "10% de desconto" etc. Sem valor monetario estruturado de proposito (MVP).</summary>
     public string LoyaltyRewardDescription { get; private set; } = "Um agradecimento especial";
 
+    /// <summary>
+    /// Desligado por padrao (Fase 15) — so vira um aviso informativo no perfil do
+    /// cliente se o dono optar por ativar; nunca bloqueia agendamento sozinho
+    /// (a cobranca de sinal em si e da Fase 16, aqui e so sinalizacao).
+    /// </summary>
+    public bool RequireDepositAfterNoShows { get; private set; }
+
+    /// <summary>Quantidade de faltas (no-show) a partir da qual o aviso de sinal aparece.</summary>
+    public int NoShowThresholdForDeposit { get; private set; } = 2;
+
     public DateTimeOffset CreatedAtUtc { get; set; }
 
     public string? CreatedBy { get; set; }
@@ -435,6 +445,19 @@ public sealed class Tenant : AggregateRoot<TenantId>, IAuditable, ISoftDeletable
         LoyaltyProgramEnabled = enabled;
         LoyaltyVisitsForReward = visitsForReward;
         LoyaltyRewardDescription = rewardDescription.Trim();
+
+        return Result.Success();
+    }
+
+    public Result UpdateNoShowPolicy(bool requireDepositAfterNoShows, int noShowThresholdForDeposit)
+    {
+        if (noShowThresholdForDeposit <= 0)
+        {
+            return Result.Failure(Error.Validation("Tenant.InvalidNoShowThresholdForDeposit", "A quantidade de faltas deve ser maior que zero."));
+        }
+
+        RequireDepositAfterNoShows = requireDepositAfterNoShows;
+        NoShowThresholdForDeposit = noShowThresholdForDeposit;
 
         return Result.Success();
     }

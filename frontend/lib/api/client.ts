@@ -289,6 +289,8 @@ export type TenantProfile = {
   loyaltyProgramEnabled: boolean;
   loyaltyVisitsForReward: number;
   loyaltyRewardDescription: string;
+  requireDepositAfterNoShows: boolean;
+  noShowThresholdForDeposit: number;
 };
 
 export type ClosedDate = {
@@ -365,6 +367,15 @@ export type UpdateTenantLoyaltySettingsInput = {
 
 export function updateTenantLoyaltySettings(input: UpdateTenantLoyaltySettingsInput, accessToken: string): Promise<void> {
   return request("/api/tenants/loyalty-settings", { method: "PUT", body: JSON.stringify(input) }, accessToken);
+}
+
+export type UpdateTenantNoShowPolicyInput = {
+  requireDepositAfterNoShows: boolean;
+  noShowThresholdForDeposit: number;
+};
+
+export function updateTenantNoShowPolicy(input: UpdateTenantNoShowPolicyInput, accessToken: string): Promise<void> {
+  return request("/api/tenants/no-show-policy", { method: "PUT", body: JSON.stringify(input) }, accessToken);
 }
 
 export function redeemCustomerLoyaltyReward(customerId: string, accessToken: string): Promise<void> {
@@ -890,6 +901,7 @@ export type CustomerAppointmentHistory = {
   nextAppointmentAtUtc: string | null;
   favoriteServiceName: string | null;
   favoriteProfessionalName: string | null;
+  noShowCount: number;
 };
 
 export function getCustomerAppointmentHistory(customerId: string, accessToken: string): Promise<CustomerAppointmentHistory> {

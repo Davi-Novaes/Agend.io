@@ -24,4 +24,5 @@ public sealed record CustomerAppointmentHistory(
     DateTimeOffset? LastVisitAtUtc,
     DateTimeOffset? NextAppointmentAtUtc,
     string? FavoriteServiceName,
-    string? FavoriteProfessionalName);
+    string? FavoriteProfessionalName,
+    int NoShowCount);

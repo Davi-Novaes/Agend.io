@@ -294,6 +294,47 @@ public class TenantProfileTests(IntegrationTestFixture fixture)
     }
 
     [Fact]
+    public async Task Owner_Can_Update_And_Read_Back_The_No_Show_Policy()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var client = fixture.CreateClient();
+        var accessToken = await CreateTenantWithOwnerAndLoginAsync(client, cancellationToken);
+
+        // Novo tenant nasce com o aviso desligado (zero-config) — confirma isso
+        // antes de ligar, pra provar o default sensato e nao so o resultado do teste.
+        var initialProfileResponse = await AuthorizedRequestHelpers.GetAuthorizedAsync(client, accessToken, "/api/tenants/profile", cancellationToken);
+        var initialProfile = await initialProfileResponse.Content.ReadFromJsonAsync<JsonElement>(cancellationToken);
+        initialProfile.GetProperty("requireDepositAfterNoShows").GetBoolean().ShouldBeFalse();
+        initialProfile.GetProperty("noShowThresholdForDeposit").GetInt32().ShouldBe(2);
+
+        var updateResponse = await AuthorizedRequestHelpers.PutAuthorizedAsync(
+            client, accessToken, "/api/tenants/no-show-policy",
+            new { requireDepositAfterNoShows = true, noShowThresholdForDeposit = 3 },
+            cancellationToken);
+        updateResponse.StatusCode.ShouldBe(HttpStatusCode.NoContent);
+
+        var profileResponse = await AuthorizedRequestHelpers.GetAuthorizedAsync(client, accessToken, "/api/tenants/profile", cancellationToken);
+        var profile = await profileResponse.Content.ReadFromJsonAsync<JsonElement>(cancellationToken);
+        profile.GetProperty("requireDepositAfterNoShows").GetBoolean().ShouldBeTrue();
+        profile.GetProperty("noShowThresholdForDeposit").GetInt32().ShouldBe(3);
+    }
+
+    [Fact]
+    public async Task Updating_No_Show_Policy_With_A_Zero_Threshold_Should_Be_Rejected()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var client = fixture.CreateClient();
+        var accessToken = await CreateTenantWithOwnerAndLoginAsync(client, cancellationToken);
+
+        var response = await AuthorizedRequestHelpers.PutAuthorizedAsync(
+            client, accessToken, "/api/tenants/no-show-policy",
+            new { requireDepositAfterNoShows = true, noShowThresholdForDeposit = 0 },
+            cancellationToken);
+
+        response.StatusCode.ShouldBe(HttpStatusCode.BadRequest);
+    }
+
+    [Fact]
     public async Task Owner_Can_Connect_WhatsApp_And_Read_Back_Settings_Without_Exposing_The_Raw_Token()
     {
         var cancellationToken = TestContext.Current.CancellationToken;

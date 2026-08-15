@@ -49,4 +49,6 @@ public sealed record TenantProfile(
     bool PostServiceThankYouEnabled,
     bool LoyaltyProgramEnabled,
     int LoyaltyVisitsForReward,
-    string LoyaltyRewardDescription);
+    string LoyaltyRewardDescription,
+    bool RequireDepositAfterNoShows,
+    int NoShowThresholdForDeposit);

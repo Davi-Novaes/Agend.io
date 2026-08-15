@@ -11,6 +11,7 @@ import { Bell } from "lucide-react";
 import {
   getTenantProfile,
   updateTenantReminderSettings,
+  updateTenantNoShowPolicy,
   listNotificationHistory,
   ApiError,
   type TenantProfile,
@@ -21,10 +22,11 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Switch } from "@/components/ui/switch";
+import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from "@/components/ui/table";
 import { EmptyState } from "@/components/ui/empty-state";
-import { Form, FormControl, FormField, FormItem, FormLabel } from "@/components/ui/form";
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 
 const PAGE_SIZE = 20;
 
@@ -34,6 +36,15 @@ const settingsSchema = z.object({
   postServiceThankYouEnabled: z.boolean(),
 });
 type SettingsFormValues = z.infer<typeof settingsSchema>;
+
+const noShowPolicySchema = z.object({
+  requireDepositAfterNoShows: z.boolean(),
+  noShowThresholdForDeposit: z.coerce.number().int().min(1, "Precisa ser pelo menos 1 falta."),
+});
+// z.coerce faz o tipo de entrada (antes da validacao) divergir do de saida
+// (depois da coercao) — mesmo padrao de settings/loyalty/page.tsx.
+type NoShowPolicyFormValues = z.output<typeof noShowPolicySchema>;
+type NoShowPolicyFormInput = z.input<typeof noShowPolicySchema>;
 
 const CHANNEL_LABEL: Record<NotificationLogItem["channel"], string> = {
   Email: "E-mail",
@@ -77,6 +88,12 @@ export default function NotificationsSettingsPage() {
         <Skeleton className="h-64 w-full" />
       ) : (
         <ReminderSettingsCard profile={profileQuery.data} accessToken={accessToken} />
+      )}
+
+      {profileQuery.isLoading || !profileQuery.data ? (
+        <Skeleton className="h-48 w-full" />
+      ) : (
+        <NoShowPolicyCard profile={profileQuery.data} accessToken={accessToken} />
       )}
 
       <NotificationHistoryCard accessToken={accessToken} enabled={Boolean(session)} />
@@ -155,6 +172,74 @@ function ReminderSettingsCard({ profile, accessToken }: { profile: TenantProfile
 
             <Button type="submit" disabled={mutation.isPending} className="mt-2 w-fit">
               {mutation.isPending ? "Salvando..." : "Salvar lembretes"}
+            </Button>
+          </form>
+        </Form>
+      </CardContent>
+    </Card>
+  );
+}
+
+function NoShowPolicyCard({ profile, accessToken }: { profile: TenantProfile; accessToken: string }) {
+  const queryClient = useQueryClient();
+
+  const form = useForm<NoShowPolicyFormInput, unknown, NoShowPolicyFormValues>({
+    resolver: zodResolver(noShowPolicySchema),
+    defaultValues: {
+      requireDepositAfterNoShows: profile.requireDepositAfterNoShows,
+      noShowThresholdForDeposit: profile.noShowThresholdForDeposit,
+    },
+  });
+
+  const mutation = useMutation({
+    mutationFn: (values: NoShowPolicyFormValues) => updateTenantNoShowPolicy(values, accessToken),
+    onSuccess: () => {
+      toast.success("Política de faltas atualizada.");
+      queryClient.invalidateQueries({ queryKey: ["tenant", "profile"] });
+    },
+    onError: (error) => toast.error(error instanceof ApiError ? error.message : "Não foi possível salvar a política de faltas."),
+  });
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="text-base">Política de faltas</CardTitle>
+        <CardDescription>
+          Desligado por padrão. Se ativado, o perfil do cliente mostra um aviso sugerindo exigir sinal após o número de
+          faltas configurado — nunca bloqueia o agendamento automaticamente.
+        </CardDescription>
+      </CardHeader>
+      <CardContent>
+        <Form {...form}>
+          <form onSubmit={form.handleSubmit((values) => mutation.mutate(values))} className="flex flex-col gap-4">
+            <FormField
+              control={form.control}
+              name="requireDepositAfterNoShows"
+              render={({ field }) => (
+                <FormItem className="flex items-center justify-between gap-4">
+                  <FormLabel>Avisar sobre exigir sinal após faltas recorrentes</FormLabel>
+                  <FormControl>
+                    <Switch checked={field.value} onCheckedChange={field.onChange} aria-label="Avisar sobre exigir sinal" />
+                  </FormControl>
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="noShowThresholdForDeposit"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Número de faltas para exibir o aviso</FormLabel>
+                  <FormControl>
+                    <Input type="number" min={1} {...field} value={field.value as number} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            <Button type="submit" disabled={mutation.isPending} className="mt-2 w-fit">
+              {mutation.isPending ? "Salvando..." : "Salvar política de faltas"}
             </Button>
           </form>
         </Form>

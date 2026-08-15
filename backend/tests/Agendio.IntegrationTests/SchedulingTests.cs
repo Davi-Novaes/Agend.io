@@ -433,6 +433,38 @@ public class SchedulingTests(IntegrationTestFixture fixture)
         Math.Abs((body.GetProperty("nextAppointmentAtUtc").GetDateTimeOffset() - futureAtUtc).TotalSeconds).ShouldBeLessThan(1);
         body.GetProperty("favoriteServiceName").GetString().ShouldBe("Corte");
         body.GetProperty("favoriteProfessionalName").GetString().ShouldBe("Cadeira A");
+        body.GetProperty("noShowCount").GetInt32().ShouldBe(0);
+    }
+
+    [Fact]
+    public async Task Customer_Appointment_History_Should_Count_No_Shows()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var client = fixture.CreateClient();
+        var accessToken = await CreateTenantWithOwnerAndLoginAsync(client, cancellationToken);
+
+        var customerId = await CreateCustomerAsync(client, accessToken, cancellationToken);
+        var resourceId = await CreateResourceAsync(client, accessToken, "Cadeira A", cancellationToken);
+        var serviceId = await CreateServiceAsync(client, accessToken, "Corte", 45.90m, cancellationToken);
+
+        var baseUtc = DateTimeOffset.UtcNow.AddDays(1);
+
+        var appointment1Id = await ScheduleAppointmentAsync(client, accessToken, customerId, resourceId, serviceId, baseUtc, cancellationToken);
+        (await AuthorizedRequestHelpers.PostAuthorizedAsync(
+            client, accessToken, $"/api/appointments/{appointment1Id}/no-show", new { }, cancellationToken))
+            .StatusCode.ShouldBe(HttpStatusCode.NoContent);
+
+        var appointment2Id = await ScheduleAppointmentAsync(client, accessToken, customerId, resourceId, serviceId, baseUtc.AddHours(2), cancellationToken);
+        (await AuthorizedRequestHelpers.PostAuthorizedAsync(
+            client, accessToken, $"/api/appointments/{appointment2Id}/no-show", new { }, cancellationToken))
+            .StatusCode.ShouldBe(HttpStatusCode.NoContent);
+
+        var response = await AuthorizedRequestHelpers.GetAuthorizedAsync(
+            client, accessToken, $"/api/appointments/customers/{customerId}/history", cancellationToken);
+        response.StatusCode.ShouldBe(HttpStatusCode.OK);
+
+        var body = await response.Content.ReadFromJsonAsync<JsonElement>(cancellationToken);
+        body.GetProperty("noShowCount").GetInt32().ShouldBe(2);
     }
 
     [Fact]
