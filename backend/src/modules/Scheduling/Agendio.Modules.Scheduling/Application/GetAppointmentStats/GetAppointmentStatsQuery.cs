@@ -9,5 +9,6 @@ public sealed record ServiceRevenuePoint(string ServiceName, decimal Total);
 public sealed record ProfessionalRevenuePoint(Guid ResourceId, string ResourceName, decimal Total);
 
 public sealed record AppointmentStats(
-    int TotalCount, int CompletedCount, int NoShowCount, int CancelledCount, decimal NoShowRate, decimal CancellationRate,
+    int TotalCount, int CompletedCount, int NoShowCount, int CancelledCount, int RescheduledCount,
+    decimal NoShowRate, decimal CancellationRate, decimal RescheduleRate,
     IReadOnlyList<ServiceRevenuePoint> RevenueByService, IReadOnlyList<ProfessionalRevenuePoint> RevenueByProfessional);

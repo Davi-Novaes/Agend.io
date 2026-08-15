@@ -78,12 +78,25 @@ public sealed class RescheduleAppointmentCommandHandler(
                 return Result.Failure(Error.NotFound("Appointment.NotFound", "Agendamento nao encontrado."));
             }
 
+            var previousStartUtc = trackedAppointment.Slot.StartUtc;
+
             var rescheduleResult = trackedAppointment.Reschedule(newSlotResult.Value);
             if (rescheduleResult.IsFailure)
             {
                 await transaction.RollbackAsync(cancellationToken);
                 return rescheduleResult;
             }
+
+            var logEntryResult = AppointmentChangeLogEntry.RecordReschedule(
+                trackedAppointment.TenantId, trackedAppointment.Id, trackedAppointment.CustomerId, trackedAppointment.ResourceId,
+                trackedAppointment.ServiceName, previousStartUtc, newSlotResult.Value.StartUtc, request.Reason, clock.UtcNow);
+            if (logEntryResult.IsFailure)
+            {
+                await transaction.RollbackAsync(cancellationToken);
+                return Result.Failure(logEntryResult.Error);
+            }
+
+            dbContext.AppointmentChangeLogEntries.Add(logEntryResult.Value);
 
             try
             {

@@ -24,12 +24,23 @@ public sealed class CancelAppointmentCommandHandler(
             return Result.Failure(Error.NotFound("Appointment.NotFound", "Agendamento nao encontrado."));
         }
 
+        var previousStartUtc = appointment.Slot.StartUtc;
+
         var result = request.ByStaff ? appointment.CancelByStaff() : appointment.CancelByCustomer();
         if (result.IsFailure)
         {
             return result;
         }
 
+        var logEntryResult = AppointmentChangeLogEntry.RecordCancellation(
+            appointment.TenantId, appointment.Id, appointment.CustomerId, appointment.ResourceId, appointment.ServiceName,
+            previousStartUtc, request.ByStaff, request.Reason, clock.UtcNow);
+        if (logEntryResult.IsFailure)
+        {
+            return Result.Failure(logEntryResult.Error);
+        }
+
+        dbContext.AppointmentChangeLogEntries.Add(logEntryResult.Value);
         await dbContext.SaveChangesAsync(cancellationToken);
 
         AppointmentNotificationScheduler.EnqueueCancellation(jobClient, appointment.TenantId.Value, appointment.Id.Value);

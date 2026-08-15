@@ -9,6 +9,7 @@ using Agendio.Modules.Scheduling.Application.GetAppointmentStats;
 using Agendio.Modules.Scheduling.Application.GetCustomerAppointmentHistory;
 using Agendio.Modules.Scheduling.Application.GetCustomerRecoveryCandidates;
 using Agendio.Modules.Scheduling.Application.GetReviewsSummary;
+using Agendio.Modules.Scheduling.Application.ListAppointmentChangeLog;
 using Agendio.Modules.Scheduling.Application.ListAppointments;
 using Agendio.Modules.Scheduling.Application.ListNotificationLog;
 using Agendio.Modules.Scheduling.Application.ListWaitlist;
@@ -78,6 +79,15 @@ public sealed class AppointmentEndpoints : IEndpointModule
         .WithName("GetCustomerAppointmentHistory")
         .WithSummary("Historico de agendamentos de um cliente com agregados (visitas, total gasto, ultima/proxima visita, servico/profissional preferido) (Fase 8).");
 
+        group.MapGet("/history", async (
+            Guid? appointmentId, Guid? customerId, IDispatcher dispatcher, CancellationToken cancellationToken, int page = 1, int pageSize = 20) =>
+        {
+            var result = await dispatcher.Query(new ListAppointmentChangeLogQuery(page, pageSize, appointmentId, customerId), cancellationToken);
+            return result.IsSuccess ? Results.Ok(result.Value) : result.Error.ToProblemResult();
+        })
+        .WithName("ListAppointmentChangeLog")
+        .WithSummary("Historico de cancelamentos e remarcacoes com motivo, paginado, mais recentes primeiro, opcionalmente filtrado por agendamento ou cliente (Fase 14).");
+
         group.MapGet("/{id:guid}", async (Guid id, IDispatcher dispatcher, CancellationToken cancellationToken) =>
         {
             var result = await dispatcher.Query(new GetAppointmentByIdQuery(id), cancellationToken);
@@ -132,19 +142,19 @@ public sealed class AppointmentEndpoints : IEndpointModule
 
         group.MapPost("/{id:guid}/cancel", async (Guid id, CancelAppointmentRequest request, IDispatcher dispatcher, CancellationToken cancellationToken) =>
         {
-            var result = await dispatcher.Send(new CancelAppointmentCommand(id, request.ByStaff), cancellationToken);
+            var result = await dispatcher.Send(new CancelAppointmentCommand(id, request.ByStaff, request.Reason), cancellationToken);
             return result.IsSuccess ? Results.NoContent() : result.Error.ToProblemResult();
         })
         .WithName("CancelAppointment")
-        .WithSummary("Cancela um agendamento, pelo cliente ou pela equipe.");
+        .WithSummary("Cancela um agendamento, pelo cliente ou pela equipe, com motivo opcional (Fase 14).");
 
         group.MapPut("/{id:guid}/reschedule", async (Guid id, RescheduleAppointmentRequest request, IDispatcher dispatcher, CancellationToken cancellationToken) =>
         {
-            var result = await dispatcher.Send(new RescheduleAppointmentCommand(id, request.NewStartAtUtc), cancellationToken);
+            var result = await dispatcher.Send(new RescheduleAppointmentCommand(id, request.NewStartAtUtc, request.Reason), cancellationToken);
             return result.IsSuccess ? Results.NoContent() : result.Error.ToProblemResult();
         })
         .WithName("RescheduleAppointment")
-        .WithSummary("Remarca um agendamento, preservando a duracao original. Rejeita com 409 se o novo horario ja estiver ocupado.");
+        .WithSummary("Remarca um agendamento, preservando a duracao original, com motivo opcional (Fase 14). Rejeita com 409 se o novo horario ja estiver ocupado.");
 
         var waitlistGroup = endpoints.MapGroup("/api/waitlist").WithTags("Scheduling").RequireAuthorization();
 
@@ -178,9 +188,9 @@ public sealed class AppointmentEndpoints : IEndpointModule
 
     private sealed record ScheduleAppointmentRequest(Guid CustomerId, Guid ResourceId, Guid ServiceId, DateTimeOffset StartAtUtc, string? Notes);
 
-    private sealed record CancelAppointmentRequest(bool ByStaff);
+    private sealed record CancelAppointmentRequest(bool ByStaff, string? Reason);
 
-    private sealed record RescheduleAppointmentRequest(DateTimeOffset NewStartAtUtc);
+    private sealed record RescheduleAppointmentRequest(DateTimeOffset NewStartAtUtc, string? Reason);
 
     private sealed record ConvertWaitlistEntryRequest(Guid ResourceId, DateTimeOffset StartAtUtc);
 }

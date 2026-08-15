@@ -190,6 +190,91 @@ namespace Agendio.Modules.Scheduling.Infrastructure.Persistence.Migrations
                     b.ToTable("appointments", "scheduling");
                 });
 
+            modelBuilder.Entity("Agendio.Modules.Scheduling.Domain.AppointmentChangeLogEntry", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<Guid>("AppointmentId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("appointment_id");
+
+                    b.Property<bool>("ByStaff")
+                        .HasColumnType("boolean")
+                        .HasColumnName("by_staff");
+
+                    b.Property<string>("ChangeType")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("change_type");
+
+                    b.Property<DateTimeOffset>("CreatedAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at_utc");
+
+                    b.Property<string>("CreatedBy")
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)")
+                        .HasColumnName("created_by");
+
+                    b.Property<Guid>("CustomerId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("customer_id");
+
+                    b.Property<DateTimeOffset?>("NewStartUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("new_start_utc");
+
+                    b.Property<DateTimeOffset>("OccurredAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("occurred_at_utc");
+
+                    b.Property<DateTimeOffset>("PreviousStartUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("previous_start_utc");
+
+                    b.Property<string>("Reason")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("reason");
+
+                    b.Property<Guid>("ResourceId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("resource_id");
+
+                    b.Property<string>("ServiceName")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("service_name");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("tenant_id");
+
+                    b.Property<DateTimeOffset?>("UpdatedAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at_utc");
+
+                    b.Property<string>("UpdatedBy")
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)")
+                        .HasColumnName("updated_by");
+
+                    b.HasKey("Id")
+                        .HasName("pk_appointment_change_log_entries");
+
+                    b.HasIndex("TenantId", "OccurredAtUtc")
+                        .HasDatabaseName("ix_appointment_change_log_entries_tenant_id_occurred_at_utc");
+
+                    b.HasIndex("TenantId", "AppointmentId", "OccurredAtUtc")
+                        .HasDatabaseName("ix_appointment_change_log_entries_tenant_id_appointment_id_occ");
+
+                    b.ToTable("appointment_change_log_entries", "scheduling");
+                });
+
             modelBuilder.Entity("Agendio.Modules.Scheduling.Domain.NotificationLogEntry", b =>
                 {
                     b.Property<Guid>("Id")

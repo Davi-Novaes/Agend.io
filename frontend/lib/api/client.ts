@@ -930,16 +930,46 @@ export function markAppointmentNoShow(id: string, accessToken: string): Promise<
   return request(`/api/appointments/${id}/no-show`, { method: "POST" }, accessToken);
 }
 
-export function cancelAppointment(id: string, byStaff: boolean, accessToken: string): Promise<void> {
-  return request(`/api/appointments/${id}/cancel`, { method: "POST", body: JSON.stringify({ byStaff }) }, accessToken);
+export function cancelAppointment(id: string, byStaff: boolean, reason: string | null, accessToken: string): Promise<void> {
+  return request(`/api/appointments/${id}/cancel`, { method: "POST", body: JSON.stringify({ byStaff, reason }) }, accessToken);
 }
 
-export function rescheduleAppointment(id: string, newStartAtUtc: string, accessToken: string): Promise<void> {
+export function rescheduleAppointment(id: string, newStartAtUtc: string, reason: string | null, accessToken: string): Promise<void> {
   return request(
     `/api/appointments/${id}/reschedule`,
-    { method: "PUT", body: JSON.stringify({ newStartAtUtc }) },
+    { method: "PUT", body: JSON.stringify({ newStartAtUtc, reason }) },
     accessToken
   );
+}
+
+export type AppointmentChangeType = "Cancelled" | "Rescheduled";
+
+export type AppointmentChangeLogItem = {
+  id: string;
+  appointmentId: string;
+  serviceName: string;
+  customerId: string;
+  customerName: string;
+  resourceId: string;
+  resourceName: string;
+  changeType: AppointmentChangeType;
+  reason: string | null;
+  previousStartUtc: string;
+  newStartUtc: string | null;
+  byStaff: boolean;
+  occurredAtUtc: string;
+};
+
+export function listAppointmentChangeLog(
+  params: { appointmentId?: string; customerId?: string; page?: number; pageSize?: number },
+  accessToken: string
+): Promise<PagedResult<AppointmentChangeLogItem>> {
+  const query = new URLSearchParams();
+  if (params.appointmentId) query.set("appointmentId", params.appointmentId);
+  if (params.customerId) query.set("customerId", params.customerId);
+  query.set("page", String(params.page ?? 1));
+  query.set("pageSize", String(params.pageSize ?? 20));
+  return request(`/api/appointments/history?${query.toString()}`, {}, accessToken);
 }
 
 // ---------- Portal publico (sem login) ----------
@@ -1381,8 +1411,10 @@ export type AppointmentStats = {
   completedCount: number;
   noShowCount: number;
   cancelledCount: number;
+  rescheduledCount: number;
   noShowRate: number;
   cancellationRate: number;
+  rescheduleRate: number;
   revenueByService: ServiceRevenuePoint[];
   revenueByProfessional: ProfessionalRevenuePoint[];
 };
