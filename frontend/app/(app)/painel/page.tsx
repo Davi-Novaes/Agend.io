@@ -4,13 +4,14 @@ import * as React from "react";
 import { useQuery } from "@tanstack/react-query";
 import { ArrowDownCircle, CalendarCheck, PiggyBank, Receipt, Users, Wallet } from "lucide-react";
 
-import { getAppointmentStats, getCashFlowSummary, listCustomers } from "@/lib/api/client";
+import { getAppointmentStats, getCashFlowSummary, getCustomerRecoveryCandidates, listCustomers } from "@/lib/api/client";
 import { useSession } from "@/lib/auth/session-context";
 import { PeriodFilter } from "@/components/shared/period-filter";
 import { CategoryBreakdownChart } from "@/components/financeiro/cash-flow-chart";
 import { MetricCard } from "@/components/dashboard/metric-card";
 import { RevenueChart } from "@/components/dashboard/revenue-chart";
 import { AppointmentStatusChart } from "@/components/dashboard/appointment-status-chart";
+import { InsightsSection } from "@/components/dashboard/insights-section";
 import { previousPeriod, startOfMonth, toDateOnly } from "@/lib/date-utils";
 
 function formatCurrency(value: number): string {
@@ -64,6 +65,11 @@ export default function DashboardPage() {
     queryFn: () => listCustomers({ page: 1, pageSize: 1 }, accessToken),
     enabled,
   });
+  const recoveryQuery = useQuery({
+    queryKey: ["painel", "recuperacao"],
+    queryFn: () => getCustomerRecoveryCandidates(accessToken),
+    enabled,
+  });
 
   if (!session) {
     return null;
@@ -86,6 +92,13 @@ export default function DashboardPage() {
         <h2 className="text-lg font-semibold tracking-tight">{greeting()}</h2>
         <p className="text-muted-foreground text-sm">Veja como esta o desempenho do seu negocio.</p>
       </div>
+
+      <InsightsSection
+        cashFlow={cashFlow}
+        previousCashFlow={previousCashFlow}
+        stats={stats}
+        recoveryCandidates={recoveryQuery.data}
+      />
 
       <div className="mb-8">
         <PeriodFilter from={from} to={to} onFromChange={setFrom} onToChange={setTo} />
