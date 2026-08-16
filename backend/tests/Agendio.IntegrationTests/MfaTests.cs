@@ -254,7 +254,7 @@ public class MfaTests(IntegrationTestFixture fixture)
             "RLS deveria impedir o tenant B de enxergar um codigo de recuperacao do tenant A.");
     }
 
-    private static async Task<(Guid TenantId, string Email, string AccessToken)> CreateTenantOwnerAndLoginAsync(
+    private async Task<(Guid TenantId, string Email, string AccessToken)> CreateTenantOwnerAndLoginAsync(
         HttpClient client, CancellationToken cancellationToken)
     {
         var tenantResponse = await client.PostAsJsonAsync("/api/tenants", new
@@ -271,6 +271,7 @@ public class MfaTests(IntegrationTestFixture fixture)
         var ownerEmail = $"owner-{Guid.NewGuid():N}@example.com";
         await client.PostAsJsonAsync(
             "/api/auth/register", new { tenantId, email = ownerEmail, password = Password, fullName = "Dono" }, cancellationToken);
+        await fixture.ConfirmEmailDirectlyAsync(tenantId, ownerEmail, cancellationToken);
 
         var loginResponse = await client.PostAsJsonAsync(
             "/api/auth/login", new { tenantId, email = ownerEmail, password = Password }, cancellationToken);

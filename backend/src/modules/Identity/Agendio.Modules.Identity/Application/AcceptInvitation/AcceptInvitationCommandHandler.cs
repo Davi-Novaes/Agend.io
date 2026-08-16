@@ -51,7 +51,8 @@ public sealed class AcceptInvitationCommandHandler(
         }
 
         var passwordHash = passwordHasher.Hash(request.Password);
-        var userResult = User.Register(invitation.TenantId, invitation.Email, request.FullName, passwordHash, invitation.Role);
+        var userResult = User.Register(
+            invitation.TenantId, invitation.Email, request.FullName, passwordHash, invitation.Role, emailConfirmedAtUtc: clock.UtcNow);
         if (userResult.IsFailure)
         {
             return Result.Failure<Guid>(userResult.Error);

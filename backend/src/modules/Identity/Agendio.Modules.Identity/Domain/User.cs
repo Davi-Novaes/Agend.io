@@ -27,6 +27,14 @@ public sealed class User : AggregateRoot<UserId>, ITenantOwned, IAuditable, ISof
     /// <summary>Segredo TOTP (base32) criptografado em coluna (ver docs/adr/0007) — null enquanto MFA nao esta habilitado.</summary>
     public string? MfaSecretEncrypted { get; private set; }
 
+    /// <summary>Null enquanto o e-mail nao foi confirmado — bloqueia login (ver LoginCommandHandler).</summary>
+    public DateTimeOffset? EmailConfirmedAt { get; private set; }
+
+    /// <summary>Hash SHA-256 do token de confirmacao vigente — mesmo padrao de TeamInvitation.TokenHash. Null apos confirmado.</summary>
+    public string? EmailConfirmationTokenHash { get; private set; }
+
+    public DateTimeOffset? EmailConfirmationTokenExpiresAtUtc { get; private set; }
+
     public DateTimeOffset CreatedAtUtc { get; set; }
 
     public string? CreatedBy { get; set; }
@@ -43,7 +51,7 @@ public sealed class User : AggregateRoot<UserId>, ITenantOwned, IAuditable, ISof
     {
     }
 
-    private User(TenantId tenantId, Email email, string fullName, string passwordHash, UserRole role)
+    private User(TenantId tenantId, Email email, string fullName, string passwordHash, UserRole role, DateTimeOffset? emailConfirmedAtUtc)
         : base(UserId.New())
     {
         TenantId = tenantId;
@@ -52,9 +60,17 @@ public sealed class User : AggregateRoot<UserId>, ITenantOwned, IAuditable, ISof
         PasswordHash = passwordHash;
         Role = role;
         IsActive = true;
+        EmailConfirmedAt = emailConfirmedAtUtc;
     }
 
-    public static Result<User> Register(TenantId tenantId, Email email, string? fullName, string passwordHash, UserRole role = UserRole.Owner)
+    /// <summary>
+    /// <paramref name="emailConfirmedAtUtc"/>: null para autocadastro (precisa confirmar por
+    /// e-mail antes do primeiro login, ver LoginCommandHandler). AcceptInvitationCommandHandler
+    /// passa clock.UtcNow aqui — quem aceita um convite ja provou posse do e-mail ao receber o
+    /// link, e-mail de confirmacao redundante so adicionaria friccao sem ganho de seguranca.
+    /// </summary>
+    public static Result<User> Register(
+        TenantId tenantId, Email email, string? fullName, string passwordHash, UserRole role = UserRole.Owner, DateTimeOffset? emailConfirmedAtUtc = null)
     {
         if (string.IsNullOrWhiteSpace(fullName))
         {
@@ -66,7 +82,7 @@ public sealed class User : AggregateRoot<UserId>, ITenantOwned, IAuditable, ISof
             return Result.Failure<User>(Error.Validation("User.PasswordHashEmpty", "Hash de senha invalido."));
         }
 
-        var user = new User(tenantId, email, fullName.Trim(), passwordHash, role);
+        var user = new User(tenantId, email, fullName.Trim(), passwordHash, role, emailConfirmedAtUtc);
         user.Raise(new UserRegisteredDomainEvent(user.Id, tenantId, email.Value));
 
         return Result.Success(user);
@@ -75,6 +91,31 @@ public sealed class User : AggregateRoot<UserId>, ITenantOwned, IAuditable, ISof
     public void Deactivate() => IsActive = false;
 
     public void Activate() => IsActive = true;
+
+    public void GenerateEmailConfirmationToken(string tokenHash, DateTimeOffset expiresAtUtc)
+    {
+        EmailConfirmationTokenHash = tokenHash;
+        EmailConfirmationTokenExpiresAtUtc = expiresAtUtc;
+    }
+
+    public Result ConfirmEmail(DateTimeOffset nowUtc)
+    {
+        if (EmailConfirmedAt is not null)
+        {
+            return Result.Success();
+        }
+
+        if (EmailConfirmationTokenHash is null || EmailConfirmationTokenExpiresAtUtc is null || EmailConfirmationTokenExpiresAtUtc <= nowUtc)
+        {
+            return Result.Failure(Error.Unauthorized("Auth.EmailConfirmationTokenInvalid", "Token de confirmacao invalido ou expirado."));
+        }
+
+        EmailConfirmedAt = nowUtc;
+        EmailConfirmationTokenHash = null;
+        EmailConfirmationTokenExpiresAtUtc = null;
+
+        return Result.Success();
+    }
 
     public void EnableMfa(string secret)
     {

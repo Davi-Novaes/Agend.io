@@ -291,6 +291,19 @@ namespace Agendio.Modules.Identity.Infrastructure.Persistence.Migrations
                         .HasColumnType("character varying(320)")
                         .HasColumnName("email");
 
+                    b.Property<DateTimeOffset?>("EmailConfirmationTokenExpiresAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("email_confirmation_token_expires_at_utc");
+
+                    b.Property<string>("EmailConfirmationTokenHash")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("email_confirmation_token_hash");
+
+                    b.Property<DateTimeOffset?>("EmailConfirmedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("email_confirmed_at");
+
                     b.Property<string>("FullName")
                         .IsRequired()
                         .HasMaxLength(200)
@@ -341,6 +354,10 @@ namespace Agendio.Modules.Identity.Infrastructure.Persistence.Migrations
 
                     b.HasKey("Id")
                         .HasName("pk_users");
+
+                    b.HasIndex("EmailConfirmationTokenHash")
+                        .IsUnique()
+                        .HasDatabaseName("ix_users_email_confirmation_token_hash");
 
                     b.HasIndex("TenantId", "Email")
                         .IsUnique()

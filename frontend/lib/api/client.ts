@@ -40,7 +40,7 @@ async function request<TResponse>(
     throw new ApiError(
       problem?.detail ?? problem?.title ?? "Ocorreu um erro inesperado.",
       response.status,
-      problem?.code
+      problem?.code ?? problem?.title
     );
   }
 
@@ -188,6 +188,20 @@ export function registerUser(input: {
   });
 }
 
+export function confirmEmail(input: { token: string }): Promise<void> {
+  return request<void>("/api/auth/confirm-email", {
+    method: "POST",
+    body: JSON.stringify(input),
+  });
+}
+
+export function resendConfirmationEmail(input: { tenantId: string; email: string }): Promise<void> {
+  return request<void>("/api/auth/resend-confirmation", {
+    method: "POST",
+    body: JSON.stringify(input),
+  });
+}
+
 export function refreshAccessToken(): Promise<AuthTokens> {
   return request<AuthTokens>("/api/auth/refresh", { method: "POST" });
 }
@@ -218,7 +232,7 @@ export async function uploadTenantLogo(file: File, accessToken: string): Promise
     throw new ApiError(
       problem?.detail ?? problem?.title ?? "Nao foi possivel enviar o logo.",
       response.status,
-      problem?.code
+      problem?.code ?? problem?.title
     );
   }
 
@@ -241,7 +255,7 @@ export async function uploadTenantBanner(file: File, accessToken: string): Promi
     throw new ApiError(
       problem?.detail ?? problem?.title ?? "Nao foi possivel enviar o banner.",
       response.status,
-      problem?.code
+      problem?.code ?? problem?.title
     );
   }
 
@@ -602,7 +616,7 @@ export async function importCustomersFromCsv(file: File, accessToken: string): P
     throw new ApiError(
       problem?.detail ?? problem?.title ?? "Nao foi possivel importar o arquivo.",
       response.status,
-      problem?.code
+      problem?.code ?? problem?.title
     );
   }
 
@@ -673,7 +687,7 @@ export async function uploadServiceImage(id: string, file: File, accessToken: st
 
   if (!response.ok) {
     const problem = (await response.json().catch(() => null)) as ProblemDetails | null;
-    throw new ApiError(problem?.detail ?? problem?.title ?? "Nao foi possivel enviar a imagem.", response.status, problem?.code);
+    throw new ApiError(problem?.detail ?? problem?.title ?? "Nao foi possivel enviar a imagem.", response.status, problem?.code ?? problem?.title);
   }
 
   return (await response.json()) as { imageUrl: string };
@@ -774,7 +788,7 @@ export async function uploadResourcePhoto(id: string, file: File, accessToken: s
 
   if (!response.ok) {
     const problem = (await response.json().catch(() => null)) as ProblemDetails | null;
-    throw new ApiError(problem?.detail ?? problem?.title ?? "Nao foi possivel enviar a foto.", response.status, problem?.code);
+    throw new ApiError(problem?.detail ?? problem?.title ?? "Nao foi possivel enviar a foto.", response.status, problem?.code ?? problem?.title);
   }
 
   return (await response.json()) as { photoUrl: string };

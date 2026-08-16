@@ -7,8 +7,9 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { toast } from "sonner";
+import { MailCheck } from "lucide-react";
 
-import { getTenantBySlug, ApiError } from "@/lib/api/client";
+import { getTenantBySlug, resendConfirmationEmail, ApiError } from "@/lib/api/client";
 import { useSession, MfaRequiredError } from "@/lib/auth/session-context";
 import { Logo } from "@/components/logo";
 import { Button } from "@/components/ui/button";
@@ -45,6 +46,13 @@ export default function LoginPage() {
   // Presente so durante a segunda etapa (MFA habilitado para este usuario) —
   // null significa "ainda na etapa de senha".
   const [mfaChallengeToken, setMfaChallengeToken] = React.useState<string | null>(null);
+  // Presente quando o login falhou por e-mail nao confirmado — troca de tela
+  // em vez de um toast generico, com CTA de reenvio (mesmo tenantId/email
+  // usados na tentativa de login, guardados aqui pra alimentar o reenvio).
+  const [unconfirmedEmail, setUnconfirmedEmail] = React.useState<{ tenantId: string; email: string } | null>(
+    null
+  );
+  const [isResending, setIsResending] = React.useState(false);
 
   const form = useForm<LoginFormValues>({
     resolver: zodResolver(loginSchema),
@@ -57,11 +65,13 @@ export default function LoginPage() {
   });
 
   async function onSubmit(values: LoginFormValues) {
+    let tenantId: string | undefined;
     try {
       // O login exige o Id do tenant, mas o usuario so sabe o identificador
       // publico (slug) da URL/marca do estabelecimento — resolvemos um a
       // partir do outro antes de autenticar.
       const tenant = await getTenantBySlug(values.tenantSlug);
+      tenantId = tenant.id;
 
       if (!tenant.isActive) {
         form.setError("tenantSlug", {
@@ -85,9 +95,33 @@ export default function LoginPage() {
         return;
       }
 
+      // Codigo distinto do generico "senha errada": a pessoa ja provou que
+      // sabe a senha, entao esconder o motivo do bloqueio nao ganha
+      // seguranca nenhuma — so troca pra uma tela com CTA de reenvio.
+      if (error instanceof ApiError && error.code === "Auth.EmailNotConfirmed" && tenantId) {
+        setUnconfirmedEmail({ tenantId, email: values.email });
+        return;
+      }
+
       const message =
         error instanceof ApiError ? error.message : "Nao foi possivel entrar. Tente novamente.";
       toast.error(message);
+    }
+  }
+
+  async function onResendConfirmation() {
+    if (!unconfirmedEmail) {
+      return;
+    }
+    setIsResending(true);
+    try {
+      await resendConfirmationEmail(unconfirmedEmail);
+      toast.success("E-mail reenviado. Confira sua caixa de entrada.");
+    } catch (error) {
+      const message = error instanceof ApiError ? error.message : "Nao foi possivel reenviar o e-mail. Tente novamente.";
+      toast.error(message);
+    } finally {
+      setIsResending(false);
     }
   }
 
@@ -129,7 +163,39 @@ export default function LoginPage() {
             <Logo />
           </div>
 
-          {mfaChallengeToken ? (
+          {unconfirmedEmail ? (
+            <>
+              <div className="mb-6 flex flex-col items-center gap-3 text-center">
+                <span className="bg-accent text-accent-foreground flex size-12 items-center justify-center rounded-full">
+                  <MailCheck className="size-6" aria-hidden />
+                </span>
+                <div className="space-y-1.5">
+                  <h1 className="text-xl font-semibold tracking-tight">Confirme seu e-mail</h1>
+                  <p className="text-muted-foreground text-sm">
+                    Enviamos um link de confirmação para <strong>{unconfirmedEmail.email}</strong> quando você se
+                    cadastrou. Confirme para poder entrar.
+                  </p>
+                </div>
+              </div>
+
+              <Button
+                type="button"
+                onClick={onResendConfirmation}
+                disabled={isResending}
+                className="h-10 w-full"
+              >
+                {isResending ? "Reenviando..." : "Reenviar e-mail"}
+              </Button>
+
+              <button
+                type="button"
+                onClick={() => setUnconfirmedEmail(null)}
+                className="text-muted-foreground mt-6 w-full text-center text-sm underline-offset-4 hover:underline"
+              >
+                Voltar para o login
+              </button>
+            </>
+          ) : mfaChallengeToken ? (
             <>
               <div className="mb-6 space-y-1.5">
                 <h1 className="text-xl font-semibold tracking-tight">Verificação em duas etapas</h1>

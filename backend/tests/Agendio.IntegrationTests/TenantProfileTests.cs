@@ -514,13 +514,13 @@ public class TenantProfileTests(IntegrationTestFixture fixture)
         response.StatusCode.ShouldBe(HttpStatusCode.Unauthorized);
     }
 
-    private static async Task<string> CreateTenantWithOwnerAndLoginAsync(HttpClient client, CancellationToken cancellationToken)
+    private async Task<string> CreateTenantWithOwnerAndLoginAsync(HttpClient client, CancellationToken cancellationToken)
     {
         var (_, accessToken) = await CreateTenantWithOwnerAndLoginAsyncWithId(client, cancellationToken);
         return accessToken;
     }
 
-    private static async Task<(string Slug, string AccessToken)> CreateTenantWithOwnerAndLoginAsyncWithSlug(
+    private async Task<(string Slug, string AccessToken)> CreateTenantWithOwnerAndLoginAsyncWithSlug(
         HttpClient client, CancellationToken cancellationToken)
     {
         var slug = $"tenant-{Guid.NewGuid():N}";
@@ -539,6 +539,7 @@ public class TenantProfileTests(IntegrationTestFixture fixture)
         var ownerEmail = $"owner-{Guid.NewGuid():N}@example.com";
         await client.PostAsJsonAsync(
             "/api/auth/register", new { tenantId, email = ownerEmail, password = Password, fullName = "Dono" }, cancellationToken);
+        await fixture.ConfirmEmailDirectlyAsync(tenantId, ownerEmail, cancellationToken);
 
         var loginResponse = await client.PostAsJsonAsync(
             "/api/auth/login", new { tenantId, email = ownerEmail, password = Password }, cancellationToken);
@@ -547,7 +548,7 @@ public class TenantProfileTests(IntegrationTestFixture fixture)
         return (slug, loginBody.GetProperty("accessToken").GetString()!);
     }
 
-    private static async Task<(Guid TenantId, string AccessToken)> CreateTenantWithOwnerAndLoginAsyncWithId(
+    private async Task<(Guid TenantId, string AccessToken)> CreateTenantWithOwnerAndLoginAsyncWithId(
         HttpClient client, CancellationToken cancellationToken)
     {
         var tenantResponse = await client.PostAsJsonAsync("/api/tenants", new
@@ -564,6 +565,7 @@ public class TenantProfileTests(IntegrationTestFixture fixture)
         var ownerEmail = $"owner-{Guid.NewGuid():N}@example.com";
         await client.PostAsJsonAsync(
             "/api/auth/register", new { tenantId, email = ownerEmail, password = Password, fullName = "Dono" }, cancellationToken);
+        await fixture.ConfirmEmailDirectlyAsync(tenantId, ownerEmail, cancellationToken);
 
         var loginResponse = await client.PostAsJsonAsync(
             "/api/auth/login", new { tenantId, email = ownerEmail, password = Password }, cancellationToken);

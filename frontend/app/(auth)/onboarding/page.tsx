@@ -2,21 +2,20 @@
 
 import * as React from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { toast } from "sonner";
-import { Check } from "lucide-react";
+import { Check, MailCheck } from "lucide-react";
 
 import {
   listBusinessTypes,
   createTenant,
   registerUser,
+  resendConfirmationEmail,
   ApiError,
 } from "@/lib/api/client";
-import { useSession } from "@/lib/auth/session-context";
 import { Logo } from "@/components/logo";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -72,11 +71,14 @@ const COMMON_TIME_ZONES = [
 ];
 
 export default function OnboardingPage() {
-  const router = useRouter();
-  const { login } = useSession();
   const [step, setStep] = React.useState(0);
   const [slugTouched, setSlugTouched] = React.useState(false);
   const [isSubmitting, setIsSubmitting] = React.useState(false);
+  const [isResending, setIsResending] = React.useState(false);
+  // Presente so apos o cadastro concluir — troca o formulario pela tela de
+  // "confirme seu e-mail" em vez de logar automaticamente (login agora exige
+  // e-mail confirmado).
+  const [registered, setRegistered] = React.useState<{ tenantId: string; email: string } | null>(null);
 
   const businessTypesQuery = useQuery({
     queryKey: ["business-types"],
@@ -143,8 +145,7 @@ export default function OnboardingPage() {
         fullName: values.ownerFullName,
       });
 
-      await login({ tenantId: tenant.id, email: values.ownerEmail, password: values.ownerPassword });
-      router.push("/painel");
+      setRegistered({ tenantId: tenant.id, email: values.ownerEmail });
     } catch (error) {
       if (error instanceof ApiError && error.status === 409) {
         form.setError("slug", { message: "Este identificador ja esta em uso." });
@@ -160,7 +161,58 @@ export default function OnboardingPage() {
     }
   }
 
+  async function onResendConfirmation() {
+    if (!registered) {
+      return;
+    }
+    setIsResending(true);
+    try {
+      await resendConfirmationEmail({ tenantId: registered.tenantId, email: registered.email });
+      toast.success("E-mail reenviado. Confira sua caixa de entrada.");
+    } catch (error) {
+      const message = error instanceof ApiError ? error.message : "Nao foi possivel reenviar o e-mail. Tente novamente.";
+      toast.error(message);
+    } finally {
+      setIsResending(false);
+    }
+  }
+
   const isLastStep = step === STEPS.length - 1;
+
+  if (registered) {
+    return (
+      <main className="flex min-h-full flex-1 items-center justify-center p-4 sm:p-6">
+        <div className="w-full max-w-md text-center">
+          <div className="mb-6 flex flex-col items-center gap-4">
+            <Logo />
+            <span className="bg-accent text-accent-foreground flex size-14 items-center justify-center rounded-full">
+              <MailCheck className="size-7" aria-hidden />
+            </span>
+          </div>
+          <h1 className="text-xl font-semibold tracking-tight">Confirme seu e-mail</h1>
+          <p className="text-muted-foreground mt-2 text-sm text-balance">
+            Enviamos um link de confirmação para <strong>{registered.email}</strong>. Clique nele para ativar
+            sua conta e poder entrar.
+          </p>
+          <Button
+            type="button"
+            variant="outline"
+            className="mt-6"
+            onClick={onResendConfirmation}
+            disabled={isResending}
+          >
+            {isResending ? "Reenviando..." : "Reenviar e-mail"}
+          </Button>
+          <p className="text-muted-foreground mt-6 text-center text-sm">
+            Ja confirmou?{" "}
+            <Link href="/login" className="text-primary underline-offset-4 hover:underline">
+              Entrar
+            </Link>
+          </p>
+        </div>
+      </main>
+    );
+  }
 
   return (
     <main className="flex min-h-full flex-1 items-center justify-center p-4 sm:p-6">
@@ -365,11 +417,11 @@ export default function OnboardingPage() {
                 Voltar
               </Button>
               {isLastStep ? (
-                <Button type="submit" disabled={isSubmitting}>
+                <Button key="submit" type="submit" disabled={isSubmitting}>
                   {isSubmitting ? "Criando..." : "Criar estabelecimento"}
                 </Button>
               ) : (
-                <Button type="button" onClick={goNext}>
+                <Button key="next" type="button" onClick={goNext}>
                   Continuar
                 </Button>
               )}

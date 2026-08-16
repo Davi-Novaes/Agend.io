@@ -1,11 +1,13 @@
 using Agendio.Infrastructure.Security;
 using Agendio.Modules.Identity.Domain;
+using Agendio.Modules.Identity.Infrastructure.Notifications;
 using Agendio.Modules.Identity.Infrastructure.Persistence;
 using Agendio.Modules.Tenancy.Contracts;
 using Agendio.SharedKernel.Messaging;
 using Agendio.SharedKernel.Multitenancy;
 using Agendio.SharedKernel.Results;
 using Agendio.SharedKernel.ValueObjects;
+using Hangfire;
 using Microsoft.EntityFrameworkCore;
 
 namespace Agendio.Modules.Identity.Application.RegisterUser;
@@ -13,7 +15,8 @@ namespace Agendio.Modules.Identity.Application.RegisterUser;
 public sealed class RegisterUserCommandHandler(
     IdentityDbContext dbContext,
     ITenantLookupService tenantLookupService,
-    IPasswordHasher passwordHasher) : ICommandHandler<RegisterUserCommand, Guid>
+    IPasswordHasher passwordHasher,
+    IBackgroundJobClient jobClient) : ICommandHandler<RegisterUserCommand, Guid>
 {
     public async Task<Result<Guid>> Handle(RegisterUserCommand request, CancellationToken cancellationToken)
     {
@@ -50,6 +53,13 @@ public sealed class RegisterUserCommandHandler(
         dbContext.Users.Add(userResult.Value);
         await dbContext.SaveChangesAsync(cancellationToken);
 
-        return Result.Success(userResult.Value.Id.Value);
+        // Via Hangfire (nao sincrono): e o unico jeito do dono entrar na propria
+        // conta (login exige e-mail confirmado, ver LoginCommandHandler), uma
+        // falha de SMTP precisa de retry automatico. O job gera o token de
+        // confirmacao internamente (ver EmailConfirmationJobs).
+        var userId = userResult.Value.Id.Value;
+        jobClient.Enqueue<EmailConfirmationJobs>(job => job.SendConfirmationEmailAsync(tenantId.Value, userId, CancellationToken.None));
+
+        return Result.Success(userId);
     }
 }

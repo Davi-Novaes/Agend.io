@@ -4,6 +4,7 @@ using Agendio.Infrastructure.Endpoints;
 using Agendio.Modules.Identity.Application;
 using Agendio.Modules.Identity.Endpoints;
 using Agendio.Modules.Identity.Infrastructure.Mfa;
+using Agendio.Modules.Identity.Infrastructure.Notifications;
 using Agendio.Modules.Identity.Infrastructure.Persistence;
 using Agendio.SharedKernel.Messaging;
 using FluentValidation;
@@ -33,6 +34,7 @@ public static class IdentityModuleServiceCollectionExtensions
         services.AddScoped<AuthTokenIssuer>();
         services.AddSingleton<IMfaChallengeStore, RedisMfaChallengeStore>();
         services.AddScoped<IMfaCodeVerifier, MfaCodeVerifier>();
+        services.AddScoped<EmailConfirmationJobs>();
 
         return services;
     }
