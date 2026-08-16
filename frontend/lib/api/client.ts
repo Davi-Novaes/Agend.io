@@ -1127,6 +1127,25 @@ export function setTenantActiveStatusForPlatform(
   );
 }
 
+export type SignupMonthPoint = { month: string; count: number };
+
+export type PlatformDashboardMetrics = {
+  totalTenants: number;
+  activeTenants: number;
+  newTenantsThisMonth: number;
+  trialingCount: number;
+  activeSubscriptionsCount: number;
+  pastDueCount: number;
+  canceledCount: number;
+  mrr: number;
+  mrrCurrency: string;
+  newTenantsBySeriesMonth: SignupMonthPoint[];
+};
+
+export function getPlatformDashboardMetrics(accessToken: string): Promise<PlatformDashboardMetrics> {
+  return request<PlatformDashboardMetrics>("/api/platform/dashboard", {}, accessToken);
+}
+
 // ---------- Billing (assinatura do estabelecimento) ----------
 
 export type PlanSummary = {
@@ -1182,6 +1201,10 @@ export type SubscriptionAdminSummary = {
 
 export function listSubscriptionsForPlatform(accessToken: string): Promise<SubscriptionAdminSummary[]> {
   return request<SubscriptionAdminSummary[]>("/api/platform/subscriptions", {}, accessToken);
+}
+
+export function cancelSubscriptionForTenant(tenantId: string, accessToken: string): Promise<void> {
+  return request(`/api/platform/subscriptions/${tenantId}/cancel`, { method: "POST" }, accessToken);
 }
 
 // ---------- Financeiro ----------

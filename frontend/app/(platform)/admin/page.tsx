@@ -2,20 +2,23 @@
 
 import * as React from "react";
 import { useRouter } from "next/navigation";
-import Link from "next/link";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { toast } from "sonner";
+import { useQuery } from "@tanstack/react-query";
+import { Building2, CheckCircle2, TrendingUp, Wallet } from "lucide-react";
 
-import { listTenantsForPlatform, setTenantActiveStatusForPlatform, ApiError } from "@/lib/api/client";
+import { getPlatformDashboardMetrics } from "@/lib/api/client";
 import { usePlatformSession } from "@/lib/auth/platform-session-context";
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from "@/components/ui/table";
+import { AdminNav } from "@/components/platform/admin-nav";
+import { MetricCard } from "@/components/dashboard/metric-card";
+import { SignupsChart } from "@/components/platform/signups-chart";
+import { SubscriptionStatusChart } from "@/components/platform/subscription-status-chart";
 
-export default function PlatformAdminPage() {
+function formatCurrency(value: number, currency: string): string {
+  return value.toLocaleString("pt-BR", { style: "currency", currency });
+}
+
+export default function PlatformDashboardPage() {
   const router = useRouter();
-  const { session, logout } = usePlatformSession();
-  const queryClient = useQueryClient();
+  const { session } = usePlatformSession();
 
   React.useEffect(() => {
     if (!session) {
@@ -25,21 +28,10 @@ export default function PlatformAdminPage() {
 
   const accessToken = session?.accessToken ?? "";
 
-  const tenantsQuery = useQuery({
-    queryKey: ["platform", "tenants"],
-    queryFn: () => listTenantsForPlatform(accessToken),
+  const metricsQuery = useQuery({
+    queryKey: ["platform", "dashboard"],
+    queryFn: () => getPlatformDashboardMetrics(accessToken),
     enabled: Boolean(session),
-  });
-
-  const toggleStatusMutation = useMutation({
-    mutationFn: ({ id, isActive }: { id: string; isActive: boolean }) =>
-      setTenantActiveStatusForPlatform(id, isActive, accessToken),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["platform", "tenants"] });
-    },
-    onError: (error: unknown) => {
-      toast.error(error instanceof ApiError ? error.message : "Nao foi possivel atualizar o estabelecimento.");
-    },
   });
 
   if (!session) {
@@ -47,78 +39,36 @@ export default function PlatformAdminPage() {
   }
 
   return (
-    <main className="mx-auto flex min-h-full w-full max-w-4xl flex-1 flex-col gap-6 p-6">
-      <header className="flex items-center justify-between gap-4">
-        <div>
-          <h1 className="text-xl font-semibold tracking-tight">Estabelecimentos</h1>
-          <p className="text-muted-foreground text-sm">Logado como {session.fullName}.</p>
-        </div>
-        <div className="flex gap-2">
-          <Button variant="outline" asChild>
-            <Link href="/admin/subscriptions">Assinaturas</Link>
-          </Button>
-          <Button
-            variant="outline"
-            onClick={() => {
-              logout();
-              router.replace("/admin/login");
-            }}
-          >
-            Sair
-          </Button>
-        </div>
-      </header>
+    <main className="mx-auto flex min-h-full w-full max-w-5xl flex-1 flex-col gap-6 p-6">
+      <AdminNav />
 
-      {tenantsQuery.isLoading ? (
+      <div>
+        <h1 className="text-xl font-semibold tracking-tight">Dashboard</h1>
+        <p className="text-muted-foreground text-sm">Visao geral do Agend.io como plataforma.</p>
+      </div>
+
+      {metricsQuery.isLoading ? (
         <p className="text-muted-foreground text-sm">Carregando...</p>
-      ) : tenantsQuery.isError ? (
-        <p className="text-destructive text-sm">Nao foi possivel carregar os estabelecimentos.</p>
+      ) : metricsQuery.isError || !metricsQuery.data ? (
+        <p className="text-destructive text-sm">Nao foi possivel carregar as metricas.</p>
       ) : (
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Nome</TableHead>
-              <TableHead>Identificador</TableHead>
-              <TableHead>Fuso horario</TableHead>
-              <TableHead>Status</TableHead>
-              <TableHead className="text-right">Acoes</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {tenantsQuery.data?.length === 0 ? (
-              <TableRow>
-                <TableCell colSpan={5} className="text-muted-foreground text-center">
-                  Nenhum estabelecimento cadastrado.
-                </TableCell>
-              </TableRow>
-            ) : (
-              tenantsQuery.data?.map((tenant) => (
-                <TableRow key={tenant.id}>
-                  <TableCell className="font-medium">{tenant.name}</TableCell>
-                  <TableCell>{tenant.slug}</TableCell>
-                  <TableCell>{tenant.timeZoneId}</TableCell>
-                  <TableCell>
-                    <Badge variant={tenant.isActive ? "default" : "secondary"}>
-                      {tenant.isActive ? "Ativo" : "Inativo"}
-                    </Badge>
-                  </TableCell>
-                  <TableCell className="text-right">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      disabled={toggleStatusMutation.isPending}
-                      onClick={() =>
-                        toggleStatusMutation.mutate({ id: tenant.id, isActive: !tenant.isActive })
-                      }
-                    >
-                      {tenant.isActive ? "Desativar" : "Ativar"}
-                    </Button>
-                  </TableCell>
-                </TableRow>
-              ))
-            )}
-          </TableBody>
-        </Table>
+        <>
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            <MetricCard icon={Building2} title="Estabelecimentos" value={String(metricsQuery.data.totalTenants)} />
+            <MetricCard icon={CheckCircle2} title="Estabelecimentos ativos" value={String(metricsQuery.data.activeTenants)} />
+            <MetricCard icon={TrendingUp} title="Novos este mes" value={String(metricsQuery.data.newTenantsThisMonth)} />
+            <MetricCard
+              icon={Wallet}
+              title="MRR"
+              value={formatCurrency(metricsQuery.data.mrr, metricsQuery.data.mrrCurrency)}
+            />
+          </div>
+
+          <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+            <SignupsChart data={metricsQuery.data.newTenantsBySeriesMonth} />
+            <SubscriptionStatusChart metrics={metricsQuery.data} />
+          </div>
+        </>
       )}
     </main>
   );
