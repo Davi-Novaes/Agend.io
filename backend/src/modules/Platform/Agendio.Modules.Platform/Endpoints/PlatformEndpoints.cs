@@ -1,5 +1,7 @@
 using Agendio.Infrastructure.Endpoints;
 using Agendio.Infrastructure.Security;
+using Agendio.Modules.Platform.Application.CancelSubscriptionForTenant;
+using Agendio.Modules.Platform.Application.GetPlatformDashboardMetrics;
 using Agendio.Modules.Platform.Application.ListSubscriptionsForPlatform;
 using Agendio.Modules.Platform.Application.ListTenants;
 using Agendio.Modules.Platform.Application.LoginPlatformAdmin;
@@ -59,6 +61,24 @@ public sealed class PlatformEndpoints : IEndpointModule
         .RequireAuthorization(PlatformAuthConstants.AuthorizationPolicy)
         .WithName("ListSubscriptionsForPlatform")
         .WithSummary("Lista a assinatura de todos os tenants (trial, ativa, atrasada, cancelada).");
+
+        group.MapPost("/subscriptions/{tenantId:guid}/cancel", async (Guid tenantId, IDispatcher dispatcher, CancellationToken cancellationToken) =>
+        {
+            var result = await dispatcher.Send(new CancelSubscriptionForTenantCommand(tenantId), cancellationToken);
+            return result.IsSuccess ? Results.NoContent() : result.Error.ToProblemResult();
+        })
+        .RequireAuthorization(PlatformAuthConstants.AuthorizationPolicy)
+        .WithName("CancelSubscriptionForTenant")
+        .WithSummary("Cancela a assinatura de um tenant a pedido do Super Admin — chama a Asaas de verdade, acao irreversivel.");
+
+        group.MapGet("/dashboard", async (IDispatcher dispatcher, CancellationToken cancellationToken) =>
+        {
+            var result = await dispatcher.Query(new GetPlatformDashboardMetricsQuery(), cancellationToken);
+            return result.IsSuccess ? Results.Ok(result.Value) : result.Error.ToProblemResult();
+        })
+        .RequireAuthorization(PlatformAuthConstants.AuthorizationPolicy)
+        .WithName("GetPlatformDashboardMetrics")
+        .WithSummary("Metricas agregadas do SaaS: total/novos estabelecimentos, distribuicao de assinaturas por status e MRR.");
     }
 
     private sealed record LoginRequest(string Email, string Password);
