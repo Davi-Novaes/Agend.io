@@ -26,6 +26,7 @@ public class TenantIsolationTests(IntegrationTestFixture fixture)
 
         var email = $"owner-{Guid.NewGuid():N}@example.com";
         await RegisterUserAsync(client, tenantAId, email, Password, "Dono A", cancellationToken);
+        await fixture.ConfirmEmailDirectlyAsync(tenantAId, email, cancellationToken);
 
         // Mesmo e-mail e senha CORRETOS, mas apontando para o tenant ERRADO —
         // isso so pode falhar se o isolamento estiver funcionando.

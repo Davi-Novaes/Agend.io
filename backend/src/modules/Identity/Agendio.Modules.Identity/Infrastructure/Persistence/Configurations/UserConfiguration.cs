@@ -38,6 +38,12 @@ public sealed class UserConfiguration : IEntityTypeConfiguration<User>
 
         builder.Property(u => u.MfaEnabled).IsRequired().HasDefaultValue(false);
 
+        // Mesma logica de TeamInvitation.TokenHash: SHA-256 hex de um segredo de
+        // alta entropia. Indice unico como defesa extra — nulo enquanto nao ha
+        // token vigente (Postgres trata NULL como distinto em indice unico).
+        builder.Property(u => u.EmailConfirmationTokenHash).HasMaxLength(64);
+        builder.HasIndex(u => u.EmailConfirmationTokenHash).IsUnique();
+
         // Sem HasConversion aqui: MfaSecretEncrypted (como Customer.Cpf/HealthNotes,
         // ver docs/adr/0007) usa EncryptedStringConverter, aplicado no
         // IdentityDbContext.OnModelCreating porque depende de IEncryptionService.

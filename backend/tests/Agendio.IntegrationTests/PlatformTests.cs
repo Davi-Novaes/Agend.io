@@ -296,7 +296,7 @@ public class PlatformTests(IntegrationTestFixture fixture)
         return email;
     }
 
-    private static async Task<(Guid TenantId, string OwnerEmail)> CreateTenantWithOwnerAsync(HttpClient client, CancellationToken cancellationToken)
+    private async Task<(Guid TenantId, string OwnerEmail)> CreateTenantWithOwnerAsync(HttpClient client, CancellationToken cancellationToken)
     {
         var tenantResponse = await client.PostAsJsonAsync("/api/tenants", new
         {
@@ -312,11 +312,12 @@ public class PlatformTests(IntegrationTestFixture fixture)
         var ownerEmail = $"owner-{Guid.NewGuid():N}@example.com";
         await client.PostAsJsonAsync(
             "/api/auth/register", new { tenantId, email = ownerEmail, password = "SenhaForte123!", fullName = "Dono" }, cancellationToken);
+        await fixture.ConfirmEmailDirectlyAsync(tenantId, ownerEmail, cancellationToken);
 
         return (tenantId, ownerEmail);
     }
 
-    private static async Task<string> CreateTenantWithOwnerAndLoginAsync(HttpClient client, CancellationToken cancellationToken)
+    private async Task<string> CreateTenantWithOwnerAndLoginAsync(HttpClient client, CancellationToken cancellationToken)
     {
         var (tenantId, ownerEmail) = await CreateTenantWithOwnerAsync(client, cancellationToken);
 

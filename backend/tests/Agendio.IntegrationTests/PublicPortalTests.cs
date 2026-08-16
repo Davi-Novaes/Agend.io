@@ -634,7 +634,7 @@ public class PublicPortalTests(IntegrationTestFixture fixture)
         return (resourceId, serviceId);
     }
 
-    private static async Task<(Guid TenantId, string AccessToken)> CreateTenantWithOwnerAndLoginAsync(HttpClient client, CancellationToken cancellationToken)
+    private async Task<(Guid TenantId, string AccessToken)> CreateTenantWithOwnerAndLoginAsync(HttpClient client, CancellationToken cancellationToken)
     {
         var tenantResponse = await client.PostAsJsonAsync("/api/tenants", new
         {
@@ -650,6 +650,7 @@ public class PublicPortalTests(IntegrationTestFixture fixture)
         var ownerEmail = $"owner-{Guid.NewGuid():N}@example.com";
         await client.PostAsJsonAsync(
             "/api/auth/register", new { tenantId, email = ownerEmail, password = Password, fullName = "Dono" }, cancellationToken);
+        await fixture.ConfirmEmailDirectlyAsync(tenantId, ownerEmail, cancellationToken);
 
         var loginResponse = await client.PostAsJsonAsync(
             "/api/auth/login", new { tenantId, email = ownerEmail, password = Password }, cancellationToken);

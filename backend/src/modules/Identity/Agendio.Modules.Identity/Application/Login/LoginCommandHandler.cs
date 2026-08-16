@@ -49,6 +49,17 @@ public sealed class LoginCommandHandler(
             return Result.Failure<LoginResult>(Error.Unauthorized("Auth.InvalidCredentials", "E-mail ou senha invalidos."));
         }
 
+        // Codigo de erro DISTINTO do generico acima — diferente da checagem de
+        // senha (onde esconder o motivo evita enumeracao de conta), aqui a pessoa
+        // ja provou que e dona da conta ao acertar a senha. Esconder o motivo nao
+        // ganha seguranca nenhuma e so deixa o usuario travado sem saber o que
+        // fazer; o frontend usa este codigo pra mostrar um CTA de reenvio.
+        if (user.EmailConfirmedAt is null)
+        {
+            return Result.Failure<LoginResult>(
+                Error.Unauthorized("Auth.EmailNotConfirmed", "Confirme seu e-mail antes de entrar. Verifique sua caixa de entrada."));
+        }
+
         if (user.MfaEnabled)
         {
             // Senha confirmou a identidade, mas o token final so sai depois do

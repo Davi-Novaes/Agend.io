@@ -77,7 +77,7 @@ public class RefreshTokenFlowTests(IntegrationTestFixture fixture)
         response.StatusCode.ShouldBe(HttpStatusCode.Unauthorized);
     }
 
-    private static async Task<(Guid TenantId, string Email)> RegisterAndCreateTenantAsync(HttpClient client, CancellationToken cancellationToken)
+    private async Task<(Guid TenantId, string Email)> RegisterAndCreateTenantAsync(HttpClient client, CancellationToken cancellationToken)
     {
         var tenantResponse = await client.PostAsJsonAsync("/api/tenants", new
         {
@@ -94,6 +94,7 @@ public class RefreshTokenFlowTests(IntegrationTestFixture fixture)
         var registerResponse = await client.PostAsJsonAsync(
             "/api/auth/register", new { tenantId, email, password = Password, fullName = "Usuario de Teste" }, cancellationToken);
         registerResponse.StatusCode.ShouldBe(HttpStatusCode.Created);
+        await fixture.ConfirmEmailDirectlyAsync(tenantId, email, cancellationToken);
 
         return (tenantId, email);
     }

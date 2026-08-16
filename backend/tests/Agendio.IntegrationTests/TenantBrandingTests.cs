@@ -55,7 +55,7 @@ public class TenantBrandingTests(IntegrationTestFixture fixture)
         response.StatusCode.ShouldBe(HttpStatusCode.Unauthorized);
     }
 
-    private static async Task<(Guid TenantId, string Slug, string AccessToken)> CreateTenantWithOwnerAndLoginAsync(
+    private async Task<(Guid TenantId, string Slug, string AccessToken)> CreateTenantWithOwnerAndLoginAsync(
         HttpClient client, CancellationToken cancellationToken)
     {
         var slug = $"tenant-{Guid.NewGuid():N}";
@@ -74,6 +74,7 @@ public class TenantBrandingTests(IntegrationTestFixture fixture)
         var ownerEmail = $"owner-{Guid.NewGuid():N}@example.com";
         await client.PostAsJsonAsync(
             "/api/auth/register", new { tenantId, email = ownerEmail, password = Password, fullName = "Dono" }, cancellationToken);
+        await fixture.ConfirmEmailDirectlyAsync(tenantId, ownerEmail, cancellationToken);
 
         var loginResponse = await client.PostAsJsonAsync(
             "/api/auth/login", new { tenantId, email = ownerEmail, password = Password }, cancellationToken);

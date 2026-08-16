@@ -118,7 +118,7 @@ public class RateLimitingTests(IntegrationTestFixture fixture)
         tenantBResponse.StatusCode.ShouldBe(HttpStatusCode.OK);
     }
 
-    private static async Task<(Guid TenantId, string OwnerEmail)> CreateTenantWithOwnerAsync(HttpClient client, CancellationToken cancellationToken)
+    private async Task<(Guid TenantId, string OwnerEmail)> CreateTenantWithOwnerAsync(HttpClient client, CancellationToken cancellationToken)
     {
         var tenantResponse = await client.PostAsJsonAsync("/api/tenants", new
         {
@@ -135,6 +135,7 @@ public class RateLimitingTests(IntegrationTestFixture fixture)
         var registerResponse = await client.PostAsJsonAsync(
             "/api/auth/register", new { tenantId, email = ownerEmail, password = Password, fullName = "Dono" }, cancellationToken);
         registerResponse.StatusCode.ShouldBe(HttpStatusCode.Created);
+        await fixture.ConfirmEmailDirectlyAsync(tenantId, ownerEmail, cancellationToken);
 
         return (tenantId, ownerEmail);
     }

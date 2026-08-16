@@ -2,6 +2,7 @@ using System.Security.Claims;
 using Agendio.Infrastructure.Endpoints;
 using Agendio.Modules.Identity.Application;
 using Agendio.Modules.Identity.Application.AcceptInvitation;
+using Agendio.Modules.Identity.Application.ConfirmEmail;
 using Agendio.Modules.Identity.Application.DisableMfa;
 using Agendio.Modules.Identity.Application.EnableMfa;
 using Agendio.Modules.Identity.Application.GetMfaStatus;
@@ -9,6 +10,7 @@ using Agendio.Modules.Identity.Application.InviteTeamMember;
 using Agendio.Modules.Identity.Application.Login;
 using Agendio.Modules.Identity.Application.RefreshAccessToken;
 using Agendio.Modules.Identity.Application.RegisterUser;
+using Agendio.Modules.Identity.Application.ResendConfirmationEmail;
 using Agendio.Modules.Identity.Application.SetupMfa;
 using Agendio.Modules.Identity.Application.VerifyMfa;
 using Agendio.Modules.Identity.Domain;
@@ -44,6 +46,28 @@ public sealed class IdentityEndpoints : IEndpointModule
         .RequireRateLimiting("auth")
         .WithName("RegisterUser")
         .WithSummary("Registra o primeiro usuario (dono) de um estabelecimento.");
+
+        group.MapPost("/confirm-email", async (ConfirmEmailRequest request, IDispatcher dispatcher, CancellationToken cancellationToken) =>
+        {
+            var result = await dispatcher.Send(new ConfirmEmailCommand(request.Token), cancellationToken);
+            return result.IsSuccess ? Results.NoContent() : result.Error.ToProblemResult();
+        })
+        .AllowAnonymous()
+        .RequireRateLimiting("auth")
+        .WithName("ConfirmEmail")
+        .WithSummary("Confirma o e-mail do usuario a partir do token enviado por e-mail no cadastro.");
+
+        group.MapPost("/resend-confirmation", async (ResendConfirmationRequest request, IDispatcher dispatcher, CancellationToken cancellationToken) =>
+        {
+            var command = new ResendConfirmationEmailCommand(request.TenantId, request.Email);
+            var result = await dispatcher.Send(command, cancellationToken);
+            return result.IsSuccess ? Results.NoContent() : result.Error.ToProblemResult();
+        })
+        // Sempre 204, exista ou nao o e-mail — evita enumeracao de contas (ver Handler).
+        .AllowAnonymous()
+        .RequireRateLimiting("auth")
+        .WithName("ResendConfirmationEmail")
+        .WithSummary("Reenvia o e-mail de confirmacao de cadastro, se pendente.");
 
         group.MapPost("/login", async (LoginRequest request, IDispatcher dispatcher, HttpContext httpContext, CancellationToken cancellationToken) =>
         {
@@ -244,6 +268,10 @@ public sealed class IdentityEndpoints : IEndpointModule
         Guid.Parse(httpContext.User.FindFirst(ClaimTypes.NameIdentifier)!.Value);
 
     private sealed record RegisterRequest(Guid TenantId, string Email, string Password, string FullName);
+
+    private sealed record ConfirmEmailRequest(string Token);
+
+    private sealed record ResendConfirmationRequest(Guid TenantId, string Email);
 
     private sealed record LoginRequest(Guid TenantId, string Email, string Password);
 
