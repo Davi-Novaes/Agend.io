@@ -1170,7 +1170,10 @@ export type PlanSummary = {
   billingCycle: string;
 };
 
-export function listPlans(accessToken: string): Promise<PlanSummary[]> {
+// Sem accessToken: usado tambem no onboarding, antes de existir sessao — o
+// backend expoe este endpoint anonimo de proposito (preco de plano nao e
+// dado sensivel).
+export function listPlans(accessToken?: string): Promise<PlanSummary[]> {
   return request<PlanSummary[]>("/api/billing/plans", {}, accessToken);
 }
 
@@ -1202,6 +1205,20 @@ export function subscribeToPlan(
 
 export function cancelSubscription(accessToken: string): Promise<void> {
   return request("/api/billing/subscription/cancel", { method: "POST" }, accessToken);
+}
+
+// Sem accessToken (onboarding roda antes de existir sessao). Sem
+// nome/CPF/e-mail no payload — o Checkout da Asaas coleta isso na propria
+// pagina hospedada quando o plano escolhido e pago (ver Fase 24).
+export function onboardSelectPlan(input: {
+  tenantId: string;
+  planId: string;
+}): Promise<{ requiresPayment: boolean; checkoutLink: string | null }> {
+  return request("/api/billing/subscription/onboard-select-plan", { method: "POST", body: JSON.stringify(input) });
+}
+
+export function getOnboardingSubscriptionStatus(tenantId: string): Promise<{ isReady: boolean }> {
+  return request(`/api/billing/subscription/onboard-status?tenantId=${encodeURIComponent(tenantId)}`);
 }
 
 export type SubscriptionAdminSummary = {

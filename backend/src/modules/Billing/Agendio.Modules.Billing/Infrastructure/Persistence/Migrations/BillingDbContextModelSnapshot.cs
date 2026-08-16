@@ -246,6 +246,15 @@ namespace Agendio.Modules.Billing.Infrastructure.Persistence.Migrations
                             IsActive = true,
                             Name = "Padrão",
                             PriceAmount = 99.00m
+                        },
+                        new
+                        {
+                            Id = new Guid("22222222-2222-2222-2222-222222222222"),
+                            BillingCycle = "Monthly",
+                            Currency = "BRL",
+                            IsActive = true,
+                            Name = "Grátis",
+                            PriceAmount = 0.00m
                         });
                 });
 

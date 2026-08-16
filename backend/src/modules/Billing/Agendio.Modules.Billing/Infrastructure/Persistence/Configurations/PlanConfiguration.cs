@@ -10,6 +10,9 @@ public sealed class PlanConfiguration : IEntityTypeConfiguration<Plan>
     // e o mesmo Id em toda instalacao que rodar esta migration.
     public static readonly PlanId DefaultPlanId = PlanId.From(Guid.Parse("11111111-1111-1111-1111-111111111111"));
 
+    // Mesmo raciocinio do DefaultPlanId acima — Id fixo e reproduzivel.
+    public static readonly PlanId FreePlanId = PlanId.From(Guid.Parse("22222222-2222-2222-2222-222222222222"));
+
     public void Configure(EntityTypeBuilder<Plan> builder)
     {
         builder.ToTable("plans");
@@ -23,8 +26,9 @@ public sealed class PlanConfiguration : IEntityTypeConfiguration<Plan>
         builder.Property(p => p.BillingCycle).HasConversion<string>().HasMaxLength(20);
         builder.Property(p => p.IsActive).IsRequired();
 
-        // Catalogo real desde a migration inicial — nao e dado de Development,
-        // e o unico plano disponivel para assinar ate um segundo ser criado.
-        builder.HasData(new Plan(DefaultPlanId, "Padrão", 99.00m, BillingCycle.Monthly));
+        // Catalogo real desde a migration inicial — nao e dado de Development.
+        builder.HasData(
+            new Plan(DefaultPlanId, "Padrão", 99.00m, BillingCycle.Monthly),
+            new Plan(FreePlanId, "Grátis", 0.00m, BillingCycle.Monthly));
     }
 }

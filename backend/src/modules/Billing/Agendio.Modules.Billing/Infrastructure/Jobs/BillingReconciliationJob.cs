@@ -1,5 +1,6 @@
 using Agendio.Modules.Billing.Domain;
 using Agendio.Modules.Billing.Infrastructure.Persistence;
+using Agendio.Modules.Billing.Infrastructure.Persistence.Configurations;
 using Agendio.Modules.Tenancy.Contracts;
 using Agendio.SharedKernel.Time;
 using Microsoft.EntityFrameworkCore;
@@ -31,12 +32,16 @@ public sealed class BillingReconciliationJob(
 
         var overdueSubscriptions = await dbContext.Subscriptions
             .Where(s =>
-                (s.Status == SubscriptionStatus.Trialing && s.TrialEndsAtUtc < now) ||
+                // Plano Free ativa direto (ActivateAsFree) sem passar por Trialing/
+                // PastDue e nunca cobra — mas e defesa em profundidade explicita
+                // aqui, nao so uma consequencia acidental do fluxo normal.
+                s.PlanId != PlanConfiguration.FreePlanId &&
+                ((s.Status == SubscriptionStatus.Trialing && s.TrialEndsAtUtc < now) ||
                 // (CurrentPeriodEndsAtUtc ?? TrialEndsAtUtc): cobre o caso do
                 // PRIMEIRO pagamento de uma assinatura vencer sem nunca ter
                 // sido confirmado — nesse caso CurrentPeriodEndsAtUtc ainda
                 // nunca foi setado por MarkActive.
-                (s.Status == SubscriptionStatus.PastDue && (s.CurrentPeriodEndsAtUtc ?? s.TrialEndsAtUtc) < pastDueCutoff))
+                (s.Status == SubscriptionStatus.PastDue && (s.CurrentPeriodEndsAtUtc ?? s.TrialEndsAtUtc) < pastDueCutoff)))
             .ToListAsync(cancellationToken);
 
         foreach (var subscription in overdueSubscriptions)
