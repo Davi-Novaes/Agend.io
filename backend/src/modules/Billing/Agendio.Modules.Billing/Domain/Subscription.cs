@@ -75,6 +75,30 @@ public sealed class Subscription : AggregateRoot<SubscriptionId>, IAuditable
         CurrentPeriodEndsAtUtc = currentPeriodEndsAtUtc;
     }
 
+    /// <summary>
+    /// Plano Free escolhido no onboarding — ativa direto, sem passar pela
+    /// Asaas. CurrentPeriodEndsAtUtc fica null de proposito (nunca cobra,
+    /// nunca vence) — BillingReconciliationJob exclui explicitamente o plano
+    /// Free da varredura de trial/assinatura vencidos por esse motivo.
+    /// </summary>
+    public Result ActivateAsFree(PlanId freePlanId)
+    {
+        if (Status is SubscriptionStatus.Canceled)
+        {
+            return Result.Failure(Error.Validation("Subscription.AlreadyCanceled", "Esta assinatura ja foi cancelada."));
+        }
+
+        if (Status is SubscriptionStatus.Active)
+        {
+            return Result.Failure(Error.Conflict("Subscription.AlreadyActive", "Este estabelecimento ja tem uma assinatura ativa."));
+        }
+
+        PlanId = freePlanId;
+        Status = SubscriptionStatus.Active;
+        CurrentPeriodEndsAtUtc = null;
+        return Result.Success();
+    }
+
     public void MarkPastDue() => Status = SubscriptionStatus.PastDue;
 
     public Result Cancel(DateTimeOffset nowUtc)

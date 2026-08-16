@@ -5,6 +5,7 @@ using System.Text.Json;
 using Agendio.Infrastructure.Messaging;
 using Agendio.Modules.Billing.Domain;
 using Agendio.Modules.Billing.Infrastructure.Persistence;
+using Agendio.Modules.Billing.Infrastructure.Persistence.Configurations;
 using Agendio.Modules.Tenancy.Infrastructure.Persistence;
 using Agendio.SharedKernel.Multitenancy;
 using Microsoft.EntityFrameworkCore;
@@ -213,6 +214,182 @@ public class BillingTests(IntegrationTestFixture fixture)
             var tenants = await tenantAdministrationService.ListAllAsync(cancellationToken);
             var tenant = tenants.Single(t => t.TenantId.Value == tenantId);
             tenant.IsActive.ShouldBeFalse();
+        }
+    }
+
+    [Fact]
+    public async Task Onboard_Selecting_The_Free_Plan_Should_Activate_The_Subscription_Immediately_Without_Payment()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var client = fixture.CreateClient();
+        var (tenantId, _) = await CreateTenantWithOwnerAsync(client, cancellationToken);
+
+        var response = await client.PostAsJsonAsync(
+            "/api/billing/subscription/onboard-select-plan",
+            new { tenantId, planId = PlanConfiguration.FreePlanId.Value },
+            cancellationToken);
+
+        response.StatusCode.ShouldBe(HttpStatusCode.OK);
+        var body = await response.Content.ReadFromJsonAsync<JsonElement>(cancellationToken);
+        body.GetProperty("requiresPayment").GetBoolean().ShouldBeFalse();
+        body.TryGetProperty("checkoutLink", out var checkoutLink).ShouldBeTrue();
+        (checkoutLink.ValueKind is JsonValueKind.Null).ShouldBeTrue();
+
+        await using var scope = fixture.Services.CreateAsyncScope();
+        var dbContext = scope.ServiceProvider.GetRequiredService<BillingDbContext>();
+        var subscription = await dbContext.Subscriptions.SingleAsync(s => s.TenantId == TenantId.From(tenantId), cancellationToken);
+        subscription.Status.ShouldBe(SubscriptionStatus.Active);
+        subscription.PlanId.ShouldBe(PlanConfiguration.FreePlanId);
+        subscription.CurrentPeriodEndsAtUtc.ShouldBeNull();
+
+        var statusResponse = await client.GetAsync($"/api/billing/subscription/onboard-status?tenantId={tenantId}", cancellationToken);
+        var statusBody = await statusResponse.Content.ReadFromJsonAsync<JsonElement>(cancellationToken);
+        statusBody.GetProperty("isReady").GetBoolean().ShouldBeTrue();
+    }
+
+    [Fact]
+    public async Task Onboard_Selecting_A_Paid_Plan_Should_Return_A_Checkout_Link_Without_Requiring_Customer_Data()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var client = fixture.CreateClient();
+        var (tenantId, _) = await CreateTenantWithOwnerAsync(client, cancellationToken);
+
+        // De proposito, sem nome/CPF/e-mail no corpo — o Checkout da Asaas
+        // coleta isso na propria pagina hospedada (ver Fase 24).
+        var response = await client.PostAsJsonAsync(
+            "/api/billing/subscription/onboard-select-plan",
+            new { tenantId, planId = PlanConfiguration.DefaultPlanId.Value },
+            cancellationToken);
+
+        response.StatusCode.ShouldBe(HttpStatusCode.OK);
+        var body = await response.Content.ReadFromJsonAsync<JsonElement>(cancellationToken);
+        body.GetProperty("requiresPayment").GetBoolean().ShouldBeTrue();
+        body.GetProperty("checkoutLink").GetString().ShouldNotBeNullOrWhiteSpace();
+
+        // Continua Trialing — so vira Active quando o webhook confirmar o
+        // primeiro pagamento (nao no ato de criar o Checkout).
+        await using var scope = fixture.Services.CreateAsyncScope();
+        var dbContext = scope.ServiceProvider.GetRequiredService<BillingDbContext>();
+        var subscription = await dbContext.Subscriptions.SingleAsync(s => s.TenantId == TenantId.From(tenantId), cancellationToken);
+        subscription.Status.ShouldBe(SubscriptionStatus.Trialing);
+        subscription.AsaasSubscriptionId.ShouldBeNull();
+
+        var statusResponse = await client.GetAsync($"/api/billing/subscription/onboard-status?tenantId={tenantId}", cancellationToken);
+        var statusBody = await statusResponse.Content.ReadFromJsonAsync<JsonElement>(cancellationToken);
+        statusBody.GetProperty("isReady").GetBoolean().ShouldBeFalse();
+    }
+
+    [Fact]
+    public async Task Checkout_Payment_Confirmed_Webhook_Adopts_The_Subscription_Via_ExternalReference_And_Marks_It_Ready()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var client = fixture.CreateClient();
+        var (tenantId, _) = await CreateTenantWithOwnerAsync(client, cancellationToken);
+
+        await client.PostAsJsonAsync(
+            "/api/billing/subscription/onboard-select-plan",
+            new { tenantId, planId = PlanConfiguration.DefaultPlanId.Value },
+            cancellationToken);
+
+        // O Checkout do onboarding nunca chama POST /subscriptions — a Asaas cria
+        // a assinatura por conta propria quando o pagador confirma o cartao, entao
+        // este AsaasSubscriptionId/AsaasCustomerId sao "novos" pra nos: o unico jeito
+        // de saber a qual tenant pertencem e o externalReference setado no Checkout.
+        var asaasSubscriptionId = $"fake-checkout-sub-{Guid.NewGuid():N}";
+        var asaasPaymentId = $"fake-checkout-pay-{Guid.NewGuid():N}";
+        var webhookPayload = new
+        {
+            @event = "PAYMENT_CONFIRMED",
+            payment = new
+            {
+                id = asaasPaymentId,
+                status = "CONFIRMED",
+                value = 99.00m,
+                dueDate = DateOnly.FromDateTime(DateTime.UtcNow).ToString("yyyy-MM-dd", CultureInfo.InvariantCulture),
+                invoiceUrl = (string?)null,
+                billingType = "CREDIT_CARD",
+                subscription = asaasSubscriptionId,
+                customer = $"fake-checkout-cus-{Guid.NewGuid():N}",
+                externalReference = tenantId.ToString(),
+            },
+        };
+
+        var webhookResponse = await PostWebhookAsync(client, webhookPayload, AsaasSecretHeader(), cancellationToken);
+        webhookResponse.StatusCode.ShouldBe(HttpStatusCode.OK);
+
+        await using var scope = fixture.Services.CreateAsyncScope();
+        var dbContext = scope.ServiceProvider.GetRequiredService<BillingDbContext>();
+        var subscription = await dbContext.Subscriptions.SingleAsync(s => s.TenantId == TenantId.From(tenantId), cancellationToken);
+        subscription.Status.ShouldBe(SubscriptionStatus.Active);
+        subscription.AsaasSubscriptionId.ShouldBe(asaasSubscriptionId);
+
+        var payment = await dbContext.Payments.SingleAsync(p => p.AsaasPaymentId == asaasPaymentId, cancellationToken);
+        payment.Status.ShouldBe(PaymentStatus.Confirmed);
+
+        var statusResponse = await client.GetAsync($"/api/billing/subscription/onboard-status?tenantId={tenantId}", cancellationToken);
+        var statusBody = await statusResponse.Content.ReadFromJsonAsync<JsonElement>(cancellationToken);
+        statusBody.GetProperty("isReady").GetBoolean().ShouldBeTrue();
+    }
+
+    [Fact]
+    public async Task Onboard_Selecting_A_Plan_When_Subscription_Already_Active_Should_Be_Rejected()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var client = fixture.CreateClient();
+        var (tenantId, _) = await CreateTenantWithOwnerAsync(client, cancellationToken);
+
+        var firstAttempt = await client.PostAsJsonAsync(
+            "/api/billing/subscription/onboard-select-plan",
+            new { tenantId, planId = PlanConfiguration.FreePlanId.Value },
+            cancellationToken);
+        firstAttempt.StatusCode.ShouldBe(HttpStatusCode.OK);
+
+        var secondAttempt = await client.PostAsJsonAsync(
+            "/api/billing/subscription/onboard-select-plan",
+            new { tenantId, planId = PlanConfiguration.DefaultPlanId.Value },
+            cancellationToken);
+        secondAttempt.StatusCode.ShouldBe(HttpStatusCode.Conflict);
+    }
+
+    [Fact]
+    public async Task Reconciliation_Job_Should_Never_Deactivate_A_Tenant_On_The_Free_Plan()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var client = fixture.CreateClient();
+        var (tenantId, _) = await CreateTenantWithOwnerAsync(client, cancellationToken);
+
+        await client.PostAsJsonAsync(
+            "/api/billing/subscription/onboard-select-plan",
+            new { tenantId, planId = PlanConfiguration.FreePlanId.Value },
+            cancellationToken);
+
+        await using (var scope = fixture.Services.CreateAsyncScope())
+        {
+            var dbContext = scope.ServiceProvider.GetRequiredService<BillingDbContext>();
+
+            // Defesa em profundidade: forca de volta pro estado que o job varre
+            // (Trialing vencido ha muito tempo) mesmo estando no plano Free —
+            // o guard explicito por PlanId tem que segurar independente do
+            // fluxo normal (que nem deixa uma Subscription Free chegar aqui).
+            await dbContext.Database.ExecuteSqlInterpolatedAsync(
+                $"""
+                UPDATE billing.subscriptions
+                SET status = {SubscriptionStatus.Trialing.ToString()}, trial_ends_at_utc = {DateTimeOffset.UtcNow.AddDays(-30)}
+                WHERE tenant_id = {tenantId}
+                """,
+                cancellationToken);
+
+            var job = scope.ServiceProvider.GetRequiredService<Agendio.Modules.Billing.Infrastructure.Jobs.BillingReconciliationJob>();
+            await job.RunAsync(cancellationToken);
+        }
+
+        await using (var scope = fixture.Services.CreateAsyncScope())
+        {
+            var tenantAdministrationService = scope.ServiceProvider
+                .GetRequiredService<Agendio.Modules.Tenancy.Contracts.ITenantAdministrationService>();
+            var tenants = await tenantAdministrationService.ListAllAsync(cancellationToken);
+            var tenant = tenants.Single(t => t.TenantId.Value == tenantId);
+            tenant.IsActive.ShouldBeTrue();
         }
     }
 

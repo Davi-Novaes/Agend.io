@@ -59,6 +59,26 @@ public sealed class AsaasClient(HttpClient httpClient) : IAsaasClient
         await EnsureSuccessAsync(response, cancellationToken);
     }
 
+    public async Task<AsaasCheckoutResult> CreateCreditCardCheckoutAsync(
+        string itemName, string itemDescription, decimal value, DateOnly nextDueDate,
+        string successUrl, string cancelUrl, string externalReference, CancellationToken cancellationToken)
+    {
+        var request = new CreateCheckoutRequest(
+            ["CREDIT_CARD"],
+            ["RECURRENT"],
+            [new CheckoutItem(itemName, itemDescription, 1, value)],
+            new CheckoutSubscription("MONTHLY", nextDueDate.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture)),
+            new CheckoutCallback(successUrl, cancelUrl),
+            externalReference);
+
+        using var response = await httpClient.PostAsJsonAsync("checkouts", request, JsonOptions, cancellationToken);
+        await EnsureSuccessAsync(response, cancellationToken);
+
+        var body = await response.Content.ReadFromJsonAsync<CreateCheckoutResponse>(JsonOptions, cancellationToken)
+            ?? throw new InvalidOperationException("Resposta vazia da Asaas ao criar checkout.");
+        return new AsaasCheckoutResult(body.Id, body.Link);
+    }
+
     private static async Task EnsureSuccessAsync(HttpResponseMessage response, CancellationToken cancellationToken)
     {
         if (response.IsSuccessStatusCode)
@@ -81,4 +101,16 @@ public sealed class AsaasClient(HttpClient httpClient) : IAsaasClient
     private sealed record SubscriptionPaymentsResponse([property: JsonPropertyName("data")] List<SubscriptionPaymentItem> Data);
 
     private sealed record SubscriptionPaymentItem(string Id, string Status, decimal Value, string DueDate, string? InvoiceUrl, string BillingType);
+
+    private sealed record CreateCheckoutRequest(
+        string[] BillingTypes, string[] ChargeTypes, List<CheckoutItem> Items,
+        CheckoutSubscription Subscription, CheckoutCallback Callback, string ExternalReference);
+
+    private sealed record CheckoutItem(string Name, string Description, int Quantity, decimal Value);
+
+    private sealed record CheckoutSubscription(string Cycle, string NextDueDate);
+
+    private sealed record CheckoutCallback(string SuccessUrl, string CancelUrl);
+
+    private sealed record CreateCheckoutResponse(string Id, string Link);
 }

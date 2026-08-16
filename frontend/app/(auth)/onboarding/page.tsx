@@ -7,13 +7,17 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { toast } from "sonner";
-import { Check, MailCheck } from "lucide-react";
+import { Check, MailCheck, Loader2 } from "lucide-react";
 
 import {
   listBusinessTypes,
   createTenant,
   registerUser,
   resendConfirmationEmail,
+  listPlans,
+  onboardSelectPlan,
+  getOnboardingSubscriptionStatus,
+  type PlanSummary,
   ApiError,
 } from "@/lib/api/client";
 import { Logo } from "@/components/logo";
@@ -77,13 +81,42 @@ export default function OnboardingPage() {
   const [isResending, setIsResending] = React.useState(false);
   // Presente so apos o cadastro concluir — troca o formulario pela tela de
   // "confirme seu e-mail" em vez de logar automaticamente (login agora exige
-  // e-mail confirmado).
+  // e-mail confirmado). So chega la depois do passo de plano (abaixo).
   const [registered, setRegistered] = React.useState<{ tenantId: string; email: string } | null>(null);
+  // Conta criada, mas plano ainda nao escolhido — controla a tela "Escolha
+  // seu plano" (passo final, depois de conta, ver Fase 24).
+  const [accountCreated, setAccountCreated] = React.useState<{ tenantId: string; email: string } | null>(null);
+  const [isSelectingPlan, setIsSelectingPlan] = React.useState(false);
+  // Plano pago escolhido: aba de checkout aberta, aguardando confirmacao via
+  // polling (nao pelo redirect da Asaas, que nao funciona em localhost).
+  const [pendingCheckout, setPendingCheckout] = React.useState<{ tenantId: string; email: string; checkoutLink: string } | null>(
+    null
+  );
 
   const businessTypesQuery = useQuery({
     queryKey: ["business-types"],
     queryFn: listBusinessTypes,
   });
+
+  const plansQuery = useQuery({
+    queryKey: ["billing-plans"],
+    queryFn: () => listPlans(),
+    enabled: accountCreated !== null,
+  });
+
+  const subscriptionStatusQuery = useQuery({
+    queryKey: ["onboarding-subscription-status", pendingCheckout?.tenantId],
+    queryFn: () => getOnboardingSubscriptionStatus(pendingCheckout!.tenantId),
+    enabled: pendingCheckout !== null,
+    refetchInterval: 3000,
+  });
+
+  React.useEffect(() => {
+    if (pendingCheckout && subscriptionStatusQuery.data?.isReady) {
+      setRegistered({ tenantId: pendingCheckout.tenantId, email: pendingCheckout.email });
+      setPendingCheckout(null);
+    }
+  }, [pendingCheckout, subscriptionStatusQuery.data?.isReady]);
 
   const detectedTimeZone = React.useMemo(() => {
     try {
@@ -145,7 +178,7 @@ export default function OnboardingPage() {
         fullName: values.ownerFullName,
       });
 
-      setRegistered({ tenantId: tenant.id, email: values.ownerEmail });
+      setAccountCreated({ tenantId: tenant.id, email: values.ownerEmail });
     } catch (error) {
       if (error instanceof ApiError && error.status === 409) {
         form.setError("slug", { message: "Este identificador ja esta em uso." });
@@ -158,6 +191,27 @@ export default function OnboardingPage() {
       toast.error(message);
     } finally {
       setIsSubmitting(false);
+    }
+  }
+
+  async function onSelectPlan(plan: PlanSummary) {
+    if (!accountCreated) {
+      return;
+    }
+    setIsSelectingPlan(true);
+    try {
+      const result = await onboardSelectPlan({ tenantId: accountCreated.tenantId, planId: plan.id });
+      if (result.requiresPayment && result.checkoutLink) {
+        window.open(result.checkoutLink, "_blank", "noopener,noreferrer");
+        setPendingCheckout({ tenantId: accountCreated.tenantId, email: accountCreated.email, checkoutLink: result.checkoutLink });
+      } else {
+        setRegistered(accountCreated);
+      }
+    } catch (error) {
+      const message = error instanceof ApiError ? error.message : "Nao foi possivel selecionar o plano. Tente novamente.";
+      toast.error(message);
+    } finally {
+      setIsSelectingPlan(false);
     }
   }
 
@@ -179,6 +233,10 @@ export default function OnboardingPage() {
 
   const isLastStep = step === STEPS.length - 1;
 
+  // Checado ANTES de pendingCheckout/accountCreated de proposito: os dois
+  // continuam com valor (nunca zerados) depois que o cadastro conclui, entao
+  // registered precisa vencer no render ou a tela travaria em "Escolha seu
+  // plano"/"Aguardando confirmação" mesmo depois de pronto.
   if (registered) {
     return (
       <main className="flex min-h-full flex-1 items-center justify-center p-4 sm:p-6">
@@ -209,6 +267,86 @@ export default function OnboardingPage() {
               Entrar
             </Link>
           </p>
+        </div>
+      </main>
+    );
+  }
+
+  if (pendingCheckout) {
+    return (
+      <main className="flex min-h-full flex-1 items-center justify-center p-4 sm:p-6">
+        <div className="w-full max-w-md text-center">
+          <div className="mb-6 flex flex-col items-center gap-4">
+            <Logo />
+            <Loader2 className="text-primary size-10 animate-spin" aria-hidden />
+          </div>
+          <h1 className="text-xl font-semibold tracking-tight">Aguardando confirmação do cartão</h1>
+          <p className="text-muted-foreground mt-2 text-sm text-balance">
+            Complete o cadastro do cartão na aba que abrimos para você. Assim que a Asaas confirmar, seguimos
+            automaticamente.
+          </p>
+          <Button
+            type="button"
+            variant="outline"
+            className="mt-6"
+            onClick={() => window.open(pendingCheckout.checkoutLink, "_blank", "noopener,noreferrer")}
+          >
+            Reabrir pagamento
+          </Button>
+        </div>
+      </main>
+    );
+  }
+
+  if (accountCreated) {
+    return (
+      <main className="flex min-h-full flex-1 items-center justify-center p-4 sm:p-6">
+        <div className="w-full max-w-2xl">
+          <div className="mb-8 flex flex-col items-center gap-3 text-center">
+            <Logo />
+            <h1 className="text-xl font-semibold tracking-tight">Escolha seu plano</h1>
+            <p className="text-muted-foreground text-sm">Você pode trocar de plano quando quiser depois.</p>
+          </div>
+
+          {plansQuery.isLoading && (
+            <p className="text-muted-foreground text-center text-sm">Carregando planos...</p>
+          )}
+          {plansQuery.isError && (
+            <p className="text-destructive text-center text-sm">
+              Não foi possível carregar os planos. Recarregue a página.
+            </p>
+          )}
+
+          <div className="grid gap-4 sm:grid-cols-2">
+            {plansQuery.data?.map((plan) => {
+              const isFree = plan.priceAmount === 0;
+              return (
+                <button
+                  key={plan.id}
+                  type="button"
+                  onClick={() => onSelectPlan(plan)}
+                  disabled={isSelectingPlan}
+                  className="border-border hover:border-primary hover:bg-accent flex flex-col items-start gap-2 rounded-xl border p-5 text-left transition-colors disabled:pointer-events-none disabled:opacity-60"
+                >
+                  <span className="text-lg font-semibold">{plan.name}</span>
+                  <span className="text-2xl font-bold">
+                    {isFree
+                      ? "Grátis"
+                      : `R$ ${plan.priceAmount.toFixed(2).replace(".", ",")}/mês`}
+                  </span>
+                  <span className="text-muted-foreground text-sm">
+                    {isFree
+                      ? "Sem cartão, sem compromisso — comece a usar agora."
+                      : "14 dias grátis, depois cobrado automaticamente. Cancele quando quiser."}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+
+          {isSelectingPlan && (
+            <p className="text-muted-foreground mt-4 text-center text-sm">Preparando...</p>
+          )}
         </div>
       </main>
     );

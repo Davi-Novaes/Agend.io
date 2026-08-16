@@ -20,4 +20,9 @@ internal sealed class FakeAsaasClient : IAsaasClient
             $"fake-sub-{Guid.NewGuid():N}", $"fake-pay-{Guid.NewGuid():N}", "https://fake.local/checkout", nextDueDate, "UNDEFINED"));
 
     public Task CancelSubscriptionAsync(string asaasSubscriptionId, CancellationToken cancellationToken) => Task.CompletedTask;
+
+    public Task<AsaasCheckoutResult> CreateCreditCardCheckoutAsync(
+        string itemName, string itemDescription, decimal value, DateOnly nextDueDate,
+        string successUrl, string cancelUrl, string externalReference, CancellationToken cancellationToken) =>
+        Task.FromResult(new AsaasCheckoutResult($"fake-checkout-{Guid.NewGuid():N}", "https://fake.local/checkout-session"));
 }
