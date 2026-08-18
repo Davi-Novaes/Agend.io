@@ -1,5 +1,6 @@
 using System.Net;
 using System.Net.Http.Json;
+using System.Text;
 using System.Text.Json;
 
 namespace Agendio.IntegrationTests;
@@ -67,6 +68,24 @@ public class RefreshTokenFlowTests(IntegrationTestFixture fixture)
     }
 
     [Fact]
+    public async Task Login_And_Refresh_Should_Both_Include_FullName_Claim_In_Access_Token()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var client = fixture.CreateClient();
+        var (tenantId, email) = await RegisterAndCreateTenantAsync(client, cancellationToken);
+
+        var loginResponse = await client.PostAsJsonAsync(
+            "/api/auth/login", new { tenantId, email, password = Password }, cancellationToken);
+        var loginBody = await loginResponse.Content.ReadFromJsonAsync<JsonElement>(cancellationToken);
+        ReadClaim(loginBody.GetProperty("accessToken").GetString()!, "full_name").ShouldBe("Usuario de Teste");
+
+        var refreshToken = ExtractRefreshTokenCookie(loginResponse)!;
+        var refreshResponse = await SendRefreshAsync(client, refreshToken, cancellationToken);
+        var refreshBody = await refreshResponse.Content.ReadFromJsonAsync<JsonElement>(cancellationToken);
+        ReadClaim(refreshBody.GetProperty("accessToken").GetString()!, "full_name").ShouldBe("Usuario de Teste");
+    }
+
+    [Fact]
     public async Task Refreshing_Without_A_Cookie_Should_Return_Unauthorized()
     {
         var cancellationToken = TestContext.Current.CancellationToken;
@@ -104,6 +123,15 @@ public class RefreshTokenFlowTests(IntegrationTestFixture fixture)
         var request = new HttpRequestMessage(HttpMethod.Post, "/api/auth/refresh");
         request.Headers.Add("Cookie", $"{RefreshCookieName}={refreshToken}");
         return client.SendAsync(request, cancellationToken);
+    }
+
+    private static string ReadClaim(string accessToken, string claimType)
+    {
+        var payloadSegment = accessToken.Split('.')[1];
+        var padded = payloadSegment.PadRight(payloadSegment.Length + ((4 - (payloadSegment.Length % 4)) % 4), '=');
+        var payloadJson = Encoding.UTF8.GetString(Convert.FromBase64String(padded.Replace('-', '+').Replace('_', '/')));
+        var claims = JsonSerializer.Deserialize<JsonElement>(payloadJson);
+        return claims.GetProperty(claimType).GetString()!;
     }
 
     private static string? ExtractRefreshTokenCookie(HttpResponseMessage response)

@@ -35,10 +35,13 @@ public sealed class AuthTokenIssuer(
         return new AuthTokensResult(accessToken, accessTokenExpiresAtUtc, rawRefreshToken, refreshToken.ExpiresAtUtc);
     }
 
-    private static List<Claim> BuildClaims(User user, TenantLookupResult tenant) =>
+    public const string FullNameClaimType = "full_name";
+
+    internal static List<Claim> BuildClaims(User user, TenantLookupResult tenant) =>
     [
         new Claim(ClaimTypes.NameIdentifier, user.Id.Value.ToString()),
         new Claim(ClaimTypes.Email, user.Email.Value),
+        new Claim(FullNameClaimType, user.FullName),
         new Claim(ClaimTypes.Role, user.Role.ToString()),
         new Claim(HttpTenantContext.TenantIdClaimType, tenant.TenantId.Value.ToString()),
         new Claim(HttpTenantContext.TenantSlugClaimType, tenant.Slug),
