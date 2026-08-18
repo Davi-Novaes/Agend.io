@@ -1,5 +1,3 @@
-using System.Security.Claims;
-using Agendio.Infrastructure.Multitenancy;
 using Agendio.Infrastructure.Security;
 using Agendio.Modules.Identity.Domain;
 using Agendio.Modules.Identity.Infrastructure.Persistence;
@@ -82,7 +80,7 @@ public sealed class RefreshAccessTokenCommandHandler(
         presentedToken.Revoke(clock.UtcNow);
         dbContext.RefreshTokens.Add(rotatedToken);
 
-        var claims = BuildClaims(user, tenant);
+        var claims = AuthTokenIssuer.BuildClaims(user, tenant);
         var (accessToken, accessTokenExpiresAtUtc) = jwtTokenService.GenerateAccessToken(claims);
 
         await dbContext.SaveChangesAsync(cancellationToken);
@@ -103,13 +101,4 @@ public sealed class RefreshAccessTokenCommandHandler(
 
         await dbContext.SaveChangesAsync(cancellationToken);
     }
-
-    private static List<Claim> BuildClaims(User user, TenantLookupResult tenant) =>
-    [
-        new Claim(ClaimTypes.NameIdentifier, user.Id.Value.ToString()),
-        new Claim(ClaimTypes.Email, user.Email.Value),
-        new Claim(ClaimTypes.Role, user.Role.ToString()),
-        new Claim(HttpTenantContext.TenantIdClaimType, tenant.TenantId.Value.ToString()),
-        new Claim(HttpTenantContext.TenantSlugClaimType, tenant.Slug),
-    ];
 }

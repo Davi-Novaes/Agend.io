@@ -5,7 +5,7 @@ import { LogOut } from "lucide-react";
 
 import { NAV_ITEMS } from "@/components/layout/nav-config";
 import { useSession } from "@/lib/auth/session-context";
-import { decodeJwtEmail } from "@/lib/auth/decode-jwt";
+import { decodeJwtEmail, decodeJwtFullName } from "@/lib/auth/decode-jwt";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { SidebarTrigger } from "@/components/ui/sidebar";
 import { Separator } from "@/components/ui/separator";
@@ -19,11 +19,17 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 
-function initialsFrom(email: string | null): string {
-  if (!email) {
-    return "?";
+function initialsFrom(fullName: string | null, email: string | null): string {
+  if (fullName) {
+    const words = fullName.trim().split(/\s+/);
+    const firstInitial = words[0]?.[0] ?? "";
+    const lastInitial = words.length > 1 ? words[words.length - 1][0] : words[0]?.[1] ?? "";
+    return `${firstInitial}${lastInitial}`.toUpperCase();
   }
-  return email.slice(0, 2).toUpperCase();
+  if (email) {
+    return email.slice(0, 2).toUpperCase();
+  }
+  return "?";
 }
 
 export function AppHeader() {
@@ -33,6 +39,7 @@ export function AppHeader() {
 
   const title = NAV_ITEMS.find((item) => item.href === pathname)?.label ?? "Agendio";
   const email = session ? decodeJwtEmail(session.accessToken) : null;
+  const fullName = session ? decodeJwtFullName(session.accessToken) : null;
 
   function handleLogout() {
     logout();
@@ -54,14 +61,15 @@ export function AppHeader() {
                     (achado pelo axe-core no e2e) — usa o par primary/primary-foreground,
                     ja auditado para AA (ver components/ui/button.tsx). */}
                 <AvatarFallback className="bg-primary text-xs text-primary-foreground">
-                  {initialsFrom(email)}
+                  {initialsFrom(fullName, email)}
                 </AvatarFallback>
               </Avatar>
             </button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
-            <DropdownMenuLabel className="truncate font-normal text-muted-foreground">
-              {email ?? "Minha conta"}
+            <DropdownMenuLabel className="truncate font-normal">
+              {fullName ?? email ?? "Minha conta"}
+              {fullName && email && <p className="truncate text-xs text-muted-foreground">{email}</p>}
             </DropdownMenuLabel>
             <DropdownMenuSeparator />
             <DropdownMenuItem onClick={handleLogout}>

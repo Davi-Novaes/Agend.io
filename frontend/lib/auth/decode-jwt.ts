@@ -2,7 +2,7 @@
 // verifica assinatura. A validacao real do token sempre acontece no backend;
 // isto e so leitura de um payload que ja confiamos por termos acabado de
 // receber do proprio backend no login.
-export function decodeJwtEmail(accessToken: string): string | null {
+function decodeJwtClaims(accessToken: string): Record<string, unknown> | null {
   try {
     const payload = accessToken.split(".")[1];
     if (!payload) {
@@ -17,11 +17,25 @@ export function decodeJwtEmail(accessToken: string): string | null {
         .join("")
     );
 
-    const claims = JSON.parse(json) as Record<string, unknown>;
-    const email = claims["email"] ?? claims["http://schemas.xmlsoap.org/ws/2005/05/identity/claims/emailaddress"];
-
-    return typeof email === "string" ? email : null;
+    return JSON.parse(json) as Record<string, unknown>;
   } catch {
     return null;
   }
+}
+
+export function decodeJwtEmail(accessToken: string): string | null {
+  const claims = decodeJwtClaims(accessToken);
+  const email = claims?.["email"] ?? claims?.["http://schemas.xmlsoap.org/ws/2005/05/identity/claims/emailaddress"];
+
+  return typeof email === "string" ? email : null;
+}
+
+// O backend emite "full_name" como claim customizada (nao ClaimTypes.Name do
+// .NET) justamente para evitar o mapeamento verboso pra URI que ClaimTypes.*
+// sofre ao serializar no JWT — ver AuthTokenIssuer.BuildClaims no backend.
+export function decodeJwtFullName(accessToken: string): string | null {
+  const claims = decodeJwtClaims(accessToken);
+  const fullName = claims?.["full_name"];
+
+  return typeof fullName === "string" && fullName.length > 0 ? fullName : null;
 }
