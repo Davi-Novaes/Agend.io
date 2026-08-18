@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Text.Json;
 using Agendio.Infrastructure.AiAssistant;
 using Agendio.Modules.Estoque.Contracts;
@@ -114,7 +115,7 @@ public sealed class AskAssistantCommandHandler(
     }
 
     private static DateOnly ReadDate(JsonElement root, string propertyName) =>
-        DateOnly.Parse(root.GetProperty(propertyName).GetString()!);
+        DateOnly.Parse(root.GetProperty(propertyName).GetString()!, CultureInfo.InvariantCulture);
 
     private static TimeZoneInfo ResolveTimeZone(string timeZoneId)
     {
