@@ -238,7 +238,12 @@ export default function DashboardPage() {
         />
       </div>
 
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      {/* 2 colunas, nao 4: ServiceRevenueChart/AppointmentStatusChart tem controles
+          internos (toggles, legenda) que dependem de largura de viewport (sm:/lg:),
+          nao da largura da coluna do grid -- numa 4a coluna eles ficam espremidos
+          mesmo em telas largas, porque o breakpoint interno nao sabe que ganhou
+          menos espaco por causa do grid pai. */}
+      <div className="grid gap-4 sm:grid-cols-2">
         {stats ? <ServiceRevenueChart data={stats.revenueByService} /> : <div className="h-72 animate-pulse rounded-lg border bg-muted/40" />}
         <CustomerStatsCard
           newCount={newCustomersQuery.data?.totalCount}
