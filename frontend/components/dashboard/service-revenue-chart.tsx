@@ -38,7 +38,7 @@ export function ServiceRevenueChart({ data }: { data: ServiceRevenuePoint[] }) {
             <Button
               type="button"
               size="sm"
-              variant={metric === "count" ? "secondary" : "ghost"}
+              variant={metric === "count" ? "default" : "ghost"}
               aria-pressed={metric === "count"}
               onClick={() => setMetric("count")}
             >
@@ -47,7 +47,7 @@ export function ServiceRevenueChart({ data }: { data: ServiceRevenuePoint[] }) {
             <Button
               type="button"
               size="sm"
-              variant={metric === "total" ? "secondary" : "ghost"}
+              variant={metric === "total" ? "default" : "ghost"}
               aria-pressed={metric === "total"}
               onClick={() => setMetric("total")}
             >
@@ -58,7 +58,7 @@ export function ServiceRevenueChart({ data }: { data: ServiceRevenuePoint[] }) {
             <Button
               type="button"
               size="sm"
-              variant={view === "chart" ? "secondary" : "ghost"}
+              variant={view === "chart" ? "default" : "ghost"}
               aria-pressed={view === "chart"}
               onClick={() => setView("chart")}
             >
@@ -67,7 +67,7 @@ export function ServiceRevenueChart({ data }: { data: ServiceRevenuePoint[] }) {
             <Button
               type="button"
               size="sm"
-              variant={view === "table" ? "secondary" : "ghost"}
+              variant={view === "table" ? "default" : "ghost"}
               aria-pressed={view === "table"}
               onClick={() => setView("table")}
             >

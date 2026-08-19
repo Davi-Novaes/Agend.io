@@ -164,7 +164,12 @@ export default function DashboardPage() {
           <p className="text-muted-foreground text-sm">Veja como esta o desempenho do seu negocio.</p>
         </div>
         <div className="flex gap-2">
-          <Button asChild variant="outline" size="sm">
+          <Button
+            asChild
+            variant="ghost"
+            size="sm"
+            className="border border-primary/50 bg-transparent text-primary hover:bg-primary/10 hover:text-primary dark:border-primary/50 dark:bg-transparent dark:hover:bg-primary/10 dark:hover:text-primary"
+          >
             <Link href="/clientes?novo=1">
               <Plus className="size-4" />
               Novo cliente
