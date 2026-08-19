@@ -2,24 +2,24 @@
 
 import Link from "next/link";
 import type { LucideIcon } from "lucide-react";
-import { CircleCheck, PackageX, Receipt, UserRoundX, UsersRound } from "lucide-react";
-import { Card, CardContent } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
+import { Bell, CircleCheck, PackageX, Receipt, UserRoundX, UsersRound } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
+import { cn } from "@/lib/utils";
 
 type Alert = {
   key: string;
   icon: LucideIcon;
   tone: "critical" | "warning" | "info";
-  message: string;
+  count: number;
+  label: string;
   href: string;
   ctaLabel: string;
 };
 
 const TONE_CLASSES: Record<Alert["tone"], string> = {
-  critical: "text-destructive",
-  warning: "text-warning",
-  info: "text-info",
+  critical: "bg-destructive/15 text-destructive",
+  warning: "bg-warning/15 text-warning",
+  info: "bg-info/15 text-info",
 };
 
 export function AttentionSection({
@@ -42,7 +42,8 @@ export function AttentionSection({
       key: "overdue-payables",
       icon: Receipt,
       tone: "critical",
-      message: `${overduePayablesCount} ${overduePayablesCount === 1 ? "pagamento precisa" : "pagamentos precisam"} de atencao.`,
+      count: overduePayablesCount,
+      label: overduePayablesCount === 1 ? "pagamento precisa de atencao" : "pagamentos precisam de atencao",
       href: "/settings/payments",
       ctaLabel: "Ver pagamentos",
     });
@@ -53,7 +54,8 @@ export function AttentionSection({
       key: "pending-appointments",
       icon: UserRoundX,
       tone: "warning",
-      message: `${pendingAppointmentsCount} ${pendingAppointmentsCount === 1 ? "cliente aguarda" : "clientes aguardam"} confirmacao hoje.`,
+      count: pendingAppointmentsCount,
+      label: pendingAppointmentsCount === 1 ? "cliente aguarda confirmacao hoje" : "clientes aguardam confirmacao hoje",
       href: "/agenda",
       ctaLabel: "Ver agenda",
     });
@@ -64,7 +66,8 @@ export function AttentionSection({
       key: "low-stock",
       icon: PackageX,
       tone: "warning",
-      message: `${lowStockCount} ${lowStockCount === 1 ? "produto esta" : "produtos estao"} abaixo do estoque minimo.`,
+      count: lowStockCount,
+      label: lowStockCount === 1 ? "produto abaixo do estoque minimo" : "produtos abaixo do estoque minimo",
       href: "/estoque",
       ctaLabel: "Ver estoque",
     });
@@ -75,42 +78,53 @@ export function AttentionSection({
       key: "inactive-customers",
       icon: UsersRound,
       tone: "info",
-      message: `${inactiveCustomersCount} ${inactiveCustomersCount === 1 ? "cliente nao retorna" : "clientes nao retornam"} ha mais de 90 dias.`,
+      count: inactiveCustomersCount,
+      label: inactiveCustomersCount === 1 ? "cliente nao retorna ha mais de 90 dias" : "clientes nao retornam ha mais de 90 dias",
       href: "/clientes?segmento=Inativo",
       ctaLabel: "Ver clientes",
     });
   }
 
   return (
-    <div>
-      <h3 className="mb-3 text-sm font-semibold">Requer sua atencao</h3>
+    <div className="rounded-lg border p-4">
+      <div className="mb-3 flex items-center gap-2">
+        <Bell className="text-primary size-4" aria-hidden="true" />
+        <div>
+          <h3 className="text-sm font-semibold">Requer sua atencao</h3>
+          <p className="text-muted-foreground text-xs">Existem itens que precisam da sua acao.</p>
+        </div>
+      </div>
+
       {isLoading ? (
         <div className="grid gap-3 sm:grid-cols-2">
-          <Skeleton className="h-16 w-full" />
-          <Skeleton className="h-16 w-full" />
+          <Skeleton className="h-20 w-full" />
+          <Skeleton className="h-20 w-full" />
         </div>
       ) : alerts.length === 0 ? (
-        <Card size="sm">
-          <CardContent className="flex items-center gap-3">
-            <CircleCheck className="text-success size-5 shrink-0" aria-hidden="true" />
-            <div>
-              <p className="text-sm font-medium">Esta tudo em ordem</p>
-              <p className="text-muted-foreground text-xs">Nao encontramos nenhuma pendencia importante.</p>
-            </div>
-          </CardContent>
-        </Card>
+        <div className="flex items-center gap-3 py-6">
+          <CircleCheck className="text-success size-5 shrink-0" aria-hidden="true" />
+          <div>
+            <p className="text-sm font-medium">Esta tudo em ordem</p>
+            <p className="text-muted-foreground text-xs">Nao encontramos nenhuma pendencia importante.</p>
+          </div>
+        </div>
       ) : (
         <div className="grid gap-3 sm:grid-cols-2">
           {alerts.map((alert) => (
-            <Card key={alert.key} size="sm">
-              <CardContent className="flex items-center gap-3">
-                <alert.icon className={`size-5 shrink-0 ${TONE_CLASSES[alert.tone]}`} aria-hidden="true" />
-                <p className="flex-1 text-sm">{alert.message}</p>
-                <Button asChild variant="ghost" size="sm" className="shrink-0">
-                  <Link href={alert.href}>{alert.ctaLabel}</Link>
-                </Button>
-              </CardContent>
-            </Card>
+            <Link
+              key={alert.key}
+              href={alert.href}
+              className="hover:border-primary/40 hover:bg-accent/50 flex flex-col gap-2 rounded-lg border p-3 transition-colors"
+            >
+              <div className="flex items-center gap-2">
+                <div className={cn("flex size-7 items-center justify-center rounded-md", TONE_CLASSES[alert.tone])}>
+                  <alert.icon className="size-4" aria-hidden="true" />
+                </div>
+                <span className="text-lg font-semibold tabular-nums">{alert.count}</span>
+              </div>
+              <p className="text-muted-foreground text-xs leading-snug">{alert.label}</p>
+              <span className="text-primary text-xs font-medium">{alert.ctaLabel} →</span>
+            </Link>
           ))}
         </div>
       )}

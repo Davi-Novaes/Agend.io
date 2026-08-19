@@ -188,6 +188,7 @@ export default function DashboardPage() {
           value={cashFlow ? formatCurrency(cashFlow.totalReceived) : "—"}
           delta={cashFlow && previousCashFlow ? percentDelta(cashFlow.totalReceived, previousCashFlow.totalReceived) : undefined}
           isLoading={kpiLoading}
+          tone="primary"
         />
         <MetricCard
           icon={ArrowDownCircle}
@@ -195,6 +196,7 @@ export default function DashboardPage() {
           value={cashFlow ? formatCurrency(cashFlow.totalPaid) : "—"}
           delta={cashFlow && previousCashFlow ? percentDelta(cashFlow.totalPaid, previousCashFlow.totalPaid) : undefined}
           isLoading={kpiLoading}
+          tone="destructive"
         />
         <MetricCard
           icon={Scale}
@@ -203,6 +205,7 @@ export default function DashboardPage() {
           delta={cashFlow && previousCashFlow ? percentDelta(cashFlow.netBalance, previousCashFlow.netBalance) : undefined}
           description="Receitas menos despesas no periodo."
           isLoading={kpiLoading}
+          tone="success"
         />
         <MetricCard
           icon={CalendarCheck}
@@ -210,6 +213,7 @@ export default function DashboardPage() {
           value={todayAppointmentsQuery.data ? `${todayAppointmentsQuery.data.length} hoje` : "—"}
           description={todayAppointmentsQuery.data ? `${todayCompletedCount} concluidos` : undefined}
           isLoading={todayAppointmentsQuery.isLoading}
+          tone="info"
         />
       </div>
 
@@ -218,26 +222,36 @@ export default function DashboardPage() {
         <TodayAgendaCard appointments={todayAppointments} isLoading={todayAppointmentsQuery.isLoading} />
       </div>
 
-      <AttentionSection
-        overduePayablesCount={overduePayablesCount}
-        pendingAppointmentsCount={todayPendingCount}
-        lowStockCount={lowStockQuery.data?.lowStockCount}
-        inactiveCustomersCount={inactiveCustomersQuery.data?.totalCount}
-        isLoading={overduePayablesQuery.isLoading || lowStockQuery.isLoading || inactiveCustomersQuery.isLoading}
-      />
+      <div className="grid gap-4 lg:grid-cols-2">
+        <AttentionSection
+          overduePayablesCount={overduePayablesCount}
+          pendingAppointmentsCount={todayPendingCount}
+          lowStockCount={lowStockQuery.data?.lowStockCount}
+          inactiveCustomersCount={inactiveCustomersQuery.data?.totalCount}
+          isLoading={overduePayablesQuery.isLoading || lowStockQuery.isLoading || inactiveCustomersQuery.isLoading}
+        />
+        <InsightsSection
+          cashFlow={cashFlow}
+          previousCashFlow={previousCashFlow}
+          stats={stats}
+          recoveryCandidates={recoveryQuery.data}
+        />
+      </div>
 
-      {stats ? <ServiceRevenueChart data={stats.revenueByService} /> : <div className="h-64 animate-pulse rounded-lg border bg-muted/40" />}
-
-      <CustomerStatsCard
-        newCount={newCustomersQuery.data?.totalCount}
-        recurringCount={recurringCustomersQuery.data?.totalCount}
-        inactiveCount={inactiveCustomersQuery.data?.totalCount}
-        isLoading={newCustomersQuery.isLoading || recurringCustomersQuery.isLoading || inactiveCustomersQuery.isLoading}
-      />
-
-      {stats ? (
-        <div className="grid gap-4 lg:grid-cols-2">
+      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        {stats ? <ServiceRevenueChart data={stats.revenueByService} /> : <div className="h-72 animate-pulse rounded-lg border bg-muted/40" />}
+        <CustomerStatsCard
+          newCount={newCustomersQuery.data?.totalCount}
+          recurringCount={recurringCustomersQuery.data?.totalCount}
+          inactiveCount={inactiveCustomersQuery.data?.totalCount}
+          isLoading={newCustomersQuery.isLoading || recurringCustomersQuery.isLoading || inactiveCustomersQuery.isLoading}
+        />
+        {stats ? (
           <AppointmentStatusChart stats={stats} />
+        ) : (
+          <div className="h-72 animate-pulse rounded-lg border bg-muted/40" />
+        )}
+        {stats ? (
           <CategoryBreakdownChart
             id="painel-revenue-by-service"
             title="Faturamento por servico"
@@ -246,20 +260,10 @@ export default function DashboardPage() {
             categoryLabel="Servico"
             data={stats.revenueByService.map((point) => ({ category: point.serviceName, total: point.total }))}
           />
-        </div>
-      ) : (
-        <div className="grid gap-4 lg:grid-cols-2">
-          <div className="h-64 animate-pulse rounded-lg border bg-muted/40" />
-          <div className="h-64 animate-pulse rounded-lg border bg-muted/40" />
-        </div>
-      )}
-
-      <InsightsSection
-        cashFlow={cashFlow}
-        previousCashFlow={previousCashFlow}
-        stats={stats}
-        recoveryCandidates={recoveryQuery.data}
-      />
+        ) : (
+          <div className="h-72 animate-pulse rounded-lg border bg-muted/40" />
+        )}
+      </div>
     </div>
   );
 }

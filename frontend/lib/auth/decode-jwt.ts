@@ -39,3 +39,12 @@ export function decodeJwtFullName(accessToken: string): string | null {
 
   return typeof fullName === "string" && fullName.length > 0 ? fullName : null;
 }
+
+// Role usa ClaimTypes.Role do .NET (AuthTokenIssuer.BuildClaims), que serializa
+// pra URI longa igual ClaimTypes.Email — mesmo fallback de chave da decodeJwtEmail.
+export function decodeJwtRole(accessToken: string): "Owner" | "Staff" | null {
+  const claims = decodeJwtClaims(accessToken);
+  const role = claims?.["role"] ?? claims?.["http://schemas.microsoft.com/ws/2008/06/identity/claims/role"];
+
+  return role === "Owner" || role === "Staff" ? role : null;
+}

@@ -1,12 +1,13 @@
 "use client";
 
 import { usePathname, useRouter } from "next/navigation";
-import { LogOut } from "lucide-react";
+import { Bell, ChevronDown, LogOut } from "lucide-react";
 
 import { NAV_ITEMS } from "@/components/layout/nav-config";
 import { useSession } from "@/lib/auth/session-context";
-import { decodeJwtEmail, decodeJwtFullName } from "@/lib/auth/decode-jwt";
+import { decodeJwtEmail, decodeJwtFullName, decodeJwtRole } from "@/lib/auth/decode-jwt";
 import { ThemeToggle } from "@/components/theme-toggle";
+import { Button } from "@/components/ui/button";
 import { SidebarTrigger } from "@/components/ui/sidebar";
 import { Separator } from "@/components/ui/separator";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
@@ -18,6 +19,11 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+
+const ROLE_LABELS: Record<"Owner" | "Staff", string> = {
+  Owner: "Administrador",
+  Staff: "Equipe",
+};
 
 function initialsFrom(fullName: string | null, email: string | null): string {
   if (fullName) {
@@ -40,6 +46,7 @@ export function AppHeader() {
   const title = NAV_ITEMS.find((item) => item.href === pathname)?.label ?? "Agendio";
   const email = session ? decodeJwtEmail(session.accessToken) : null;
   const fullName = session ? decodeJwtFullName(session.accessToken) : null;
+  const role = session ? decodeJwtRole(session.accessToken) : null;
 
   function handleLogout() {
     logout();
@@ -51,12 +58,19 @@ export function AppHeader() {
       <SidebarTrigger />
       <Separator orientation="vertical" className="h-4" />
       <h1 className="text-sm font-medium">{title}</h1>
-      <div className="ml-auto flex items-center gap-1">
+      <div className="ml-auto flex items-center gap-2">
         <ThemeToggle />
+        {/* Sem contador: nao ha um sistema de notificacoes de verdade ainda —
+            mostrar um numero aqui seria inventar dado. Fica so o icone,
+            estrutura pronta pra quando existir uma inbox real. */}
+        <Button variant="ghost" size="icon" className="text-muted-foreground" aria-label="Notificacoes">
+          <Bell className="size-4.5" />
+        </Button>
+        <Separator orientation="vertical" className="h-6" />
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <button className="ml-1" aria-label="Menu da conta">
-              <Avatar className="size-7">
+            <button className="flex items-center gap-2 rounded-md py-1 pl-1 pr-2 hover:bg-accent" aria-label="Menu da conta">
+              <Avatar className="size-8">
                 {/* bg-muted/text-muted-foreground nao atinge contraste AA em text-xs
                     (achado pelo axe-core no e2e) — usa o par primary/primary-foreground,
                     ja auditado para AA (ver components/ui/button.tsx). */}
@@ -64,6 +78,11 @@ export function AppHeader() {
                   {initialsFrom(fullName, email)}
                 </AvatarFallback>
               </Avatar>
+              <span className="hidden flex-col items-start leading-tight sm:flex">
+                <span className="max-w-40 truncate text-sm font-medium">{fullName ?? email ?? "Minha conta"}</span>
+                {role && <span className="text-xs text-muted-foreground">{ROLE_LABELS[role]}</span>}
+              </span>
+              <ChevronDown className="text-muted-foreground hidden size-4 sm:block" aria-hidden="true" />
             </button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">

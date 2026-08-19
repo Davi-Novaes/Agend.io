@@ -3,6 +3,7 @@
 import * as React from "react";
 import Link from "next/link";
 import { CalendarCheck, CalendarDays, CheckCircle2, Clock, UserX, XCircle } from "lucide-react";
+import { Cell, Pie, PieChart, ResponsiveContainer, Tooltip } from "recharts";
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
@@ -14,33 +15,28 @@ type Segment = {
   key: "confirmed" | "scheduled" | "completed" | "cancelled" | "noShow";
   label: string;
   count: number;
-  colorClassName: string;
+  color: string;
   icon: typeof CheckCircle2;
 };
 
 /**
- * Status carrega significado de bom/ruim (concluido = bom, no-show/cancelado = ruim), entao
- * usa a paleta fixa de status da skill dataviz (good/critical), nao a categorica — e vira
- * barra horizontal empilhada (parte-todo), nunca rosca/pizza. Ver references/choosing-a-form.md
- * e references/color-formula.md da skill.
+ * Status carrega significado (concluido = bom, no-show/cancelado = ruim, os
+ * demais neutros) — usa cores fixas por status (--destructive pro cancelado,
+ * --chart-N pros demais) em vez da paleta categorica pura, mas em rosca (nao
+ * barra) a pedido explicito do usuario: ja tinha sido barra empilhada por
+ * causa da skill dataviz, mudou aqui porque a preferencia visual foi reafirmada.
  */
 export function AppointmentStatusChart({ stats }: { stats: AppointmentStats }) {
   const [view, setView] = React.useState<ViewMode>("chart");
-  const [activeSegment, setActiveSegment] = React.useState<Segment["key"] | null>(null);
 
   const segments: Segment[] = [
-    { key: "confirmed", label: "Confirmados", count: stats.confirmedCount, colorClassName: "bg-[#2a78d6] dark:bg-[#3987e5]", icon: CalendarCheck },
-    {
-      key: "scheduled",
-      label: "Pendentes",
-      count: stats.scheduledCount,
-      colorClassName: "bg-[#c3c2b7] dark:bg-[#383835]",
-      icon: Clock,
-    },
-    { key: "completed", label: "Concluidos", count: stats.completedCount, colorClassName: "bg-[#0ca30c]", icon: CheckCircle2 },
-    { key: "cancelled", label: "Cancelados", count: stats.cancelledCount, colorClassName: "bg-[#d03b3b]", icon: XCircle },
-    { key: "noShow", label: "Nao compareceu", count: stats.noShowCount, colorClassName: "bg-[#a5321f] dark:bg-[#e8674d]", icon: UserX },
+    { key: "confirmed", label: "Confirmados", count: stats.confirmedCount, color: "var(--chart-1)", icon: CalendarCheck },
+    { key: "scheduled", label: "Pendentes", count: stats.scheduledCount, color: "var(--chart-4)", icon: Clock },
+    { key: "completed", label: "Concluidos", count: stats.completedCount, color: "var(--chart-3)", icon: CheckCircle2 },
+    { key: "cancelled", label: "Cancelados", count: stats.cancelledCount, color: "var(--destructive)", icon: XCircle },
+    { key: "noShow", label: "Nao compareceu", count: stats.noShowCount, color: "var(--chart-2)", icon: UserX },
   ];
+  const chartData = segments.filter((segment) => segment.count > 0);
 
   function percentOf(count: number): number {
     return stats.totalCount === 0 ? 0 : Math.round((count / stats.totalCount) * 100);
@@ -106,45 +102,59 @@ export function AppointmentStatusChart({ stats }: { stats: AppointmentStats }) {
           </TableBody>
         </Table>
       ) : (
-        <div>
+        <div className="flex flex-col items-center gap-4 sm:flex-row">
           <div
+            className="relative size-40 shrink-0"
             role="img"
             aria-label={`Status de ${stats.totalCount} agendamentos: ${segments
               .map((segment) => `${segment.label} ${percentOf(segment.count)}%`)
               .join(", ")}.`}
-            className="flex h-8 w-full gap-0.5 overflow-hidden rounded-md"
           >
-            {segments
-              .filter((segment) => segment.count > 0)
-              .map((segment) => (
-                <button
-                  key={segment.key}
-                  type="button"
-                  className={`h-full transition-opacity hover:opacity-80 focus-visible:opacity-80 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 ${segment.colorClassName}`}
-                  style={{ width: `${percentOf(segment.count)}%` }}
-                  onMouseEnter={() => setActiveSegment(segment.key)}
-                  onFocus={() => setActiveSegment(segment.key)}
-                  onMouseLeave={() => setActiveSegment(null)}
-                  onBlur={() => setActiveSegment(null)}
-                  aria-label={`${segment.label}: ${segment.count} (${percentOf(segment.count)}%)`}
+            <ResponsiveContainer width="100%" height="100%">
+              <PieChart>
+                <Pie
+                  data={chartData}
+                  dataKey="count"
+                  nameKey="label"
+                  cx="50%"
+                  cy="50%"
+                  innerRadius={52}
+                  outerRadius={78}
+                  paddingAngle={2}
+                  stroke="none"
+                  isAnimationActive={false}
+                >
+                  {chartData.map((segment) => (
+                    <Cell key={segment.key} fill={segment.color} />
+                  ))}
+                </Pie>
+                <Tooltip
+                  content={({ active, payload }) => {
+                    if (!active || !payload?.[0]) return null;
+                    const segment = payload[0].payload as Segment;
+                    return (
+                      <div className="bg-popover text-popover-foreground rounded-md border px-3 py-2 text-xs shadow-md">
+                        {segment.label}: {segment.count} ({percentOf(segment.count)}%)
+                      </div>
+                    );
+                  }}
                 />
-              ))}
-          </div>
-          <div aria-live="polite" className="text-muted-foreground mt-2 h-4 text-xs">
-            {activeSegment
-              ? (() => {
-                  const segment = segments.find((candidate) => candidate.key === activeSegment)!;
-                  return `${segment.label}: ${segment.count} (${percentOf(segment.count)}%)`;
-                })()
-              : ""}
+              </PieChart>
+            </ResponsiveContainer>
+            <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center">
+              <span className="text-2xl font-semibold tabular-nums">{stats.totalCount}</span>
+              <span className="text-muted-foreground text-[11px]">agendamentos</span>
+            </div>
           </div>
 
-          <ul className="mt-3 flex flex-wrap gap-x-4 gap-y-1.5" aria-hidden="true">
+          <ul className="flex w-full flex-col gap-2" aria-label="Legenda de status dos agendamentos">
             {segments.map((segment) => (
-              <li key={segment.key} className="flex items-center gap-1.5 text-xs">
-                <segment.icon className="size-3.5 shrink-0" aria-hidden="true" />
-                <span>
-                  {segment.label} ({segment.count})
+              <li key={segment.key} className="flex items-center gap-2 text-xs">
+                <span aria-hidden="true" className="inline-block size-2.5 shrink-0 rounded-full" style={{ backgroundColor: segment.color }} />
+                <segment.icon className="text-muted-foreground size-3.5 shrink-0" aria-hidden="true" />
+                <span className="flex-1">{segment.label}</span>
+                <span className="tabular-nums">
+                  {segment.count} ({percentOf(segment.count)}%)
                 </span>
               </li>
             ))}
