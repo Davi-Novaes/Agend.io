@@ -2,6 +2,7 @@ import type { LucideIcon } from "lucide-react";
 import { TrendingDown, TrendingUp } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Skeleton } from "@/components/ui/skeleton";
 
 function formatDelta(delta: number): string {
   const rounded = Math.abs(delta).toLocaleString("pt-BR", { maximumFractionDigits: 1, minimumFractionDigits: 1 });
@@ -14,6 +15,8 @@ export function MetricCard({
   value,
   delta,
   deltaLabel = "vs. periodo anterior",
+  description,
+  isLoading = false,
 }: {
   icon: LucideIcon;
   title: string;
@@ -21,8 +24,12 @@ export function MetricCard({
   /** Omitir quando o periodo anterior nao tiver base de comparacao (ex.: tenant novo, sem historico). */
   delta?: number | null;
   deltaLabel?: string;
+  /** Legenda curta abaixo do valor — usado por KPIs cujo calculo nao e obvio (ex.: Resultado). */
+  description?: string;
+  /** Enquanto true, ignora `value`/`delta` e mostra skeleton no lugar (query ainda em voo). */
+  isLoading?: boolean;
 }) {
-  const hasDelta = delta !== null && delta !== undefined && Number.isFinite(delta);
+  const hasDelta = !isLoading && delta !== null && delta !== undefined && Number.isFinite(delta);
   const isPositive = hasDelta && delta >= 0;
 
   return (
@@ -32,7 +39,8 @@ export function MetricCard({
           <span className="text-muted-foreground text-sm">{title}</span>
           <Icon className="text-muted-foreground size-4" aria-hidden="true" />
         </div>
-        <span className="text-2xl font-semibold tabular-nums">{value}</span>
+        {isLoading ? <Skeleton className="h-8 w-24" /> : <span className="text-2xl font-semibold tabular-nums">{value}</span>}
+        {description && !isLoading && <p className="text-muted-foreground -mt-2 text-xs">{description}</p>}
         {hasDelta && (
           <div className="flex items-center gap-1.5">
             <Badge variant={isPositive ? "success" : "destructive"}>

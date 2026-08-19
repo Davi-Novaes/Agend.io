@@ -95,8 +95,20 @@ export default function CustomersPage() {
   const [page, setPage] = React.useState(1);
   const [searchInput, setSearchInput] = React.useState("");
   const [search, setSearch] = React.useState("");
-  const [segment, setSegment] = React.useState<CustomerSegment | "all">("all");
-  const [dialogOpen, setDialogOpen] = React.useState(false);
+  // Le a URL uma unica vez, no proprio inicializador (nao em useEffect+setState,
+  // que dispara react-hooks/set-state-in-effect) — os CTAs do Dashboard chegam
+  // aqui via "?segmento=Inativo" (alerta de "Requer sua atencao") ou "?novo=1"
+  // ("+ Novo cliente"). typeof window guard: build estatico nao tem window, mas
+  // isso nunca diverge do client em uso real porque a navegacao vinda do
+  // Dashboard e sempre client-side (Link), sem hidratacao de HTML server com querystring.
+  const [segment, setSegment] = React.useState<CustomerSegment | "all">(() => {
+    if (typeof window === "undefined") return "all";
+    const param = new URLSearchParams(window.location.search).get("segmento") as CustomerSegment | null;
+    return param ?? "all";
+  });
+  const [dialogOpen, setDialogOpen] = React.useState(
+    () => typeof window !== "undefined" && new URLSearchParams(window.location.search).get("novo") === "1"
+  );
   const [editingCustomer, setEditingCustomer] = React.useState<CustomerSummary | null>(null);
   const [viewingCustomerId, setViewingCustomerId] = React.useState<string | null>(null);
   const importInputRef = React.useRef<HTMLInputElement>(null);
@@ -200,6 +212,18 @@ export default function CustomersPage() {
     form.reset(emptyCustomerForm);
     setDialogOpen(true);
   }
+
+  // So limpa a querystring depois do mount (nao mexe em state React — os
+  // valores iniciais de segment/dialogOpen acima ja leram "novo"/"segmento").
+  React.useEffect(() => {
+    if (typeof window === "undefined") {
+      return;
+    }
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("novo") || params.get("segmento")) {
+      window.history.replaceState(null, "", "/clientes");
+    }
+  }, []);
 
   async function openEditDialog(customer: CustomerSummary) {
     try {

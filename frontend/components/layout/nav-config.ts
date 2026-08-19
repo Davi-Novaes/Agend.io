@@ -62,11 +62,11 @@ export const NAV_GROUPS: NavGroup[] = [
     ],
   },
   {
-    label: "Operação",
+    label: "Análises",
     items: [{ href: "/relatorios", label: "Relatórios", icon: BarChart3 }],
   },
   {
-    label: "Marketing",
+    label: "Relacionamento",
     items: [
       { href: "/marketing", label: "Marketing", icon: Megaphone },
       { href: "/settings/whatsapp", label: "WhatsApp", icon: MessageCircle },

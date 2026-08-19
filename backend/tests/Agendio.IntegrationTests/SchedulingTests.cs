@@ -259,6 +259,16 @@ public class SchedulingTests(IntegrationTestFixture fixture)
             client, accessToken, $"/api/appointments/{appointment3Id}/no-show", new { }, cancellationToken))
             .StatusCode.ShouldBe(HttpStatusCode.NoContent);
 
+        // Ainda agendado (aguardando confirmacao), dentro do periodo.
+        await ScheduleAppointmentAsync(client, accessToken, customerId, resource2Id, service2Id, inPeriodStart.AddHours(5), cancellationToken);
+
+        // Confirmado, dentro do periodo.
+        var appointment4Id = await ScheduleAppointmentAsync(
+            client, accessToken, customerId, resource2Id, service2Id, inPeriodStart.AddHours(7), cancellationToken);
+        (await AuthorizedRequestHelpers.PostAuthorizedAsync(
+            client, accessToken, $"/api/appointments/{appointment4Id}/confirm", new { }, cancellationToken))
+            .StatusCode.ShouldBe(HttpStatusCode.NoContent);
+
         // Fora do periodo do relatorio — prova que o filtro por StartUtc exclui.
         await ScheduleAppointmentAsync(client, accessToken, customerId, resource1Id, service1Id, inPeriodStart.AddDays(10), cancellationToken);
 
@@ -270,19 +280,23 @@ public class SchedulingTests(IntegrationTestFixture fixture)
         statsResponse.StatusCode.ShouldBe(HttpStatusCode.OK);
 
         var stats = await statsResponse.Content.ReadFromJsonAsync<JsonElement>(cancellationToken);
-        stats.GetProperty("totalCount").GetInt32().ShouldBe(3);
+        stats.GetProperty("totalCount").GetInt32().ShouldBe(5);
         stats.GetProperty("completedCount").GetInt32().ShouldBe(2);
         stats.GetProperty("noShowCount").GetInt32().ShouldBe(1);
         stats.GetProperty("cancelledCount").GetInt32().ShouldBe(0);
-        stats.GetProperty("noShowRate").GetDecimal().ShouldBe(33.3m);
+        stats.GetProperty("scheduledCount").GetInt32().ShouldBe(1);
+        stats.GetProperty("confirmedCount").GetInt32().ShouldBe(1);
+        stats.GetProperty("noShowRate").GetDecimal().ShouldBe(20.0m);
         stats.GetProperty("cancellationRate").GetDecimal().ShouldBe(0m);
 
         var revenueByService = stats.GetProperty("revenueByService");
         revenueByService.GetArrayLength().ShouldBe(2);
         revenueByService[0].GetProperty("serviceName").GetString().ShouldBe("Corte VIP");
         revenueByService[0].GetProperty("total").GetDecimal().ShouldBe(80.00m);
+        revenueByService[0].GetProperty("count").GetInt32().ShouldBe(1);
         revenueByService[1].GetProperty("serviceName").GetString().ShouldBe("Corte Simples");
         revenueByService[1].GetProperty("total").GetDecimal().ShouldBe(30.00m);
+        revenueByService[1].GetProperty("count").GetInt32().ShouldBe(1);
 
         var revenueByProfessional = stats.GetProperty("revenueByProfessional");
         revenueByProfessional.GetArrayLength().ShouldBe(2);
@@ -306,6 +320,8 @@ public class SchedulingTests(IntegrationTestFixture fixture)
 
         var stats = await response.Content.ReadFromJsonAsync<JsonElement>(cancellationToken);
         stats.GetProperty("totalCount").GetInt32().ShouldBe(0);
+        stats.GetProperty("scheduledCount").GetInt32().ShouldBe(0);
+        stats.GetProperty("confirmedCount").GetInt32().ShouldBe(0);
         stats.GetProperty("noShowRate").GetDecimal().ShouldBe(0m);
         stats.GetProperty("cancellationRate").GetDecimal().ShouldBe(0m);
         stats.GetProperty("revenueByService").GetArrayLength().ShouldBe(0);
