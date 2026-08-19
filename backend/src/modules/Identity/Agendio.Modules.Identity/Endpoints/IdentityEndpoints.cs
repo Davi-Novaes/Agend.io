@@ -8,6 +8,7 @@ using Agendio.Modules.Identity.Application.EnableMfa;
 using Agendio.Modules.Identity.Application.GetMfaStatus;
 using Agendio.Modules.Identity.Application.InviteTeamMember;
 using Agendio.Modules.Identity.Application.Login;
+using Agendio.Modules.Identity.Application.Logout;
 using Agendio.Modules.Identity.Application.RefreshAccessToken;
 using Agendio.Modules.Identity.Application.RegisterUser;
 using Agendio.Modules.Identity.Application.ResendConfirmationEmail;
@@ -162,7 +163,7 @@ public sealed class IdentityEndpoints : IEndpointModule
             {
                 // Cookie invalido/reutilizado: remove para o cliente nao ficar
                 // reenviando um token que so vai continuar falhando.
-                httpContext.Response.Cookies.Delete(RefreshTokenCookieName);
+                DeleteRefreshTokenCookie(httpContext);
                 return result.Error.ToProblemResult();
             }
 
@@ -171,6 +172,23 @@ public sealed class IdentityEndpoints : IEndpointModule
         })
         .AllowAnonymous()
         .WithName("RefreshAccessToken");
+
+        group.MapPost("/logout", async (HttpContext httpContext, IDispatcher dispatcher, CancellationToken cancellationToken) =>
+        {
+            var refreshToken = httpContext.Request.Cookies[RefreshTokenCookieName];
+            if (!string.IsNullOrEmpty(refreshToken))
+            {
+                await dispatcher.Send(new LogoutCommand(refreshToken), cancellationToken);
+            }
+
+            DeleteRefreshTokenCookie(httpContext);
+            return Results.NoContent();
+        })
+        // Publica de proposito: se o access token ja expirou, o frontend ainda
+        // precisa conseguir limpar a sessao (cookie + revogar o refresh token).
+        .AllowAnonymous()
+        .WithName("Logout")
+        .WithSummary("Revoga o refresh token da sessao atual e limpa o cookie.");
 
         var team = endpoints.MapGroup("/api/team").WithTags("Team");
 
@@ -250,6 +268,12 @@ public sealed class IdentityEndpoints : IEndpointModule
             Path = "/api/auth",
         });
     }
+
+    // Path precisa bater exatamente com o usado em SetRefreshTokenCookie —
+    // Response.Cookies.Delete sem essa opcao nao remove o cookie de fato
+    // (o navegador trata como um Set-Cookie de um path diferente).
+    private static void DeleteRefreshTokenCookie(HttpContext httpContext) =>
+        httpContext.Response.Cookies.Delete(RefreshTokenCookieName, new CookieOptions { Path = "/api/auth" });
 
     // O refresh token NUNCA aparece no corpo da resposta — so no cookie
     // HttpOnly. O access token vive em memoria no frontend (nunca localStorage).

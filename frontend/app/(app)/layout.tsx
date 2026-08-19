@@ -10,15 +10,18 @@ import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   const router = useRouter();
-  const { session } = useSession();
+  const { session, isRestoringSession } = useSession();
 
   React.useEffect(() => {
-    if (!session) {
+    if (!isRestoringSession && !session) {
       router.replace("/login");
     }
-  }, [session, router]);
+  }, [session, isRestoringSession, router]);
 
-  if (!session) {
+  // Enquanto isRestoringSession, ainda nao sabemos se ha um refresh token
+  // valido no cookie — redirecionar aqui mandaria pro login uma sessao que
+  // so nao terminou de ser restaurada ainda (ex.: logo apos um F5).
+  if (isRestoringSession || !session) {
     return null;
   }
 
