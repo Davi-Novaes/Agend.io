@@ -1,15 +1,17 @@
 "use client";
 
 import * as React from "react";
-import { CheckCircle2, Clock, XCircle } from "lucide-react";
+import Link from "next/link";
+import { CalendarCheck, CalendarDays, CheckCircle2, Clock, UserX, XCircle } from "lucide-react";
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
+import { EmptyState } from "@/components/ui/empty-state";
 import type { AppointmentStats } from "@/lib/api/client";
 
 type ViewMode = "chart" | "table";
 
 type Segment = {
-  key: "completed" | "problem" | "scheduled";
+  key: "confirmed" | "scheduled" | "completed" | "cancelled" | "noShow";
   label: string;
   count: number;
   colorClassName: string;
@@ -26,19 +28,18 @@ export function AppointmentStatusChart({ stats }: { stats: AppointmentStats }) {
   const [view, setView] = React.useState<ViewMode>("chart");
   const [activeSegment, setActiveSegment] = React.useState<Segment["key"] | null>(null);
 
-  const problemCount = stats.noShowCount + stats.cancelledCount;
-  const scheduledCount = Math.max(0, stats.totalCount - stats.completedCount - problemCount);
-
   const segments: Segment[] = [
-    { key: "completed", label: "Concluidos", count: stats.completedCount, colorClassName: "bg-[#0ca30c]", icon: CheckCircle2 },
-    { key: "problem", label: "Nao compareceu / cancelados", count: problemCount, colorClassName: "bg-[#d03b3b]", icon: XCircle },
+    { key: "confirmed", label: "Confirmados", count: stats.confirmedCount, colorClassName: "bg-[#2a78d6] dark:bg-[#3987e5]", icon: CalendarCheck },
     {
       key: "scheduled",
-      label: "Agendados / em andamento",
-      count: scheduledCount,
+      label: "Pendentes",
+      count: stats.scheduledCount,
       colorClassName: "bg-[#c3c2b7] dark:bg-[#383835]",
       icon: Clock,
     },
+    { key: "completed", label: "Concluidos", count: stats.completedCount, colorClassName: "bg-[#0ca30c]", icon: CheckCircle2 },
+    { key: "cancelled", label: "Cancelados", count: stats.cancelledCount, colorClassName: "bg-[#d03b3b]", icon: XCircle },
+    { key: "noShow", label: "Nao compareceu", count: stats.noShowCount, colorClassName: "bg-[#a5321f] dark:bg-[#e8674d]", icon: UserX },
   ];
 
   function percentOf(count: number): number {
@@ -75,7 +76,16 @@ export function AppointmentStatusChart({ stats }: { stats: AppointmentStats }) {
       </div>
 
       {stats.totalCount === 0 ? (
-        <p className="text-muted-foreground py-8 text-center text-sm">Nenhum agendamento no periodo.</p>
+        <EmptyState
+          icon={CalendarDays}
+          title="Sem agendamentos"
+          description="Voce ainda nao possui agendamentos neste periodo."
+          action={
+            <Button asChild size="sm" variant="outline">
+              <Link href="/agenda?novo=1">Criar agendamento</Link>
+            </Button>
+          }
+        />
       ) : view === "table" ? (
         <Table>
           <TableHeader>

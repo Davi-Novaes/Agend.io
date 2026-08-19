@@ -1,10 +1,13 @@
 "use client";
 
 import * as React from "react";
+import Link from "next/link";
+import { LineChart } from "lucide-react";
 import { Area, AreaChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import type { ValueType, NameType } from "recharts/types/component/DefaultTooltipContent";
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
+import { EmptyState } from "@/components/ui/empty-state";
 import type { CashFlowMonthPoint } from "@/lib/api/client";
 
 function formatCurrency(value: number): string {
@@ -74,7 +77,16 @@ export function RevenueChart({ data }: { data: CashFlowMonthPoint[] }) {
       </div>
 
       {data.length === 0 ? (
-        <p className="text-muted-foreground py-8 text-center text-sm">Nenhum faturamento registrado no periodo.</p>
+        <EmptyState
+          icon={LineChart}
+          title="Sem dados suficientes para este periodo"
+          description="Assim que houver movimentacoes, seu desempenho aparece aqui."
+          action={
+            <Button asChild size="sm" variant="outline">
+              <Link href="/financeiro">Ir para financeiro</Link>
+            </Button>
+          }
+        />
       ) : view === "table" ? (
         <Table>
           <TableHeader>

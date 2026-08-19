@@ -2,6 +2,7 @@
 
 import * as React from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -29,6 +30,7 @@ import {
   type AppointmentStatus,
 } from "@/lib/api/client";
 import { useSession } from "@/lib/auth/session-context";
+import { APPOINTMENT_STATUS_LABELS, APPOINTMENT_STATUS_VARIANTS } from "@/lib/appointment-status";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -48,25 +50,8 @@ const ROW_HEIGHT_PX = 32;
 const TOTAL_MINUTES = (DAY_END_HOUR - DAY_START_HOUR) * 60;
 const GRID_HEIGHT_PX = (TOTAL_MINUTES / SLOT_MINUTES) * ROW_HEIGHT_PX;
 
-const STATUS_LABELS: Record<AppointmentStatus, string> = {
-  Scheduled: "Agendado",
-  Confirmed: "Confirmado",
-  InProgress: "Em andamento",
-  Completed: "Concluido",
-  NoShow: "Nao compareceu",
-  CancelledByCustomer: "Cancelado (cliente)",
-  CancelledByStaff: "Cancelado (equipe)",
-};
-
-const STATUS_VARIANTS: Record<AppointmentStatus, "secondary" | "info" | "default" | "success" | "destructive"> = {
-  Scheduled: "secondary",
-  Confirmed: "info",
-  InProgress: "default",
-  Completed: "success",
-  NoShow: "destructive",
-  CancelledByCustomer: "destructive",
-  CancelledByStaff: "destructive",
-};
+const STATUS_LABELS = APPOINTMENT_STATUS_LABELS;
+const STATUS_VARIANTS = APPOINTMENT_STATUS_VARIANTS;
 
 // Mesmo agrupamento bom/ruim de components/dashboard/appointment-status-chart.tsx (Etapa 3),
 // aplicado como tom de fundo em vez de paleta fixa de status — aqui e badge de UI, nao mark de grafico.
@@ -151,6 +136,7 @@ function formatChangeLogDateTime(value: string): string {
 export default function AgendaPage() {
   const { session } = useSession();
   const queryClient = useQueryClient();
+  const router = useRouter();
 
   const [view, setView] = React.useState<"day" | "week" | "month">("day");
   const [currentDate, setCurrentDate] = React.useState(() => startOfDay(new Date()));
@@ -371,6 +357,36 @@ export default function AgendaPage() {
     setCreateDialogState({ resourceId, start });
     createForm.reset({ customerId: "", serviceId: "", startAtLocal: toDatetimeLocalValue(start), notes: "" });
   }
+
+  // Entrada rapida vinda do Dashboard ("+ Novo agendamento") — mesmo dialog e
+  // mutation de sempre, so aberto automaticamente com um horario default (proximo
+  // slot de 30min dentro do expediente) em vez do usuario clicar numa celula da grade.
+  // Le window.location direto (em vez de useSearchParams) pra nao exigir um
+  // boundary de Suspense so por causa desse efeito de montagem.
+  React.useEffect(() => {
+    if (typeof window === "undefined" || new URLSearchParams(window.location.search).get("novo") !== "1" || !resolvedResourceId) {
+      return;
+    }
+
+    const now = new Date();
+    const start = new Date(now);
+    start.setSeconds(0, 0);
+    start.setMinutes(Math.ceil(now.getMinutes() / SLOT_MINUTES) * SLOT_MINUTES);
+    if (start.getHours() < DAY_START_HOUR || start.getHours() >= DAY_END_HOUR) {
+      start.setHours(DAY_START_HOUR, 0, 0, 0);
+      if (start.getTime() <= now.getTime()) {
+        start.setDate(start.getDate() + 1);
+      }
+    }
+
+    // Legitimo "esperar um dado assincrono (recursos) chegar, entao sincronizar" —
+    // nao da pra resolver via useState(() => ...) porque resolvedResourceId so
+    // existe depois que resourcesQuery volta da API.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setCreateDialogState({ resourceId: resolvedResourceId, start });
+    createForm.reset({ customerId: "", serviceId: "", startAtLocal: toDatetimeLocalValue(start), notes: "" });
+    router.replace("/agenda");
+  }, [resolvedResourceId, router, createForm]);
 
   function openDetailDialog(appointmentId: string) {
     setSelectedAppointmentId(appointmentId);

@@ -79,15 +79,18 @@ export function InsightsSection({
   }
 
   return (
-    <div className="mb-8 flex flex-col gap-2">
-      {insights.map((insight) => (
-        <Card key={insight.text} size="sm">
-          <CardContent className="flex items-center gap-3">
-            <insight.icon className={`size-5 shrink-0 ${TONE_CLASSES[insight.tone]}`} aria-hidden="true" />
-            <p className="text-sm">{insight.text}</p>
-          </CardContent>
-        </Card>
-      ))}
+    <div>
+      <h3 className="mb-3 text-sm font-semibold">Resumo do periodo</h3>
+      <div className="flex flex-col gap-2">
+        {insights.map((insight) => (
+          <Card key={insight.text} size="sm">
+            <CardContent className="flex items-center gap-3">
+              <insight.icon className={`size-5 shrink-0 ${TONE_CLASSES[insight.tone]}`} aria-hidden="true" />
+              <p className="text-sm">{insight.text}</p>
+            </CardContent>
+          </Card>
+        ))}
+      </div>
     </div>
   );
 }

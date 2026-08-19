@@ -28,6 +28,9 @@ public sealed class GetAppointmentStatsQueryHandler(SchedulingDbContext dbContex
         var noShowCount = appointments.Count(a => a.Status == AppointmentStatus.NoShow);
         var cancelledCount = appointments.Count(a =>
             a.Status == AppointmentStatus.CancelledByCustomer || a.Status == AppointmentStatus.CancelledByStaff);
+        var scheduledCount = appointments.Count(a => a.Status == AppointmentStatus.Scheduled);
+        var confirmedCount = appointments.Count(a =>
+            a.Status == AppointmentStatus.Confirmed || a.Status == AppointmentStatus.InProgress);
 
         var noShowRate = totalCount == 0 ? 0m : Math.Round(noShowCount * 100m / totalCount, 1);
         var cancellationRate = totalCount == 0 ? 0m : Math.Round(cancelledCount * 100m / totalCount, 1);
@@ -47,7 +50,7 @@ public sealed class GetAppointmentStatsQueryHandler(SchedulingDbContext dbContex
 
         var revenueByService = completed
             .GroupBy(a => a.ServiceName)
-            .Select(group => new ServiceRevenuePoint(group.Key, group.Sum(a => a.Amount)))
+            .Select(group => new ServiceRevenuePoint(group.Key, group.Sum(a => a.Amount), group.Count()))
             .OrderByDescending(point => point.Total)
             .ToList();
 
@@ -65,7 +68,8 @@ public sealed class GetAppointmentStatsQueryHandler(SchedulingDbContext dbContex
         }
 
         return Result.Success(new AppointmentStats(
-            totalCount, completedCount, noShowCount, cancelledCount, rescheduledCount, noShowRate, cancellationRate, rescheduleRate,
+            totalCount, completedCount, noShowCount, cancelledCount, rescheduledCount, scheduledCount, confirmedCount,
+            noShowRate, cancellationRate, rescheduleRate,
             revenueByService, revenueByProfessional));
     }
 }
