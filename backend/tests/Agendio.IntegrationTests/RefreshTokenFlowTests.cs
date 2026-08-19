@@ -86,6 +86,42 @@ public class RefreshTokenFlowTests(IntegrationTestFixture fixture)
     }
 
     [Fact]
+    public async Task Logout_Should_Revoke_The_Refresh_Token_And_Clear_The_Cookie()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var client = fixture.CreateClient();
+        var (tenantId, email) = await RegisterAndCreateTenantAsync(client, cancellationToken);
+
+        var loginResponse = await client.PostAsJsonAsync(
+            "/api/auth/login", new { tenantId, email, password = Password }, cancellationToken);
+        var refreshToken = ExtractRefreshTokenCookie(loginResponse)!;
+
+        var logoutResponse = await SendLogoutAsync(client, refreshToken, cancellationToken);
+        logoutResponse.StatusCode.ShouldBe(HttpStatusCode.NoContent);
+
+        // O Set-Cookie de logout precisa expirar o MESMO cookie (path identico
+        // ao usado no login) — senao o navegador nao limpa nada de fato.
+        var clearedCookie = ExtractRefreshTokenCookie(logoutResponse);
+        clearedCookie.ShouldBeNullOrEmpty();
+
+        // O token apresentado no logout precisa ter sido revogado de verdade no
+        // servidor, nao so o cookie local limpo — reusa-lo deve falhar.
+        var refreshAfterLogout = await SendRefreshAsync(client, refreshToken, cancellationToken);
+        refreshAfterLogout.StatusCode.ShouldBe(HttpStatusCode.Unauthorized);
+    }
+
+    [Fact]
+    public async Task Logout_Without_A_Cookie_Should_Still_Succeed()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var client = fixture.CreateClient();
+
+        var response = await client.PostAsync("/api/auth/logout", content: null, cancellationToken);
+
+        response.StatusCode.ShouldBe(HttpStatusCode.NoContent);
+    }
+
+    [Fact]
     public async Task Refreshing_Without_A_Cookie_Should_Return_Unauthorized()
     {
         var cancellationToken = TestContext.Current.CancellationToken;
@@ -121,6 +157,13 @@ public class RefreshTokenFlowTests(IntegrationTestFixture fixture)
     private static Task<HttpResponseMessage> SendRefreshAsync(HttpClient client, string refreshToken, CancellationToken cancellationToken)
     {
         var request = new HttpRequestMessage(HttpMethod.Post, "/api/auth/refresh");
+        request.Headers.Add("Cookie", $"{RefreshCookieName}={refreshToken}");
+        return client.SendAsync(request, cancellationToken);
+    }
+
+    private static Task<HttpResponseMessage> SendLogoutAsync(HttpClient client, string refreshToken, CancellationToken cancellationToken)
+    {
+        var request = new HttpRequestMessage(HttpMethod.Post, "/api/auth/logout");
         request.Headers.Add("Cookie", $"{RefreshCookieName}={refreshToken}");
         return client.SendAsync(request, cancellationToken);
     }

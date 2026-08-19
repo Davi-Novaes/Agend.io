@@ -206,6 +206,10 @@ export function refreshAccessToken(): Promise<AuthTokens> {
   return request<AuthTokens>("/api/auth/refresh", { method: "POST" });
 }
 
+export function logout(): Promise<void> {
+  return request<void>("/api/auth/logout", { method: "POST" });
+}
+
 export function updateTenantBranding(primaryColorHex: string, accessToken: string): Promise<void> {
   return request<void>(
     "/api/tenants/branding",
@@ -1519,7 +1523,7 @@ export function listStockMovements(
 
 // ---------- Relatorios ----------
 
-export type ServiceRevenuePoint = { serviceName: string; total: number };
+export type ServiceRevenuePoint = { serviceName: string; total: number; count: number };
 export type ProfessionalRevenuePoint = { resourceId: string; resourceName: string; total: number };
 
 export type AppointmentStats = {
@@ -1528,6 +1532,8 @@ export type AppointmentStats = {
   noShowCount: number;
   cancelledCount: number;
   rescheduledCount: number;
+  scheduledCount: number;
+  confirmedCount: number;
   noShowRate: number;
   cancellationRate: number;
   rescheduleRate: number;
