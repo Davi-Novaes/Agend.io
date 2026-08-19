@@ -3,11 +3,21 @@ import { TrendingDown, TrendingUp } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
+import { cn } from "@/lib/utils";
 
 function formatDelta(delta: number): string {
   const rounded = Math.abs(delta).toLocaleString("pt-BR", { maximumFractionDigits: 1, minimumFractionDigits: 1 });
   return `${delta >= 0 ? "+" : "-"}${rounded}%`;
 }
+
+type Tone = "primary" | "destructive" | "success" | "info";
+
+const TONE_CLASSES: Record<Tone, string> = {
+  primary: "bg-primary/15 text-primary",
+  destructive: "bg-destructive/15 text-destructive",
+  success: "bg-success/15 text-success",
+  info: "bg-info/15 text-info",
+};
 
 export function MetricCard({
   icon: Icon,
@@ -17,6 +27,7 @@ export function MetricCard({
   deltaLabel = "vs. periodo anterior",
   description,
   isLoading = false,
+  tone = "primary",
 }: {
   icon: LucideIcon;
   title: string;
@@ -28,6 +39,8 @@ export function MetricCard({
   description?: string;
   /** Enquanto true, ignora `value`/`delta` e mostra skeleton no lugar (query ainda em voo). */
   isLoading?: boolean;
+  /** Cor do badge do icone — puramente decorativo, nao carrega significado alem de diferenciar os cards. */
+  tone?: Tone;
 }) {
   const hasDelta = !isLoading && delta !== null && delta !== undefined && Number.isFinite(delta);
   const isPositive = hasDelta && delta >= 0;
@@ -37,7 +50,9 @@ export function MetricCard({
       <CardContent className="flex flex-col gap-3">
         <div className="flex items-center justify-between">
           <span className="text-muted-foreground text-sm">{title}</span>
-          <Icon className="text-muted-foreground size-4" aria-hidden="true" />
+          <div className={cn("flex size-9 items-center justify-center rounded-lg", TONE_CLASSES[tone])}>
+            <Icon className="size-4.5" aria-hidden="true" />
+          </div>
         </div>
         {isLoading ? <Skeleton className="h-8 w-24" /> : <span className="text-2xl font-semibold tabular-nums">{value}</span>}
         {description && !isLoading && <p className="text-muted-foreground -mt-2 text-xs">{description}</p>}

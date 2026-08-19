@@ -136,7 +136,14 @@ export function RevenueChart({ data }: { data: CashFlowMonthPoint[] }) {
                 width={80}
               />
               <Tooltip content={(props) => <RevenueTooltip active={props.active} payload={props.payload} label={props.label} />} />
-              <Area type="monotone" dataKey="received" stroke="var(--chart-1)" strokeWidth={2} fill="url(#revenue-chart-fill)" />
+              <Area
+                type="monotone"
+                dataKey="received"
+                stroke="var(--chart-1)"
+                strokeWidth={2}
+                fill="url(#revenue-chart-fill)"
+                isAnimationActive={false}
+              />
             </AreaChart>
           </ResponsiveContainer>
         </div>
