@@ -33,7 +33,7 @@ function ViewToggle({ view, onChange, id }: { view: ViewMode; onChange: (view: V
       <Button
         type="button"
         size="sm"
-        variant={view === "chart" ? "secondary" : "ghost"}
+        variant={view === "chart" ? "default" : "ghost"}
         aria-pressed={view === "chart"}
         onClick={() => onChange("chart")}
         id={`${id}-chart-btn`}
@@ -43,7 +43,7 @@ function ViewToggle({ view, onChange, id }: { view: ViewMode; onChange: (view: V
       <Button
         type="button"
         size="sm"
-        variant={view === "table" ? "secondary" : "ghost"}
+        variant={view === "table" ? "default" : "ghost"}
         aria-pressed={view === "table"}
         onClick={() => onChange("table")}
       >

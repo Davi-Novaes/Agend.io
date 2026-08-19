@@ -58,7 +58,7 @@ export function RevenueChart({ data }: { data: CashFlowMonthPoint[] }) {
           <Button
             type="button"
             size="sm"
-            variant={view === "chart" ? "secondary" : "ghost"}
+            variant={view === "chart" ? "default" : "ghost"}
             aria-pressed={view === "chart"}
             onClick={() => setView("chart")}
           >
@@ -67,7 +67,7 @@ export function RevenueChart({ data }: { data: CashFlowMonthPoint[] }) {
           <Button
             type="button"
             size="sm"
-            variant={view === "table" ? "secondary" : "ghost"}
+            variant={view === "table" ? "default" : "ghost"}
             aria-pressed={view === "table"}
             onClick={() => setView("table")}
           >
