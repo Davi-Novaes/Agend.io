@@ -107,17 +107,22 @@
 }
 
 .dark {
-  --background: oklch(0.145 0 0);
+  /* Fundo bem mais escuro (quase preto) que o padrao shadcn original — pedido
+     explicito do usuario, casando com a imagem de referencia do redesign do
+     dashboard. So a LUMINANCE de background/card/sidebar desce; foreground e
+     as demais cores ficam como estavam, entao o contraste texto-sobre-fundo
+     so AUMENTA (nunca reduz abaixo do que ja passava em AA). */
+  --background: oklch(0.09 0 0);
   --foreground: oklch(0.985 0 0);
-  --card: oklch(0.205 0 0);
+  --card: oklch(0.14 0 0);
   --card-foreground: oklch(0.985 0 0);
-  --popover: oklch(0.205 0 0);
+  --popover: oklch(0.14 0 0);
   --popover-foreground: oklch(0.985 0 0);
   --primary: oklch(0.62 0.15 273);
   --primary-foreground: oklch(0.99 0 0);
-  --secondary: oklch(0.269 0 0);
+  --secondary: oklch(0.2 0 0);
   --secondary-foreground: oklch(0.985 0 0);
-  --muted: oklch(0.269 0 0);
+  --muted: oklch(0.2 0 0);
   --muted-foreground: oklch(0.708 0 0);
   --accent: oklch(0.32 0.09 273 / 35%);
   --accent-foreground: oklch(0.88 0.05 273);
@@ -138,11 +143,11 @@
   --shadow-md: 0 4px 6px -1px oklch(0 0 0 / 0.4), 0 2px 4px -2px oklch(0 0 0 / 0.3);
   --shadow-lg: 0 10px 15px -3px oklch(0 0 0 / 0.45), 0 4px 6px -4px oklch(0 0 0 / 0.3);
   --shadow-xl: 0 20px 25px -5px oklch(0 0 0 / 0.5), 0 8px 10px -6px oklch(0 0 0 / 0.35);
-  --sidebar: oklch(0.205 0 0);
+  --sidebar: oklch(0.09 0 0);
   --sidebar-foreground: oklch(0.985 0 0);
   --sidebar-primary: oklch(0.62 0.15 273);
   --sidebar-primary-foreground: oklch(0.99 0 0);
-  --sidebar-accent: oklch(0.269 0 0);
+  --sidebar-accent: oklch(0.2 0 0);
   --sidebar-accent-foreground: oklch(0.985 0 0);
   --sidebar-border: oklch(1 0 0 / 10%);
   --sidebar-ring: oklch(0.556 0 0);
