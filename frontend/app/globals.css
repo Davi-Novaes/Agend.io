@@ -164,3 +164,25 @@
     @apply font-sans;
   }
 }
+
+@layer components {
+  /* Sombra nas bordas indicando conteudo fora da tela em overflow-x-auto —
+     some sozinha quando o scroll chega no fim daquele lado. So CSS (sem JS/
+     scroll listener): as duas primeiras camadas (attachment local) cobrem a
+     sombra quando o conteudo real ja esta ali; as duas ultimas (attachment
+     scroll) sao a sombra em si, fixas relativas ao viewport do proprio
+     container. Usado em Table (BL-18) e na grade da Agenda (BL-17) —
+     docs/BACKLOG.md. */
+  .scroll-shadow-x {
+    background:
+      linear-gradient(to right, var(--background) 30%, transparent),
+      linear-gradient(to left, var(--background) 30%, transparent) 100% 0,
+      linear-gradient(to right, color-mix(in oklch, var(--foreground) 20%, transparent), transparent),
+      linear-gradient(to left, color-mix(in oklch, var(--foreground) 20%, transparent), transparent) 100% 0;
+    background-repeat: no-repeat;
+    background-color: var(--background);
+    background-size: 24px 100%, 24px 100%, 8px 100%, 8px 100%;
+    background-position: 0 0, 100% 0, 0 0, 100% 0;
+    background-attachment: local, local, scroll, scroll;
+  }
+}
