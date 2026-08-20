@@ -176,12 +176,15 @@ export function getMfaStatus(accessToken: string): Promise<{ mfaEnabled: boolean
   return request("/api/auth/mfa/status", {}, accessToken);
 }
 
+// onboardingToken prova posse do tenant recem-criado pro resto do onboarding
+// (escolha de plano) — sem ele o endpoint antes era anonimo e ativava a
+// assinatura de QUALQUER tenant so com o Guid no corpo (BL-01, docs/BACKLOG.md).
 export function registerUser(input: {
   tenantId: string;
   email: string;
   password: string;
   fullName: string;
-}): Promise<{ id: string }> {
+}): Promise<{ id: string; onboardingToken: string; onboardingTokenExpiresAtUtc: string }> {
   return request("/api/auth/register", {
     method: "POST",
     body: JSON.stringify(input),
@@ -273,6 +276,7 @@ export type PublicPageButtonStyle = "Rounded" | "Square" | "Pill";
 export type TenantProfile = {
   name: string;
   slug: string;
+  terminology: TerminologyPack;
   primaryColorHex: string | null;
   logoUrl: string | null;
   bannerUrl: string | null;
@@ -1211,18 +1215,30 @@ export function cancelSubscription(accessToken: string): Promise<void> {
   return request("/api/billing/subscription/cancel", { method: "POST" }, accessToken);
 }
 
-// Sem accessToken (onboarding roda antes de existir sessao). Sem
-// nome/CPF/e-mail no payload — o Checkout da Asaas coleta isso na propria
-// pagina hospedada quando o plano escolhido e pago (ver Fase 24).
-export function onboardSelectPlan(input: {
-  tenantId: string;
-  planId: string;
-}): Promise<{ requiresPayment: boolean; checkoutLink: string | null }> {
-  return request("/api/billing/subscription/onboard-select-plan", { method: "POST", body: JSON.stringify(input) });
+// Ativa o plano Free pro tenant autenticado atual, sem Asaas — cobre tanto a
+// primeira escolha quanto reassinar Free depois de cancelar (BL-23/BL-33,
+// docs/BACKLOG.md). Antes so existia o formulario de plano pago pra isso.
+export function activateFreePlan(accessToken: string): Promise<void> {
+  return request("/api/billing/subscription/activate-free", { method: "POST" }, accessToken);
 }
 
-export function getOnboardingSubscriptionStatus(tenantId: string): Promise<{ isReady: boolean }> {
-  return request(`/api/billing/subscription/onboard-status?tenantId=${encodeURIComponent(tenantId)}`);
+// Token de onboarding (devolvido por registerUser), nao accessToken de sessao
+// normal (onboarding roda antes de e-mail confirmado). Sem nome/CPF/e-mail no
+// payload — o Checkout da Asaas coleta isso na propria pagina hospedada
+// quando o plano escolhido e pago (ver Fase 24).
+export function onboardSelectPlan(
+  input: { planId: string },
+  onboardingToken: string
+): Promise<{ requiresPayment: boolean; checkoutLink: string | null }> {
+  return request(
+    "/api/billing/subscription/onboard-select-plan",
+    { method: "POST", body: JSON.stringify(input) },
+    onboardingToken
+  );
+}
+
+export function getOnboardingSubscriptionStatus(onboardingToken: string): Promise<{ isReady: boolean }> {
+  return request("/api/billing/subscription/onboard-status", {}, onboardingToken);
 }
 
 export type SubscriptionAdminSummary = {

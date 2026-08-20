@@ -1,9 +1,11 @@
 "use client";
 
 import { usePathname, useRouter } from "next/navigation";
+import { useQuery } from "@tanstack/react-query";
 import { Bell, ChevronDown, LogOut } from "lucide-react";
 
-import { NAV_ITEMS } from "@/components/layout/nav-config";
+import { NAV_ITEMS, resolveNavLabel } from "@/components/layout/nav-config";
+import { getTenantProfile } from "@/lib/api/client";
 import { useSession } from "@/lib/auth/session-context";
 import { decodeJwtEmail, decodeJwtFullName, decodeJwtRole } from "@/lib/auth/decode-jwt";
 import { ThemeToggle } from "@/components/theme-toggle";
@@ -42,8 +44,18 @@ export function AppHeader() {
   const pathname = usePathname();
   const router = useRouter();
   const { session, logout } = useSession();
+  // Mesma fonte de terminologia do AppSidebar — evita o titulo do header
+  // dizer "Recursos" enquanto o menu ja diz "Barbeiros" (BL-14, docs/BACKLOG.md).
+  const profileQuery = useQuery({
+    queryKey: ["tenant-profile"],
+    queryFn: () => getTenantProfile(session!.accessToken),
+    enabled: Boolean(session),
+  });
 
-  const title = NAV_ITEMS.find((item) => item.href === pathname)?.label ?? "Agendio";
+  const matchedItem = NAV_ITEMS.find((item) => item.href === pathname);
+  const title = matchedItem
+    ? resolveNavLabel(matchedItem.href, matchedItem.label, profileQuery.data?.terminology.staffPlural)
+    : "Agendio";
   const email = session ? decodeJwtEmail(session.accessToken) : null;
   const fullName = session ? decodeJwtFullName(session.accessToken) : null;
   const role = session ? decodeJwtRole(session.accessToken) : null;

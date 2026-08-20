@@ -90,3 +90,12 @@ export const NAV_GROUPS: NavGroup[] = [
 ];
 
 export const NAV_ITEMS: NavItem[] = NAV_GROUPS.flatMap((group) => group.items);
+
+// O onboarding promete que "Profissional" vira o termo do segmento (ex.
+// "Barbeiro" numa barbearia), mas so o item de Recursos precisava mudar aqui
+// — os demais rotulos do menu (Clientes, Servicos, Agenda) nao fazem parte
+// deste achado (BL-14, docs/BACKLOG.md), entao ficam com o rotulo estatico
+// de sempre em vez de virar uma revisao geral de vocabulario nao pedida.
+export function resolveNavLabel(href: string, defaultLabel: string, staffPlural?: string): string {
+  return href === "/recursos" && staffPlural ? staffPlural : defaultLabel;
+}
