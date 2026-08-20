@@ -3,7 +3,7 @@
 import * as React from "react";
 import { useRouter } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
-import { Building2, CheckCircle2, TrendingUp, Wallet } from "lucide-react";
+import { AlertTriangle, Building2, CheckCircle2, TrendingUp, Wallet } from "lucide-react";
 
 import { getPlatformDashboardMetrics } from "@/lib/api/client";
 import { usePlatformSession } from "@/lib/auth/platform-session-context";
@@ -11,6 +11,8 @@ import { AdminNav } from "@/components/platform/admin-nav";
 import { MetricCard } from "@/components/dashboard/metric-card";
 import { SignupsChart } from "@/components/platform/signups-chart";
 import { SubscriptionStatusChart } from "@/components/platform/subscription-status-chart";
+import { EmptyState } from "@/components/ui/empty-state";
+import { Skeleton } from "@/components/ui/skeleton";
 
 function formatCurrency(value: number, currency: string): string {
   return value.toLocaleString("pt-BR", { style: "currency", currency });
@@ -48,9 +50,23 @@ export default function PlatformDashboardPage() {
       </div>
 
       {metricsQuery.isLoading ? (
-        <p className="text-muted-foreground text-sm">Carregando...</p>
+        <div className="flex flex-col gap-4">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            {Array.from({ length: 4 }).map((_, index) => (
+              <Skeleton key={index} className="h-24 rounded-xl" />
+            ))}
+          </div>
+          <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+            <Skeleton className="h-72 rounded-xl" />
+            <Skeleton className="h-72 rounded-xl" />
+          </div>
+        </div>
       ) : metricsQuery.isError || !metricsQuery.data ? (
-        <p className="text-destructive text-sm">Nao foi possivel carregar as metricas.</p>
+        <EmptyState
+          icon={AlertTriangle}
+          title="Nao foi possivel carregar as metricas"
+          description="Tente recarregar a pagina em instantes."
+        />
       ) : (
         <>
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">

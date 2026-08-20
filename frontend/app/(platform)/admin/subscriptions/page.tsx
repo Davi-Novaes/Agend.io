@@ -4,6 +4,7 @@ import * as React from "react";
 import { useRouter } from "next/navigation";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
+import { AlertTriangle, Building2 } from "lucide-react";
 
 import { listSubscriptionsForPlatform, cancelSubscriptionForTenant, ApiError, type SubscriptionAdminSummary } from "@/lib/api/client";
 import { usePlatformSession } from "@/lib/auth/platform-session-context";
@@ -13,6 +14,8 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from "@/components/ui/table";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { EmptyState } from "@/components/ui/empty-state";
+import { Skeleton } from "@/components/ui/skeleton";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -117,10 +120,12 @@ export default function PlatformSubscriptionsPage() {
         </Select>
       </div>
 
-      {subscriptionsQuery.isLoading ? (
-        <p className="text-muted-foreground text-sm">Carregando...</p>
-      ) : subscriptionsQuery.isError ? (
-        <p className="text-destructive text-sm">Nao foi possivel carregar as assinaturas.</p>
+      {subscriptionsQuery.isError ? (
+        <EmptyState
+          icon={AlertTriangle}
+          title="Nao foi possivel carregar as assinaturas"
+          description="Tente recarregar a pagina em instantes."
+        />
       ) : (
         <Table>
           <TableHeader>
@@ -134,10 +139,21 @@ export default function PlatformSubscriptionsPage() {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {filteredSubscriptions.length === 0 ? (
+            {subscriptionsQuery.isLoading ? (
+              Array.from({ length: 5 }).map((_, index) => (
+                <TableRow key={index}>
+                  <TableCell><Skeleton className="h-4 w-32" /></TableCell>
+                  <TableCell><Skeleton className="h-4 w-20" /></TableCell>
+                  <TableCell><Skeleton className="h-5 w-16 rounded-full" /></TableCell>
+                  <TableCell><Skeleton className="h-4 w-24" /></TableCell>
+                  <TableCell><Skeleton className="h-4 w-24" /></TableCell>
+                  <TableCell className="text-right"><Skeleton className="ml-auto h-8 w-24" /></TableCell>
+                </TableRow>
+              ))
+            ) : filteredSubscriptions.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={6} className="text-muted-foreground text-center">
-                  Nenhuma assinatura encontrada.
+                <TableCell colSpan={6} className="p-0">
+                  <EmptyState icon={Building2} title="Nenhuma assinatura encontrada" />
                 </TableCell>
               </TableRow>
             ) : (
