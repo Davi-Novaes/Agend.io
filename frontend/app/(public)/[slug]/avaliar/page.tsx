@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Image from "next/image";
 import { notFound } from "next/navigation";
-import { Sparkles } from "lucide-react";
+import { Sparkles, TriangleAlert } from "lucide-react";
 
 import { getTenantBySlug, resolveAssetUrl, ApiError, type TenantPublicProfile } from "@/lib/api/client";
 import { TenantThemeProvider } from "@/lib/tenant/tenant-theme-provider";
@@ -37,7 +37,12 @@ export default async function ReviewPage({ params, searchParams }: PageProps) {
   const { appointmentId } = await searchParams;
   const tenant = await loadTenant(slug);
 
-  if (!tenant || !tenant.isActive || !appointmentId) {
+  // Estabelecimento inexistente/inativo: 404 generico de verdade (nao ha
+  // marca nenhuma pra mostrar). Falta so o appointmentId (link mal
+  // formado/incompleto) e um caso diferente — o tenant existe, entao da pra
+  // mostrar uma tela com a marca dele em vez do 404 puro do Next (BL-28,
+  // docs/BACKLOG.md).
+  if (!tenant || !tenant.isActive) {
     notFound();
   }
 
@@ -63,16 +68,40 @@ export default async function ReviewPage({ params, searchParams }: PageProps) {
               <Sparkles className="text-primary size-7" strokeWidth={1.5} />
             </div>
           )}
-          <div className="text-center">
-            <h1 className="text-xl font-semibold tracking-tight">Como foi seu atendimento?</h1>
-            <p className="text-muted-foreground text-sm">{tenant.name}</p>
-          </div>
 
-          <Card className="w-full">
-            <CardContent>
-              <ReviewForm tenantId={tenant.id} appointmentId={appointmentId} />
-            </CardContent>
-          </Card>
+          {appointmentId ? (
+            <>
+              <div className="text-center">
+                <h1 className="text-xl font-semibold tracking-tight">Como foi seu atendimento?</h1>
+                <p className="text-muted-foreground text-sm">{tenant.name}</p>
+              </div>
+
+              <Card className="w-full">
+                <CardContent>
+                  <ReviewForm tenantId={tenant.id} appointmentId={appointmentId} />
+                </CardContent>
+              </Card>
+            </>
+          ) : (
+            <>
+              <div className="text-center">
+                <h1 className="text-xl font-semibold tracking-tight">{tenant.name}</h1>
+              </div>
+
+              <Card className="w-full">
+                <CardContent className="flex flex-col items-center gap-3 py-8 text-center">
+                  <TriangleAlert className="text-muted-foreground size-8" strokeWidth={1.5} aria-hidden="true" />
+                  <div>
+                    <p className="font-medium">Link de avaliacao incompleto</p>
+                    <p className="text-muted-foreground text-sm">
+                      Esse link nao informa qual atendimento avaliar. Use o link que voce recebeu por
+                      e-mail ou WhatsApp apos o atendimento.
+                    </p>
+                  </div>
+                </CardContent>
+              </Card>
+            </>
+          )}
         </div>
       </div>
     </TenantThemeProvider>

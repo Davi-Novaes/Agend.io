@@ -5,6 +5,7 @@ import { usePathname, useRouter } from "next/navigation";
 
 import { usePlatformSession } from "@/lib/auth/platform-session-context";
 import { Button } from "@/components/ui/button";
+import { ThemeToggle } from "@/components/theme-toggle";
 
 const NAV_ITEMS = [
   { href: "/admin", label: "Dashboard" },
@@ -28,6 +29,7 @@ export function AdminNav() {
       </nav>
       <div className="flex items-center gap-3">
         <span className="text-muted-foreground text-sm">Logado como {session?.fullName}</span>
+        <ThemeToggle />
         <Button
           variant="outline"
           size="sm"

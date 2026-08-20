@@ -198,6 +198,7 @@ function WhatsAppSettingsForm({ profile, accessToken }: { profile: TenantProfile
                   <FormControl>
                     <Input
                       type="password"
+                      autoComplete="off"
                       placeholder={profile.whatsAppAccessTokenConfigured ? "•••••••••••••• (já configurado)" : "Cole o token de acesso"}
                       {...field}
                     />
