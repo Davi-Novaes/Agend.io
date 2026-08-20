@@ -21,6 +21,24 @@ internal sealed class CustomerLookupService(CustomersDbContext dbContext, ICusto
             : new CustomerLookupResult(customer.Id.Value, customer.FullName, customer.Email?.Value, customer.Phone?.Value, customer.IsActive);
     }
 
+    public async Task<IReadOnlyList<CustomerLookupResult>> FindByIdsAsync(
+        IReadOnlyCollection<Guid> customerIds, CancellationToken cancellationToken = default)
+    {
+        if (customerIds.Count == 0)
+        {
+            return [];
+        }
+
+        var ids = customerIds.Select(CustomerId.From).ToList();
+        var customers = await dbContext.Customers.AsNoTracking()
+            .Where(c => ids.Contains(c.Id))
+            .ToListAsync(cancellationToken);
+
+        return customers
+            .Select(c => new CustomerLookupResult(c.Id.Value, c.FullName, c.Email?.Value, c.Phone?.Value, c.IsActive))
+            .ToList();
+    }
+
     public async Task<IReadOnlyList<CustomerLookupResult>> ListActiveWithEmailAsync(CancellationToken cancellationToken = default)
     {
         var customers = await dbContext.Customers.AsNoTracking()
