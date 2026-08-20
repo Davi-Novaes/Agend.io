@@ -93,33 +93,29 @@ const FEATURES = [
   },
 ] as const;
 
+// Os dois planos reais oferecidos hoje (ver GET /api/billing/plans) — sem
+// diferenca de recursos entre eles (nenhum modulo do sistema faz gating por
+// plano), entao a copy nao inventa limites que nao existem: a diferenca real
+// e so preco e o Gratis nunca expirar/exigir cartao (BL-04, docs/BACKLOG.md).
 const PLANS = [
   {
-    name: "Essencial",
-    price: "R$ 49,90",
-    description: "Para quem está começando e trabalha sozinho.",
-    features: ["1 profissional", "Agenda e clientes ilimitados", "Portal de agendamento online", "Suporte por e-mail"],
+    name: "Grátis",
+    price: "R$ 0,00",
+    description: "Para testar o sistema sem compromisso.",
+    features: ["Acesso completo ao sistema", "Sem cartão de crédito", "Sem prazo para decidir", "Cancele quando quiser"],
     highlighted: false,
   },
   {
-    name: "Profissional",
-    price: "R$ 99,90",
-    description: "O mais escolhido por quem já tem equipe.",
+    name: "Padrão",
+    price: "R$ 99,00",
+    description: "14 dias de teste grátis, depois cobrança automática mensal.",
     features: [
-      "Até 5 profissionais",
-      "Marca personalizada (cor e logo)",
-      "Lembretes automáticos",
-      "Convite de equipe com permissões",
-      "Suporte prioritário",
+      "Acesso completo ao sistema",
+      "14 dias de teste grátis",
+      "Cobrança automática após o teste",
+      "Cancele quando quiser",
     ],
     highlighted: true,
-  },
-  {
-    name: "Avançado",
-    price: "R$ 199,90",
-    description: "Para redes e negócios com múltiplas unidades.",
-    features: ["Profissionais ilimitados", "Múltiplas unidades", "Relatórios financeiros completos", "Suporte dedicado"],
-    highlighted: false,
   },
 ] as const;
 
@@ -265,7 +261,7 @@ export default function MarketingHomePage() {
               <h2 className="text-2xl font-semibold tracking-tight sm:text-3xl">Preços simples, sem surpresa</h2>
               <p className="text-muted-foreground mt-3">Sem fidelidade. Cancele quando quiser.</p>
             </div>
-            <div className="mt-10 grid gap-6 lg:grid-cols-3">
+            <div className="mx-auto mt-10 grid max-w-2xl gap-6 sm:grid-cols-2">
               {PLANS.map((plan) => (
                 <Card key={plan.name} className={plan.highlighted ? "border-primary shadow-md" : undefined}>
                   <CardHeader>
