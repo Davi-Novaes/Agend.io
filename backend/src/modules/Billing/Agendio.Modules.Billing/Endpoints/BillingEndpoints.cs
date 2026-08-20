@@ -1,4 +1,6 @@
 using Agendio.Infrastructure.Endpoints;
+using Agendio.Infrastructure.Security;
+using Agendio.Modules.Billing.Application.ActivateFreePlan;
 using Agendio.Modules.Billing.Application.CancelSubscription;
 using Agendio.Modules.Billing.Application.GetMySubscription;
 using Agendio.Modules.Billing.Application.GetOnboardingSubscriptionStatus;
@@ -12,6 +14,7 @@ using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Routing;
 using Microsoft.Extensions.Options;
+using System.Security.Claims;
 using System.Security.Cryptography;
 using System.Text;
 
@@ -52,6 +55,19 @@ public sealed class BillingEndpoints : IEndpointModule
         .WithName("SubscribeToPlan")
         .WithSummary("Assina um plano — devolve a URL de pagamento hospedada pela Asaas (PIX/boleto/cartao).");
 
+        // Autenticado normal (nao onboarding) de proposito: cobre tanto o dono
+        // que nunca escolheu Free quanto reassinar Free depois de cancelar
+        // (BL-23/BL-33, docs/BACKLOG.md) — sem isso, a unica forma de "assinar
+        // Free" fora do onboarding era o form de plano pago (pedia CPF/CNPJ e
+        // tentava criar uma assinatura de R$0 na Asaas).
+        group.MapPost("/subscription/activate-free", async (IDispatcher dispatcher, CancellationToken cancellationToken) =>
+        {
+            var result = await dispatcher.Send(new ActivateFreePlanCommand(), cancellationToken);
+            return result.IsSuccess ? Results.NoContent() : result.Error.ToProblemResult();
+        })
+        .WithName("ActivateFreePlan")
+        .WithSummary("Ativa o plano Free para o estabelecimento atual, sem Asaas.");
+
         group.MapPost("/subscription/cancel", async (IDispatcher dispatcher, CancellationToken cancellationToken) =>
         {
             var result = await dispatcher.Send(new CancelSubscriptionCommand(), cancellationToken);
@@ -60,25 +76,37 @@ public sealed class BillingEndpoints : IEndpointModule
         .WithName("CancelSubscription")
         .WithSummary("Cancela a assinatura do estabelecimento atual.");
 
-        // Publicos de proposito: o onboarding ainda nao tem JWT nesse ponto
-        // (conta acabou de ser criada, e-mail ainda nao foi confirmado).
-        group.MapPost("/subscription/onboard-select-plan", async (
-            OnboardSelectPlanRequest request, IDispatcher dispatcher, CancellationToken cancellationToken) =>
+        // Mapeados fora de "group" DE PROPOSITO (mesmo padrao do webhook da Asaas
+        // abaixo): "group" carrega .RequireAuthorization() default (scheme de
+        // tenant), e empilhar mais uma policy em cima exigiria os DOIS schemes
+        // passarem — o de onboarding nunca vai satisfazer o de tenant. Antes,
+        // estes dois endpoints eram anonimos e confiavam num TenantId so afirmado
+        // no corpo/query — qualquer um podia ativar a assinatura de qualquer
+        // tenant so adivinhando o Guid (BL-01, docs/BACKLOG.md). Agora exigem o
+        // token de onboarding emitido no registro (prova posse do tenant), e o
+        // TenantId usado e sempre o da claim validada — nunca o que o cliente manda.
+        endpoints.MapPost("/api/billing/subscription/onboard-select-plan", async (
+            OnboardSelectPlanRequest request, ClaimsPrincipal user, IDispatcher dispatcher, CancellationToken cancellationToken) =>
         {
-            var command = new OnboardSelectPlanCommand(request.TenantId, request.PlanId);
+            var tenantId = Guid.Parse(user.FindFirstValue(OnboardingAuthConstants.TenantIdClaimType)!);
+            var command = new OnboardSelectPlanCommand(tenantId, request.PlanId);
             var result = await dispatcher.Send(command, cancellationToken);
             return result.IsSuccess ? Results.Ok(result.Value) : result.Error.ToProblemResult();
         })
-        .AllowAnonymous()
+        .RequireAuthorization(OnboardingAuthConstants.AuthorizationPolicy)
+        .WithTags("Billing")
         .WithName("OnboardSelectPlan")
         .WithSummary("Escolhe o plano no onboarding — Free ativa direto, pago devolve o link do checkout Asaas.");
 
-        group.MapGet("/subscription/onboard-status", async (Guid tenantId, IDispatcher dispatcher, CancellationToken cancellationToken) =>
+        endpoints.MapGet("/api/billing/subscription/onboard-status", async (
+            ClaimsPrincipal user, IDispatcher dispatcher, CancellationToken cancellationToken) =>
         {
+            var tenantId = Guid.Parse(user.FindFirstValue(OnboardingAuthConstants.TenantIdClaimType)!);
             var result = await dispatcher.Query(new GetOnboardingSubscriptionStatusQuery(tenantId), cancellationToken);
             return result.IsSuccess ? Results.Ok(result.Value) : result.Error.ToProblemResult();
         })
-        .AllowAnonymous()
+        .RequireAuthorization(OnboardingAuthConstants.AuthorizationPolicy)
+        .WithTags("Billing")
         .WithName("GetOnboardingSubscriptionStatus")
         .WithSummary("Polling do onboarding: verifica se a assinatura ja esta ativa (Free ou pagamento confirmado).");
 
@@ -113,7 +141,7 @@ public sealed class BillingEndpoints : IEndpointModule
 
     private sealed record SubscribeRequest(Guid PlanId, string FullName, string CpfCnpj, string? Email);
 
-    private sealed record OnboardSelectPlanRequest(Guid TenantId, Guid PlanId);
+    private sealed record OnboardSelectPlanRequest(Guid PlanId);
 
     private sealed record AsaasWebhookPayload(string Event, AsaasWebhookPayment Payment);
 
