@@ -7,7 +7,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { toast } from "sonner";
 import Link from "next/link";
-import { Plus, Inbox, ListFilter, Receipt, Users } from "lucide-react";
+import { Plus, Inbox, ListFilter, Receipt, Users, AlertTriangle } from "lucide-react";
 
 import {
   listAccountsReceivable,
@@ -109,6 +109,7 @@ type CommissionFormValues = z.output<typeof commissionSchema>;
 
 export default function FinanceiroPage() {
   const { session } = useSession();
+  const [tab, setTab] = React.useState("resumo");
 
   if (!session) {
     return null;
@@ -120,7 +121,7 @@ export default function FinanceiroPage() {
         <p className="text-muted-foreground text-sm">Contas a pagar, a receber, comissoes e fluxo de caixa.</p>
       </div>
 
-      <Tabs defaultValue="resumo">
+      <Tabs value={tab} onValueChange={setTab}>
         <TabsList>
           <TabsTrigger value="resumo">Resumo</TabsTrigger>
           <TabsTrigger value="receber">Contas a Receber</TabsTrigger>
@@ -129,7 +130,7 @@ export default function FinanceiroPage() {
         </TabsList>
 
         <TabsContent value="resumo" className="mt-4">
-          <ResumoTab accessToken={session.accessToken} />
+          <ResumoTab accessToken={session.accessToken} onNavigateToPagar={() => setTab("pagar")} />
         </TabsContent>
         <TabsContent value="receber" className="mt-4">
           <ContasAReceberTab accessToken={session.accessToken} />
@@ -145,7 +146,7 @@ export default function FinanceiroPage() {
   );
 }
 
-function ResumoTab({ accessToken }: { accessToken: string }) {
+function ResumoTab({ accessToken, onNavigateToPagar }: { accessToken: string; onNavigateToPagar: () => void }) {
   const [from, setFrom] = React.useState(() => toDateOnly(startOfMonth(new Date())));
   const [to, setTo] = React.useState(() => toDateOnly(new Date()));
 
@@ -154,11 +155,38 @@ function ResumoTab({ accessToken }: { accessToken: string }) {
     queryFn: () => getCashFlowSummary({ from, to }, accessToken),
   });
 
+  // O Resumo so soma o que ja foi PAGO (fluxo de caixa realizado) — sem isso,
+  // uma despesa recem-lancada como "Pendente" nao aparece em lugar nenhum
+  // aqui, dando a falsa impressao de que o lancamento nao funcionou
+  // (confirmado ao vivo pela Persona C). BL-15, docs/BACKLOG.md.
+  const pendingPayablesQuery = useQuery({
+    queryKey: ["financeiro", "contas-a-pagar-pendentes"],
+    queryFn: () => listAccountsPayable({ status: "Pending", pageSize: 100 }, accessToken),
+  });
+
   const summary = summaryQuery.data;
+  const pendingItems = pendingPayablesQuery.data?.items ?? [];
+  const pendingTotal = pendingItems.reduce((sum, item) => sum + item.amount, 0);
 
   return (
     <div className="flex flex-col gap-4">
       <PeriodFilter from={from} to={to} onFromChange={setFrom} onToChange={setTo} />
+
+      {pendingItems.length > 0 && (
+        <div className="border-warning/50 bg-warning/10 flex items-center justify-between gap-3 rounded-lg border p-4 text-sm">
+          <div className="flex items-center gap-3">
+            <AlertTriangle className="text-warning size-5 shrink-0" aria-hidden="true" />
+            <p>
+              Voce tem <span className="font-medium">{formatCurrency(pendingTotal)}</span> em{" "}
+              {pendingItems.length === 1 ? "1 conta a pagar pendente" : `${pendingItems.length} contas a pagar pendentes`} —
+              esse valor ainda nao entra nas Saidas/Saldo abaixo (so contam contas ja pagas).
+            </p>
+          </div>
+          <Button variant="outline" size="sm" onClick={onNavigateToPagar} className="shrink-0">
+            Ver contas a pagar
+          </Button>
+        </div>
+      )}
 
       <div className="grid gap-4 sm:grid-cols-3">
         <Card>
@@ -318,7 +346,7 @@ function ContasAReceberTab({ accessToken }: { accessToken: string }) {
         </Table>
 
       <div className="flex items-center justify-between text-sm">
-        <span className="text-muted-foreground">
+        <span className="text-muted-foreground" aria-live="polite">
           Pagina {listQuery.data?.page ?? page} de {totalPages}
         </span>
         <div className="flex gap-2">
@@ -558,7 +586,7 @@ function ContasAPagarTab({ accessToken }: { accessToken: string }) {
         </Table>
 
       <div className="flex items-center justify-between text-sm">
-        <span className="text-muted-foreground">
+        <span className="text-muted-foreground" aria-live="polite">
           Pagina {listQuery.data?.page ?? page} de {totalPages}
         </span>
         <div className="flex gap-2">
