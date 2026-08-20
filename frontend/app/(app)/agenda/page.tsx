@@ -23,6 +23,7 @@ import {
   getAppointmentDeposit,
   listResources,
   listCustomers,
+  createCustomer,
   listServices,
   listUnits,
   ApiError,
@@ -43,10 +44,21 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Skeleton } from "@/components/ui/skeleton";
 import { EmptyState } from "@/components/ui/empty-state";
 
+// Sentinela pro item "+ Novo cliente" dentro do proprio Select de cliente do
+// modal de agendamento — nunca colide com um Id real (GUID). Cenario comum
+// de barbearia/salao: walk-in pedindo horario na hora, sem cliente cadastrado
+// ainda (BL-13, docs/BACKLOG.md).
+const NEW_CUSTOMER_VALUE = "__new_customer__";
+
 const DAY_START_HOUR = 7;
 const DAY_END_HOUR = 21;
 const SLOT_MINUTES = 30;
 const ROW_HEIGHT_PX = 32;
+// Alvo minimo de toque recomendado pelo WCAG 2.2 (criterio 2.5.8, AA) — sem
+// isso, um agendamento curto (ex. Sobrancelha, 15min) rendia um chip de
+// 16px de altura, abaixo do minimo, relevante pra uso em tablet/touch na
+// recepcao (BL-19, docs/BACKLOG.md).
+const MIN_CHIP_HEIGHT_PX = 24;
 const TOTAL_MINUTES = (DAY_END_HOUR - DAY_START_HOUR) * 60;
 const GRID_HEIGHT_PX = (TOTAL_MINUTES / SLOT_MINUTES) * ROW_HEIGHT_PX;
 
@@ -147,6 +159,14 @@ export default function AgendaPage() {
   const [reschedulingOpen, setReschedulingOpen] = React.useState(false);
   const [cancelingOpen, setCancelingOpen] = React.useState(false);
   const [draggingId, setDraggingId] = React.useState<string | null>(null);
+  // Drag-and-drop HTML5 nao tem equivalente em touch — em vez de oferecer um
+  // atalho que simplesmente nao faz nada (sem nenhum aviso) num tablet/celular,
+  // detecta o ponteiro grosseiro e desliga o "draggable" por completo: o toque
+  // continua abrindo o dialog de detalhe normalmente, que ja tem "Remarcar"
+  // 100% acessivel por clique/teclado/touch (BL-08, docs/BACKLOG.md).
+  const [isCoarsePointer] = React.useState(
+    () => typeof window !== "undefined" && window.matchMedia("(pointer: coarse)").matches
+  );
 
   const accessToken = session?.accessToken ?? "";
 
@@ -245,6 +265,35 @@ export default function AgendaPage() {
   const createForm = useForm<CreateAppointmentFormValues>({
     resolver: zodResolver(createAppointmentSchema),
     defaultValues: { customerId: "", serviceId: "", startAtLocal: "", notes: "" },
+  });
+
+  // Cadastro rapido de cliente sem sair do modal de agendamento — mesma
+  // funcao createCustomer que /clientes usa, so com os 2 campos que um
+  // walk-in/ligacao normalmente ja tem na hora (perfil completo continua
+  // editavel depois em Clientes). BL-13, docs/BACKLOG.md.
+  const [quickCustomerOpen, setQuickCustomerOpen] = React.useState(false);
+  const [quickCustomerName, setQuickCustomerName] = React.useState("");
+  const [quickCustomerPhone, setQuickCustomerPhone] = React.useState("");
+
+  const quickCreateCustomerMutation = useMutation({
+    mutationFn: () => createCustomer({ fullName: quickCustomerName.trim(), phone: quickCustomerPhone.trim() || null }, accessToken),
+    onSuccess: async (result) => {
+      toast.success("Cliente cadastrado.");
+      // Espera o refetch da lista TERMINAR E ASSENTAR antes de selecionar.
+      // Bug conhecido do Radix Select (via SelectBubbleInput, o <select>
+      // nativo espelhado por acessibilidade): setar o valor no MESMO instante
+      // em que a lista de itens muda faz o proprio componente reverter o
+      // campo pra vazio (o <select> nativo perde a opcao selecionada quando
+      // o DOM de <option> e recriado, e o Radix propaga esse reset de volta).
+      // Um instante extra depois do refetch resolver evita a corrida.
+      await queryClient.invalidateQueries({ queryKey: ["customers"] });
+      await new Promise((resolve) => setTimeout(resolve, 50));
+      createForm.setValue("customerId", result.id, { shouldValidate: true });
+      setQuickCustomerOpen(false);
+      setQuickCustomerName("");
+      setQuickCustomerPhone("");
+    },
+    onError: (error) => toast.error(error instanceof ApiError ? error.message : "Nao foi possivel cadastrar o cliente."),
   });
 
   const rescheduleForm = useForm<RescheduleFormValues>({
@@ -425,7 +474,7 @@ export default function AgendaPage() {
     const slotCount = TOTAL_MINUTES / SLOT_MINUTES;
 
     return (
-      <div className="overflow-x-auto rounded-lg">
+      <div className="scroll-shadow-x overflow-x-auto rounded-lg">
         <div className="grid" style={{ gridTemplateColumns: `4rem repeat(${columns.length}, minmax(9rem, 1fr))` }}>
           <div className="border-b border-r" />
           {columns.map((column) => (
@@ -481,19 +530,24 @@ export default function AgendaPage() {
                   const start = new Date(appointment.startUtc);
                   const end = new Date(appointment.endUtc);
                   const top = (minutesFromDayStart(start) / SLOT_MINUTES) * ROW_HEIGHT_PX;
-                  const height = Math.max(((end.getTime() - start.getTime()) / 60000 / SLOT_MINUTES) * ROW_HEIGHT_PX, ROW_HEIGHT_PX / 2);
+                  const height = Math.max(((end.getTime() - start.getTime()) / 60000 / SLOT_MINUTES) * ROW_HEIGHT_PX, MIN_CHIP_HEIGHT_PX);
 
                   return (
                     <button
                       key={appointment.id}
                       type="button"
-                      draggable={RESCHEDULABLE_STATUSES.includes(appointment.status)}
+                      draggable={!isCoarsePointer && RESCHEDULABLE_STATUSES.includes(appointment.status)}
                       onDragStart={() => setDraggingId(appointment.id)}
                       onDragEnd={() => setDraggingId(null)}
                       onClick={(event) => {
                         event.stopPropagation();
                         openDetailDialog(appointment.id);
                       }}
+                      title={
+                        !isCoarsePointer && RESCHEDULABLE_STATUSES.includes(appointment.status)
+                          ? "Arraste para remarcar rapido, ou clique para ver detalhes."
+                          : undefined
+                      }
                       className={`absolute inset-x-0.5 z-10 overflow-hidden rounded-md border p-1 text-left text-[11px] leading-tight shadow-sm ${CHIP_TONE[appointment.status]}`}
                       style={{ top, height }}
                     >
@@ -702,13 +756,19 @@ export default function AgendaPage() {
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Cliente</FormLabel>
-                    <Select value={field.value} onValueChange={field.onChange}>
+                    <Select
+                      value={field.value}
+                      onValueChange={(value) => (value === NEW_CUSTOMER_VALUE ? setQuickCustomerOpen(true) : field.onChange(value))}
+                    >
                       <FormControl>
                         <SelectTrigger className="w-full">
                           <SelectValue placeholder="Selecione um cliente" />
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
+                        <SelectItem value={NEW_CUSTOMER_VALUE} className="text-primary font-medium">
+                          + Novo cliente
+                        </SelectItem>
                         {(customersQuery.data?.items ?? []).map((customer) => (
                           <SelectItem key={customer.id} value={customer.id}>
                             {customer.fullName}
@@ -777,6 +837,55 @@ export default function AgendaPage() {
               </DialogFooter>
             </form>
           </Form>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={quickCustomerOpen} onOpenChange={setQuickCustomerOpen}>
+        <DialogContent className="sm:max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Novo cliente</DialogTitle>
+          </DialogHeader>
+          <form
+            className="flex flex-col gap-3"
+            onSubmit={(event) => {
+              event.preventDefault();
+              if (!quickCustomerName.trim()) {
+                toast.error("Informe o nome do cliente.");
+                return;
+              }
+              quickCreateCustomerMutation.mutate();
+            }}
+          >
+            <div>
+              <label htmlFor="quick-customer-name" className="mb-1 block text-sm font-medium">
+                Nome completo
+              </label>
+              <Input
+                id="quick-customer-name"
+                value={quickCustomerName}
+                onChange={(event) => setQuickCustomerName(event.target.value)}
+                autoFocus
+              />
+            </div>
+            <div>
+              <label htmlFor="quick-customer-phone" className="mb-1 block text-sm font-medium">
+                Telefone (opcional)
+              </label>
+              <Input
+                id="quick-customer-phone"
+                value={quickCustomerPhone}
+                onChange={(event) => setQuickCustomerPhone(event.target.value)}
+              />
+            </div>
+            <p className="text-muted-foreground text-xs">
+              Cadastro rapido — o perfil completo (e-mail, CPF, observacoes) pode ser preenchido depois em Clientes.
+            </p>
+            <DialogFooter>
+              <Button type="submit" disabled={quickCreateCustomerMutation.isPending}>
+                {quickCreateCustomerMutation.isPending ? "Cadastrando..." : "Cadastrar e selecionar"}
+              </Button>
+            </DialogFooter>
+          </form>
         </DialogContent>
       </Dialog>
 
