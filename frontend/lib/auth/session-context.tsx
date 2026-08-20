@@ -39,6 +39,29 @@ const SessionContext = React.createContext<SessionContextValue | null>(null);
 // CLAUDE.md) — a sessao nunca deveria cair por token expirado em uso normal.
 const REFRESH_MARGIN_MS = 60_000;
 
+// Singleton em nivel de modulo (nao estado de componente) de proposito: o
+// efeito de bootstrap (mount) e o de renovacao proativa (agendado por
+// setTimeout) podem disparar quase juntos — em especial o Strict Mode do
+// React re-executando o efeito de mount duas vezes em desenvolvimento, mas
+// tambem em producao se ambos correrem por qualquer motivo. Duas chamadas
+// concorrentes a /api/auth/refresh mandam o MESMO cookie de refresh token;
+// como o token e rotativo (reuso revoga a familia inteira, ver CLAUDE.md), a
+// segunda chamada e tratada como reuso do token que a primeira acabou de
+// consumir — derrubando a sessao que o proprio refresh deveria manter viva
+// (BL-10, docs/BACKLOG.md, confirmado ao vivo nos logs de rede desta sessao).
+// Compartilhar a MESMA promise entre chamadores concorrentes garante que
+// nunca existe mais de uma requisicao de refresh em voo por vez.
+let inFlightRefresh: ReturnType<typeof refreshAccessToken> | null = null;
+
+function refreshAccessTokenDeduped(): ReturnType<typeof refreshAccessToken> {
+  if (!inFlightRefresh) {
+    inFlightRefresh = refreshAccessToken().finally(() => {
+      inFlightRefresh = null;
+    });
+  }
+  return inFlightRefresh;
+}
+
 // O access token so existe em memoria (estado React) — nunca em localStorage
 // ou cookie legivel por JS. Por isso ao montar (inclui reload de pagina) a
 // sessao PRECISA ser reconstruida via /api/auth/refresh usando o cookie
@@ -55,7 +78,7 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
 
   React.useEffect(() => {
     let cancelled = false;
-    refreshAccessToken()
+    refreshAccessTokenDeduped()
       .then((tokens) => {
         if (!cancelled) applyTokens(tokens);
       })
@@ -79,7 +102,7 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
 
     const msUntilRefresh = Math.max(0, new Date(session.expiresAtUtc).getTime() - Date.now() - REFRESH_MARGIN_MS);
     const timer = setTimeout(() => {
-      refreshAccessToken()
+      refreshAccessTokenDeduped()
         .then(applyTokens)
         .catch(() => setSession(null));
     }, msUntilRefresh);
