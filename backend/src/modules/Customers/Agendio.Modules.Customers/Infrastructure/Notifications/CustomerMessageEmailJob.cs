@@ -23,6 +23,6 @@ public sealed class CustomerMessageEmailJob(IEmailSender emailSender, ILogger<Cu
             """;
 
         await emailSender.SendAsync(toEmail, subject, html, cancellationToken);
-        logger.LogInformation("Mensagem avulsa enviada para {Email} (tenant {TenantId}).", toEmail, tenantId);
+        logger.LogInformation("Mensagem avulsa enviada para {Email} (tenant {TenantId}).", PiiMasking.MaskEmail(toEmail), tenantId);
     }
 }

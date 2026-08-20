@@ -205,6 +205,11 @@ namespace Agendio.Modules.Customers.Infrastructure.Persistence.Migrations
                     b.HasKey("Id")
                         .HasName("pk_customers");
 
+                    b.HasIndex("TenantId", "Email")
+                        .IsUnique()
+                        .HasDatabaseName("ix_customers_tenant_id_email")
+                        .HasFilter("email IS NOT NULL AND is_deleted = false");
+
                     b.HasIndex("TenantId", "FullName")
                         .HasDatabaseName("ix_customers_tenant_id_full_name");
 
