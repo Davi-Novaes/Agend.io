@@ -378,7 +378,7 @@ export default function ServicesPage() {
           </Table>
 
           <div className="flex items-center justify-between text-sm">
-            <span className="text-muted-foreground">
+            <span className="text-muted-foreground" aria-live="polite">
               Pagina {servicesQuery.data?.page ?? page} de {totalPages}
             </span>
             <div className="flex gap-2">

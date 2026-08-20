@@ -17,6 +17,7 @@ import {
 import { useSession } from "@/lib/auth/session-context";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
@@ -164,15 +165,17 @@ export default function TeamSettingsPage() {
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>Papel</FormLabel>
-                      <FormControl>
-                        <select
-                          {...field}
-                          className="border-input bg-background flex h-9 rounded-md border px-3 text-sm shadow-xs outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
-                        >
-                          <option value="Staff">Equipe</option>
-                          <option value="Owner">Dono</option>
-                        </select>
-                      </FormControl>
+                      <Select value={field.value} onValueChange={field.onChange}>
+                        <FormControl>
+                          <SelectTrigger className="w-full">
+                            <SelectValue />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          <SelectItem value="Staff">Equipe</SelectItem>
+                          <SelectItem value="Owner">Dono</SelectItem>
+                        </SelectContent>
+                      </Select>
                     </FormItem>
                   )}
                 />

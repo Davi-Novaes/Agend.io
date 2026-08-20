@@ -425,7 +425,7 @@ function ProdutosTab({ accessToken }: { accessToken: string }) {
           </Table>
 
           <div className="flex items-center justify-between text-sm">
-            <span className="text-muted-foreground">
+            <span className="text-muted-foreground" aria-live="polite">
               Pagina {listQuery.data?.page ?? page} de {totalPages}
             </span>
             <div className="flex gap-2">
@@ -804,7 +804,7 @@ function MovimentacoesTab({ accessToken }: { accessToken: string }) {
           </Table>
 
           <div className="flex items-center justify-between text-sm">
-            <span className="text-muted-foreground">
+            <span className="text-muted-foreground" aria-live="polite">
               Pagina {movementsQuery.data?.page ?? page} de {totalPages}
             </span>
             <div className="flex gap-2">
