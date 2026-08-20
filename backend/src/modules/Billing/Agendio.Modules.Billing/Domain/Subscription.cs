@@ -57,13 +57,13 @@ public sealed class Subscription : AggregateRoot<SubscriptionId>, IAuditable
     public static Subscription StartTrial(TenantId tenantId, PlanId planId, DateTimeOffset nowUtc) =>
         new(tenantId, planId, nowUtc.AddDays(14));
 
+    // Sem guard de Status de proposito (alem do que o handler ja checa antes
+    // de chamar isto): Cancelada NAO e mais bloqueada aqui (BL-23/BL-33,
+    // docs/BACKLOG.md) — reassinar (Free ou pago) depois de cancelar e um
+    // fluxo valido que o proprio app oferece na tela de billing; o guard
+    // antigo rejeitava o submit sempre, mesmo com CPF/CNPJ corretos.
     public Result AttachAsaasCheckout(string asaasCustomerId, string asaasSubscriptionId)
     {
-        if (Status is SubscriptionStatus.Canceled)
-        {
-            return Result.Failure(Error.Validation("Subscription.AlreadyCanceled", "Esta assinatura ja foi cancelada."));
-        }
-
         AsaasCustomerId = asaasCustomerId;
         AsaasSubscriptionId = asaasSubscriptionId;
         return Result.Success();
@@ -83,11 +83,8 @@ public sealed class Subscription : AggregateRoot<SubscriptionId>, IAuditable
     /// </summary>
     public Result ActivateAsFree(PlanId freePlanId)
     {
-        if (Status is SubscriptionStatus.Canceled)
-        {
-            return Result.Failure(Error.Validation("Subscription.AlreadyCanceled", "Esta assinatura ja foi cancelada."));
-        }
-
+        // Cancelada NAO e mais bloqueada aqui de proposito — mesmo raciocinio
+        // de AttachAsaasCheckout (BL-23/BL-33, docs/BACKLOG.md).
         if (Status is SubscriptionStatus.Active)
         {
             return Result.Failure(Error.Conflict("Subscription.AlreadyActive", "Este estabelecimento ja tem uma assinatura ativa."));
