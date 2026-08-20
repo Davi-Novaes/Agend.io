@@ -50,6 +50,29 @@ public class CustomerTests(IntegrationTestFixture fixture)
     }
 
     [Fact]
+    public async Task Creating_A_Customer_With_An_Email_Already_Used_By_Another_Customer_Should_Be_Rejected()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var client = fixture.CreateClient();
+        var accessToken = await CreateTenantWithOwnerAndLoginAsync(client, cancellationToken);
+        var duplicateEmail = $"duplicado-{Guid.NewGuid():N}@example.com";
+
+        var firstResponse = await AuthorizedRequestHelpers.PostAuthorizedAsync(
+            client, accessToken, "/api/customers", new { fullName = "Primeiro Cliente", email = duplicateEmail }, cancellationToken);
+        firstResponse.StatusCode.ShouldBe(HttpStatusCode.Created);
+
+        // Simula duplo-clique/retry de rede: mesmo e-mail, mesmo tenant.
+        var secondResponse = await AuthorizedRequestHelpers.PostAuthorizedAsync(
+            client, accessToken, "/api/customers", new { fullName = "Segundo Cliente", email = duplicateEmail }, cancellationToken);
+        secondResponse.StatusCode.ShouldBe(HttpStatusCode.Conflict);
+
+        var listResponse = await AuthorizedRequestHelpers.GetAuthorizedAsync(
+            client, accessToken, "/api/customers?search=" + Uri.EscapeDataString("Cliente"), cancellationToken);
+        var listBody = await listResponse.Content.ReadFromJsonAsync<JsonElement>(cancellationToken);
+        listBody.GetProperty("totalCount").GetInt32().ShouldBe(1);
+    }
+
+    [Fact]
     public async Task A_Tenant_Should_Never_See_A_Customer_From_Another_Tenant()
     {
         var cancellationToken = TestContext.Current.CancellationToken;

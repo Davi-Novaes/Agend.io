@@ -53,6 +53,15 @@ public sealed class CustomerConfiguration : IEntityTypeConfiguration<Customer>
 
         builder.HasIndex(c => new { c.TenantId, c.FullName });
 
+        // Email e opcional (pet shop/servico sem contato por e-mail), mas
+        // quando presente nao pode duplicar dentro do tenant — fecha o
+        // gap de duplo-clique/retry criando 2 clientes identicos (BL-26,
+        // docs/BACKLOG.md). Ignora linhas com soft-delete pra nao bloquear
+        // recriar um cliente com o mesmo e-mail de um que foi excluido.
+        builder.HasIndex(c => new { c.TenantId, c.Email })
+            .IsUnique()
+            .HasFilter("email IS NOT NULL AND is_deleted = false");
+
         // Filtro de tenant + soft-delete fica no DbContext (ver AgendioDbContextBase).
     }
 }

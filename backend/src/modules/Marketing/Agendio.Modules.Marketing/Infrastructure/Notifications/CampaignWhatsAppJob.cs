@@ -21,7 +21,7 @@ public sealed class CampaignWhatsAppJob(ITenantLookupService tenantLookup, IWhat
         {
             logger.LogWarning(
                 "Campanha WhatsApp nao enviada para {Phone} (tenant {TenantId}): configuracao ausente ou desativada no momento do envio.",
-                toPhoneE164, tenantId);
+                PiiMasking.MaskPhone(toPhoneE164), tenantId);
             return;
         }
 
@@ -31,11 +31,11 @@ public sealed class CampaignWhatsAppJob(ITenantLookupService tenantLookup, IWhat
         try
         {
             await whatsAppSender.SendAsync(credentials, toPhoneE164, personalizedMessage, cancellationToken);
-            logger.LogInformation("Campanha WhatsApp enviada para {Phone} (tenant {TenantId}).", toPhoneE164, tenantId);
+            logger.LogInformation("Campanha WhatsApp enviada para {Phone} (tenant {TenantId}).", PiiMasking.MaskPhone(toPhoneE164), tenantId);
         }
         catch (Exception ex)
         {
-            logger.LogWarning(ex, "Falha ao enviar campanha WhatsApp para {Phone} (tenant {TenantId}).", toPhoneE164, tenantId);
+            logger.LogWarning(ex, "Falha ao enviar campanha WhatsApp para {Phone} (tenant {TenantId}).", PiiMasking.MaskPhone(toPhoneE164), tenantId);
         }
     }
 }

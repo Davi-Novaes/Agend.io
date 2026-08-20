@@ -2,6 +2,8 @@ using Agendio.Modules.Customers.Infrastructure.Persistence;
 using Agendio.SharedKernel.Messaging;
 using Agendio.SharedKernel.Multitenancy;
 using Agendio.SharedKernel.Results;
+using Microsoft.EntityFrameworkCore;
+using Npgsql;
 
 namespace Agendio.Modules.Customers.Application.CreateCustomer;
 
@@ -20,8 +22,24 @@ public sealed class CreateCustomerCommandHandler(CustomersDbContext dbContext, I
         }
 
         dbContext.Customers.Add(customerResult.Value);
-        await dbContext.SaveChangesAsync(cancellationToken);
+
+        try
+        {
+            await dbContext.SaveChangesAsync(cancellationToken);
+        }
+        catch (DbUpdateException ex) when (IsDuplicateEmail(ex))
+        {
+            // Constraint de unicidade (tenant_id, email) do banco e a defesa
+            // de verdade contra duplo-clique/retry criando 2 clientes
+            // identicos — este catch so traduz pra um erro legivel (BL-26,
+            // docs/BACKLOG.md), mesmo padrao de ScheduleAppointmentCommandHandler.
+            return Result.Failure<Guid>(
+                Error.Conflict("Customer.EmailTaken", "Ja existe um cliente com este e-mail."));
+        }
 
         return Result.Success(customerResult.Value.Id.Value);
     }
+
+    private static bool IsDuplicateEmail(DbUpdateException exception) =>
+        exception.InnerException is PostgresException { SqlState: PostgresErrorCodes.UniqueViolation };
 }

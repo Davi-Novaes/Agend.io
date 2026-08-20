@@ -28,6 +28,6 @@ public sealed class CampaignEmailJob(IEmailSender emailSender, ILogger<CampaignE
             """;
 
         await emailSender.SendAsync(toEmail, subject, html, cancellationToken);
-        logger.LogInformation("Campanha enviada para {Email} (tenant {TenantId}).", toEmail, tenantId);
+        logger.LogInformation("Campanha enviada para {Email} (tenant {TenantId}).", PiiMasking.MaskEmail(toEmail), tenantId);
     }
 }
