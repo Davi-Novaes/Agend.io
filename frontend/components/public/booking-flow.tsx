@@ -187,7 +187,16 @@ export function BookingFlow({
             Escolha um servico
           </h2>
           {servicesQuery.isLoading && <p className="text-muted-foreground text-sm">Carregando servicos...</p>}
-          {servicesQuery.data?.length === 0 && (
+          {servicesQuery.isError && (
+            <div className="border-destructive/50 bg-destructive/5 rounded-lg border p-4 text-sm">
+              <p className="text-destructive font-medium">Nao foi possivel carregar os servicos agora.</p>
+              <p className="text-muted-foreground mt-1">Tente novamente em instantes — pode ser uma falha temporaria, nao falta de cadastro.</p>
+              <Button type="button" variant="outline" size="sm" className="mt-3" onClick={() => servicesQuery.refetch()}>
+                Tentar novamente
+              </Button>
+            </div>
+          )}
+          {!servicesQuery.isError && servicesQuery.data?.length === 0 && (
             <p className="text-muted-foreground text-sm">Nenhum servico disponivel no momento.</p>
           )}
           <ul className="flex flex-col gap-2">
@@ -221,6 +230,16 @@ export function BookingFlow({
           <h2 id="step-resource-heading" className="mb-4 text-lg font-medium">
             Escolha o profissional
           </h2>
+          {resourcesQuery.isLoading && <p className="text-muted-foreground text-sm">Carregando profissionais...</p>}
+          {resourcesQuery.isError && (
+            <div className="border-destructive/50 bg-destructive/5 rounded-lg border p-4 text-sm">
+              <p className="text-destructive font-medium">Nao foi possivel carregar os profissionais agora.</p>
+              <p className="text-muted-foreground mt-1">Tente novamente em instantes.</p>
+              <Button type="button" variant="outline" size="sm" className="mt-3" onClick={() => resourcesQuery.refetch()}>
+                Tentar novamente
+              </Button>
+            </div>
+          )}
           <ul className="flex flex-col gap-2">
             {(resourcesQuery.data ?? []).map((resource) => (
               <li key={resource.id}>
@@ -269,6 +288,15 @@ export function BookingFlow({
           />
 
           {slotsQuery.isLoading && <p className="text-muted-foreground text-sm">Carregando horarios...</p>}
+          {slotsQuery.isError && (
+            <div className="border-destructive/50 bg-destructive/5 rounded-lg border p-4 text-sm">
+              <p className="text-destructive font-medium">Nao foi possivel carregar os horarios agora.</p>
+              <p className="text-muted-foreground mt-1">Tente novamente em instantes — pode ser uma falha temporaria, nao falta de horario.</p>
+              <Button type="button" variant="outline" size="sm" className="mt-3" onClick={() => slotsQuery.refetch()}>
+                Tentar novamente
+              </Button>
+            </div>
+          )}
           {slotsQuery.data && slotsQuery.data.length > 0 && (
             <div className="grid grid-cols-3 gap-2 sm:grid-cols-4">
               {slotsQuery.data.map((slot) => (
