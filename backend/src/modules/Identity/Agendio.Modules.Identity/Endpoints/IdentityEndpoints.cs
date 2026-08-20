@@ -40,7 +40,12 @@ public sealed class IdentityEndpoints : IEndpointModule
             var result = await dispatcher.Send(command, cancellationToken);
 
             return result.IsSuccess
-                ? Results.Created($"/api/tenants/{request.TenantId}", new { id = result.Value })
+                ? Results.Created($"/api/tenants/{request.TenantId}", new
+                {
+                    id = result.Value.UserId,
+                    onboardingToken = result.Value.OnboardingToken,
+                    onboardingTokenExpiresAtUtc = result.Value.OnboardingTokenExpiresAtUtc,
+                })
                 : result.Error.ToProblemResult();
         })
         .AllowAnonymous()

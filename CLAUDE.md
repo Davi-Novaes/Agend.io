@@ -39,11 +39,21 @@ Quebrar qualquer uma dessas quebra o build. É intencional.
 
 ## Multi-tenancy — defesa em profundidade
 
-Três camadas independentes. Nunca remova uma "porque a outra já cobre".
+Duas camadas independentes, verificadas por teste de isolamento cruzado real (não só leitura de
+código). Nunca remova uma "porque a outra já cobre".
 
-1. Resolução do tenant (subdomínio/slug + claim `tenant_id` no JWT; divergência = 403).
-2. Global query filter do EF Core.
-3. Row Level Security no PostgreSQL — a aplicação conecta com role **sem `BYPASSRLS`**.
+1. Global query filter do EF Core, por `TenantId` resolvido da claim `tenant_id` do JWT (ver
+   `HttpTenantContext`).
+2. Row Level Security no PostgreSQL — a aplicação conecta com role **sem `BYPASSRLS`**.
+
+> Uma auditoria de segurança (2026-08, ver `docs/BACKEND_AUDIT.md` achado P1-2 e
+> `docs/BACKLOG.md` BL-06) encontrou uma "Camada 1" documentada aqui anteriormente — resolução de
+> tenant por subdomínio/slug com checagem de divergência contra o JWT — que **nunca existia no
+> código**. A arquitetura real de resolução de tenant é: o cliente informa o tenant explicitamente
+> (slug/Guid) no login/cadastro, e daí em diante todo acesso autenticado usa só a claim `tenant_id`
+> do JWT — não há roteamento por subdomínio em nenhuma camada (a página pública usa path, `/slug`,
+> não subdomínio). Se subdomínio-por-tenant for implementado no futuro, documentar aqui só depois
+> do middleware existir de verdade — não descrever proteção que não está implementada.
 
 **Toda** feature nova que toca dados de tenant precisa de um teste de isolamento cruzado.
 

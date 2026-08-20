@@ -15,9 +15,13 @@ namespace Agendio.Infrastructure.Multitenancy;
 /// construtor do DbContext) — SetTenant pode ser chamado DEPOIS do DbContext
 /// already ter sido resolvido pelo DI, e o filtro precisa refletir isso.
 ///
-/// TenantMiddleware (Agendio.Api) roda antes de qualquer endpoint autenticado e
-/// confere que o tenant do JWT bate com o tenant da rota (subdominio/slug) —
-/// esta classe so LE o que o middleware ja validou, nunca decide sozinha.
+/// Resolucao de tenant hoje e SO pela claim do JWT — nao existe middleware de
+/// subdominio/slug conferindo divergencia contra a rota (ver BL-06 em
+/// docs/BACKLOG.md, que corrigiu a documentacao do CLAUDE.md pra refletir
+/// isso). As duas camadas que seguram isolamento de verdade sao o Global
+/// Query Filter do EF Core (abaixo desta classe) e a Row Level Security do
+/// Postgres — confirmado por testes de isolamento cruzado, nao so por leitura
+/// de codigo.
 /// </summary>
 public sealed class HttpTenantContext(IHttpContextAccessor httpContextAccessor) : ITenantContext
 {

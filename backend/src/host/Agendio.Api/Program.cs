@@ -23,6 +23,7 @@ using Agendio.Modules.Scheduling.DependencyInjection;
 using Agendio.Modules.Tenancy.DependencyInjection;
 using Hangfire;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.Extensions.FileProviders;
@@ -95,6 +96,12 @@ try
         ?? throw new InvalidOperationException("Secao 'Jwt' nao configurada em appsettings.");
     var platformJwtOptions = builder.Configuration.GetSection(PlatformJwtOptions.SectionName).Get<PlatformJwtOptions>()
         ?? throw new InvalidOperationException("Secao 'PlatformJwt' nao configurada em appsettings.");
+    // Terceira autoridade JWT, tao isolada das outras duas quanto elas sao entre
+    // si: prova posse do tenant recem-criado no onboarding (antes do e-mail ser
+    // confirmado, antes de existir sessao de tenant) sem exigir que o cliente so
+    // "diga" um TenantId no corpo — ver BL-01 em docs/BACKLOG.md.
+    var onboardingJwtOptions = builder.Configuration.GetSection(OnboardingJwtOptions.SectionName).Get<OnboardingJwtOptions>()
+        ?? throw new InvalidOperationException("Secao 'OnboardingJwt' nao configurada em appsettings.");
 
     builder.Services
         .AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
@@ -117,14 +124,42 @@ try
                 IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(platformJwtOptions.SigningKey)),
                 ClockSkew = TimeSpan.FromSeconds(30),
             };
+        })
+        .AddJwtBearer(OnboardingAuthConstants.AuthenticationScheme, options =>
+        {
+            options.TokenValidationParameters = new TokenValidationParameters
+            {
+                ValidIssuer = onboardingJwtOptions.Issuer,
+                ValidAudience = onboardingJwtOptions.Audience,
+                IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(onboardingJwtOptions.SigningKey)),
+                ClockSkew = TimeSpan.FromSeconds(30),
+            };
         });
 
     builder.Services.AddAuthorization(options =>
     {
+        // Todo token de tenant emitido de verdade (login/refresh/MFA) sempre
+        // carrega tenant_id — ver AuthTokenIssuer.BuildClaims. Exigir a claim
+        // aqui, na policy default usada por todo ".RequireAuthorization()" sem
+        // nome explicito, fecha um token forjado/manualmente montado (assinatura
+        // valida, mas sem essa claim) direto num 401 limpo na camada de
+        // autorizacao — em vez de deixar a requisicao chegar no handler e
+        // estourar HttpTenantContext.TenantId (500 cru em escrita, 200 vazio
+        // mascarando o problema em leitura). Ver BL-05, docs/BACKLOG.md.
+        options.DefaultPolicy = new AuthorizationPolicyBuilder()
+            .RequireAuthenticatedUser()
+            .RequireClaim(HttpTenantContext.TenantIdClaimType)
+            .Build();
+
         options.AddPolicy(PlatformAuthConstants.AuthorizationPolicy, policy => policy
             .AddAuthenticationSchemes(PlatformAuthConstants.AuthenticationScheme)
             .RequireAuthenticatedUser()
             .RequireClaim(PlatformAuthConstants.ScopeClaimType, PlatformAuthConstants.PlatformScopeValue));
+
+        options.AddPolicy(OnboardingAuthConstants.AuthorizationPolicy, policy => policy
+            .AddAuthenticationSchemes(OnboardingAuthConstants.AuthenticationScheme)
+            .RequireAuthenticatedUser()
+            .RequireClaim(OnboardingAuthConstants.TenantIdClaimType));
     });
 
     // ---------- Rate limiting ----------
@@ -216,6 +251,13 @@ try
     builder.Services.ConfigureHttpJsonOptions(options =>
         options.SerializerOptions.Converters.Add(new JsonStringEnumConverter()));
 
+    // ---------- Tratamento global de excecao ----------
+    // Ver GlobalExceptionHandler.cs — sem isto, excecao nao tratada vazava
+    // stack trace/headers (Bearer token incluso) em Development e virava 500
+    // cru e inconsistente em produção (BL-05, docs/BACKLOG.md).
+    builder.Services.AddExceptionHandler<GlobalExceptionHandler>();
+    builder.Services.AddProblemDetails();
+
     // ---------- OpenAPI ----------
     builder.Services.AddOpenApi();
 
@@ -270,6 +312,14 @@ try
     {
         await Agendio.Modules.Platform.Seeding.PlatformAdminDevSeeder.SeedAsync(app.Services, app.Configuration);
     }
+
+    // Primeiro middleware de proposito — precisa envolver TUDo que vem depois
+    // para capturar qualquer excecao nao tratada, em qualquer ambiente. Sem
+    // isto explicito, o ASP.NET Core insere a Developer Exception Page
+    // automaticamente quando ASPNETCORE_ENVIRONMENT=Development, que e
+    // exatamente a pagina que vazava stack trace/headers (ver
+    // GlobalExceptionHandler.cs, BL-05 em docs/BACKLOG.md).
+    app.UseExceptionHandler();
 
     app.UseSerilogRequestLogging();
 

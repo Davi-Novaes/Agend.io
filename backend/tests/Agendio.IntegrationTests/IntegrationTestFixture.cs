@@ -213,6 +213,9 @@ public sealed class IntegrationTestFixture : WebApplicationFactory<Program>, IAs
         builder.UseSetting("PlatformJwt:Issuer", "https://agendio.test/platform");
         builder.UseSetting("PlatformJwt:Audience", "agendio-platform-tests");
         builder.UseSetting("PlatformJwt:SigningKey", "integration-test-platform-signing-key-min-32-bytes!!");
+        builder.UseSetting("OnboardingJwt:Issuer", "https://agendio.test/onboarding");
+        builder.UseSetting("OnboardingJwt:Audience", "agendio-onboarding-tests");
+        builder.UseSetting("OnboardingJwt:SigningKey", "integration-test-onboarding-signing-key-min-32-bytes!!");
         builder.UseSetting("ColumnEncryption:Key", "aW50ZWdyYXRpb24tdGVzdC1jb2wta2V5LTMyYnl0ZXM=");
         builder.UseSetting("Cors:AllowedOrigins:0", "http://localhost");
 
