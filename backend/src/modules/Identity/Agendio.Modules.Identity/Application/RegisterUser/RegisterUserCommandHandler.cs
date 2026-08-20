@@ -1,3 +1,4 @@
+using System.Security.Claims;
 using Agendio.Infrastructure.Security;
 using Agendio.Modules.Identity.Domain;
 using Agendio.Modules.Identity.Infrastructure.Notifications;
@@ -16,22 +17,23 @@ public sealed class RegisterUserCommandHandler(
     IdentityDbContext dbContext,
     ITenantLookupService tenantLookupService,
     IPasswordHasher passwordHasher,
-    IBackgroundJobClient jobClient) : ICommandHandler<RegisterUserCommand, Guid>
+    IBackgroundJobClient jobClient,
+    IOnboardingJwtTokenService onboardingJwtTokenService) : ICommandHandler<RegisterUserCommand, RegisterUserResult>
 {
-    public async Task<Result<Guid>> Handle(RegisterUserCommand request, CancellationToken cancellationToken)
+    public async Task<Result<RegisterUserResult>> Handle(RegisterUserCommand request, CancellationToken cancellationToken)
     {
         var tenantId = TenantId.From(request.TenantId);
 
         var tenant = await tenantLookupService.FindByIdAsync(tenantId, cancellationToken);
         if (tenant is null || !tenant.IsActive)
         {
-            return Result.Failure<Guid>(Error.NotFound("Tenant.NotFound", "Estabelecimento nao encontrado ou inativo."));
+            return Result.Failure<RegisterUserResult>(Error.NotFound("Tenant.NotFound", "Estabelecimento nao encontrado ou inativo."));
         }
 
         var emailResult = Email.Create(request.Email);
         if (emailResult.IsFailure)
         {
-            return Result.Failure<Guid>(emailResult.Error);
+            return Result.Failure<RegisterUserResult>(emailResult.Error);
         }
 
         // ExplicitTenantBehavior ja ancorou o tenant no ITenantContext antes deste
@@ -39,7 +41,7 @@ public sealed class RegisterUserCommandHandler(
         var emailTaken = await dbContext.Users.AnyAsync(u => u.Email == emailResult.Value, cancellationToken);
         if (emailTaken)
         {
-            return Result.Failure<Guid>(Error.Conflict("User.EmailTaken", "Ja existe uma conta com este e-mail neste estabelecimento."));
+            return Result.Failure<RegisterUserResult>(Error.Conflict("User.EmailTaken", "Ja existe uma conta com este e-mail neste estabelecimento."));
         }
 
         var passwordHash = passwordHasher.Hash(request.Password);
@@ -47,7 +49,7 @@ public sealed class RegisterUserCommandHandler(
         var userResult = User.Register(tenantId, emailResult.Value, request.FullName, passwordHash);
         if (userResult.IsFailure)
         {
-            return Result.Failure<Guid>(userResult.Error);
+            return Result.Failure<RegisterUserResult>(userResult.Error);
         }
 
         dbContext.Users.Add(userResult.Value);
@@ -60,6 +62,17 @@ public sealed class RegisterUserCommandHandler(
         var userId = userResult.Value.Id.Value;
         jobClient.Enqueue<EmailConfirmationJobs>(job => job.SendConfirmationEmailAsync(tenantId.Value, userId, CancellationToken.None));
 
-        return Result.Success(userId);
+        // Prova posse do tenant recem-criado pro restante do onboarding (escolha
+        // de plano) — substitui o antigo "TenantId so afirmado no corpo" que
+        // deixava o endpoint de billing anonimo ativar assinatura de qualquer
+        // tenant (BL-01, docs/BACKLOG.md).
+        var onboardingClaims = new[]
+        {
+            new Claim(ClaimTypes.NameIdentifier, userId.ToString()),
+            new Claim(OnboardingAuthConstants.TenantIdClaimType, tenantId.Value.ToString()),
+        };
+        var (onboardingToken, onboardingTokenExpiresAtUtc) = onboardingJwtTokenService.GenerateAccessToken(onboardingClaims);
+
+        return Result.Success(new RegisterUserResult(userId, onboardingToken, onboardingTokenExpiresAtUtc));
     }
 }

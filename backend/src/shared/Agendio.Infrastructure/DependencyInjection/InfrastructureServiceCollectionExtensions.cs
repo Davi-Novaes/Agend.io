@@ -42,6 +42,9 @@ public static class InfrastructureServiceCollectionExtensions
         services.Configure<PlatformJwtOptions>(configuration.GetSection(PlatformJwtOptions.SectionName));
         services.AddSingleton<IPlatformJwtTokenService, PlatformJwtTokenService>();
 
+        services.Configure<OnboardingJwtOptions>(configuration.GetSection(OnboardingJwtOptions.SectionName));
+        services.AddSingleton<IOnboardingJwtTokenService, OnboardingJwtTokenService>();
+
         services.Configure<ColumnEncryptionOptions>(configuration.GetSection(ColumnEncryptionOptions.SectionName));
         services.AddSingleton<IEncryptionService, AesGcmEncryptionService>();
 
