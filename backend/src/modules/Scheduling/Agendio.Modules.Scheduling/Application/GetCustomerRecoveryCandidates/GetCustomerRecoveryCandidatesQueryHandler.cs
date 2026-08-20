@@ -73,11 +73,14 @@ public sealed class GetCustomerRecoveryCandidatesQueryHandler(
             }
         }
 
+        // Busca em lote (uma query) em vez de uma por candidato — BL-20, docs/BACKLOG.md.
+        var customersById = (await customerLookup.FindByIdsAsync(overdueByCustomerId.Keys, cancellationToken))
+            .ToDictionary(c => c.CustomerId);
+
         var results = new List<CustomerRecoveryCandidate>();
         foreach (var (customerId, stats) in overdueByCustomerId.OrderByDescending(kv => kv.Value.DaysOverdue))
         {
-            var customer = await customerLookup.FindByIdAsync(customerId, cancellationToken);
-            if (customer is null || !customer.IsActive)
+            if (!customersById.TryGetValue(customerId, out var customer) || !customer.IsActive)
             {
                 continue;
             }
