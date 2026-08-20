@@ -11,6 +11,7 @@ import { Armchair, Briefcase, CalendarOff, Clock, Plus, Search, Trash2 } from "l
 import {
   listResources,
   getResourceById,
+  getTenantProfile,
   createResource,
   updateResource,
   setResourceActiveStatus,
@@ -29,6 +30,7 @@ import {
   type ResourceType,
   type DayOfWeekName,
   type TimeOffSummary,
+  type WorkingHourEntry,
 } from "@/lib/api/client";
 import { useSession } from "@/lib/auth/session-context";
 import { Button } from "@/components/ui/button";
@@ -121,6 +123,17 @@ function toApiTimeValue(time: string): string {
   return time.length === 5 ? `${time}:00` : time;
 }
 
+// Sem isso, um recurso novo nao tem NENHUM horario de trabalho e a pagina
+// publica de agendamento mostra "nenhum horario disponivel" pra sempre, ate o
+// dono descobrir a tela separada de "Horarios" — trava silenciosa real,
+// confirmada ao vivo pela Persona A da auditoria (BL-09, docs/BACKLOG.md).
+// Segunda a sabado, comercial, editavel a qualquer momento no mesmo dialog
+// que ja existe — nao inventa uma feature nova, so preenche o que ja tinha
+// que ser preenchido manualmente.
+const DEFAULT_WORKING_HOURS: WorkingHourEntry[] = (
+  ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"] as const
+).map((dayOfWeek) => ({ dayOfWeek, startTime: "09:00:00", endTime: "18:00:00" }));
+
 export default function ResourcesPage() {
   const { session } = useSession();
   const queryClient = useQueryClient();
@@ -154,6 +167,17 @@ export default function ResourcesPage() {
     enabled: Boolean(session),
     placeholderData: (previous) => previous,
   });
+
+  // Onboarding promete que "Profissional" vira o termo do segmento (ex.
+  // "Barbeiro" numa barbearia) — sem isso a pagina ficava rotulada
+  // genericamente "Recursos" mesmo quando o resto do produto ja fala a
+  // lingua do segmento (BL-14, docs/BACKLOG.md).
+  const profileQuery = useQuery({
+    queryKey: ["tenant-profile"],
+    queryFn: () => getTenantProfile(accessToken),
+    enabled: Boolean(session),
+  });
+  const staffLabel = profileQuery.data?.terminology.staff ?? "Recurso";
 
   const unitsQuery = useQuery({
     queryKey: ["units"],
@@ -199,7 +223,15 @@ export default function ResourcesPage() {
         },
         accessToken
       ),
-    onSuccess: () => {
+    onSuccess: async (result) => {
+      // Falha ao pre-preencher o horario nao pode travar o cadastro em si —
+      // o recurso ja foi criado com sucesso; o dono sempre pode configurar
+      // manualmente depois em "Horarios" se isso aqui nao completar.
+      try {
+        await setResourceWorkingHours(result.id, DEFAULT_WORKING_HOURS, accessToken);
+      } catch {
+        toast.error("Recurso cadastrado, mas nao foi possivel pre-preencher o horario padrao. Configure em \"Horarios\".");
+      }
       toast.success("Recurso cadastrado.");
       invalidateList();
       setDialogOpen(false);
@@ -432,7 +464,7 @@ export default function ResourcesPage() {
         <p className="text-muted-foreground text-sm">Pessoas, salas e equipamentos que a agenda reserva.</p>
         <Button onClick={openCreateDialog}>
           <Plus className="size-4" />
-          Novo recurso
+          Novo {staffLabel}
         </Button>
       </div>
 
@@ -490,7 +522,7 @@ export default function ResourcesPage() {
                     {search ? (
                       <EmptyState
                         icon={Search}
-                        title={`Nenhum recurso encontrado para "${search}"`}
+                        title={`Nenhum ${staffLabel.toLowerCase()} encontrado para "${search}"`}
                         description="Tente ajustar os termos da busca ou limpe o filtro."
                         action={
                           <Button
@@ -509,12 +541,12 @@ export default function ResourcesPage() {
                     ) : (
                       <EmptyState
                         icon={Armchair}
-                        title="Nenhum recurso cadastrado ainda"
+                        title={`Nenhum ${staffLabel.toLowerCase()} cadastrado ainda`}
                         description="Cadastre pessoas, salas ou equipamentos que a agenda vai reservar."
                         action={
                           <Button size="sm" onClick={openCreateDialog}>
                             <Plus className="size-4" />
-                            Novo recurso
+                            Novo {staffLabel}
                           </Button>
                         }
                       />
@@ -586,7 +618,7 @@ export default function ResourcesPage() {
           </Table>
 
           <div className="flex items-center justify-between text-sm">
-            <span className="text-muted-foreground">
+            <span className="text-muted-foreground" aria-live="polite">
               Pagina {resourcesQuery.data?.page ?? page} de {totalPages}
             </span>
             <div className="flex gap-2">
@@ -604,7 +636,7 @@ export default function ResourcesPage() {
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle>{editingResource ? "Editar recurso" : "Novo recurso"}</DialogTitle>
+            <DialogTitle>{editingResource ? `Editar ${staffLabel}` : `Novo ${staffLabel}`}</DialogTitle>
           </DialogHeader>
           <Form {...form}>
             <form

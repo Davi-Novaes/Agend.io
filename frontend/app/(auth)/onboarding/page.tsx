@@ -23,6 +23,7 @@ import {
 import { Logo } from "@/components/logo";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import {
   Form,
   FormControl,
@@ -84,14 +85,17 @@ export default function OnboardingPage() {
   // e-mail confirmado). So chega la depois do passo de plano (abaixo).
   const [registered, setRegistered] = React.useState<{ tenantId: string; email: string } | null>(null);
   // Conta criada, mas plano ainda nao escolhido — controla a tela "Escolha
-  // seu plano" (passo final, depois de conta, ver Fase 24).
-  const [accountCreated, setAccountCreated] = React.useState<{ tenantId: string; email: string } | null>(null);
+  // seu plano" (passo final, depois de conta, ver Fase 24). onboardingToken
+  // prova posse do tenant nas chamadas de billing abaixo (BL-01).
+  const [accountCreated, setAccountCreated] = React.useState<{ tenantId: string; email: string; onboardingToken: string } | null>(
+    null
+  );
   const [isSelectingPlan, setIsSelectingPlan] = React.useState(false);
   // Plano pago escolhido: aba de checkout aberta, aguardando confirmacao via
   // polling (nao pelo redirect da Asaas, que nao funciona em localhost).
-  const [pendingCheckout, setPendingCheckout] = React.useState<{ tenantId: string; email: string; checkoutLink: string } | null>(
-    null
-  );
+  const [pendingCheckout, setPendingCheckout] = React.useState<
+    { tenantId: string; email: string; checkoutLink: string; onboardingToken: string } | null
+  >(null);
 
   const businessTypesQuery = useQuery({
     queryKey: ["business-types"],
@@ -106,7 +110,7 @@ export default function OnboardingPage() {
 
   const subscriptionStatusQuery = useQuery({
     queryKey: ["onboarding-subscription-status", pendingCheckout?.tenantId],
-    queryFn: () => getOnboardingSubscriptionStatus(pendingCheckout!.tenantId),
+    queryFn: () => getOnboardingSubscriptionStatus(pendingCheckout!.onboardingToken),
     enabled: pendingCheckout !== null,
     refetchInterval: 3000,
   });
@@ -171,14 +175,14 @@ export default function OnboardingPage() {
         timeZoneId: values.timeZoneId,
       });
 
-      await registerUser({
+      const registered = await registerUser({
         tenantId: tenant.id,
         email: values.ownerEmail,
         password: values.ownerPassword,
         fullName: values.ownerFullName,
       });
 
-      setAccountCreated({ tenantId: tenant.id, email: values.ownerEmail });
+      setAccountCreated({ tenantId: tenant.id, email: values.ownerEmail, onboardingToken: registered.onboardingToken });
     } catch (error) {
       if (error instanceof ApiError && error.status === 409) {
         form.setError("slug", { message: "Este identificador ja esta em uso." });
@@ -200,12 +204,17 @@ export default function OnboardingPage() {
     }
     setIsSelectingPlan(true);
     try {
-      const result = await onboardSelectPlan({ tenantId: accountCreated.tenantId, planId: plan.id });
+      const result = await onboardSelectPlan({ planId: plan.id }, accountCreated.onboardingToken);
       if (result.requiresPayment && result.checkoutLink) {
         window.open(result.checkoutLink, "_blank", "noopener,noreferrer");
-        setPendingCheckout({ tenantId: accountCreated.tenantId, email: accountCreated.email, checkoutLink: result.checkoutLink });
+        setPendingCheckout({
+          tenantId: accountCreated.tenantId,
+          email: accountCreated.email,
+          checkoutLink: result.checkoutLink,
+          onboardingToken: accountCreated.onboardingToken,
+        });
       } else {
-        setRegistered(accountCreated);
+        setRegistered({ tenantId: accountCreated.tenantId, email: accountCreated.email });
       }
     } catch (error) {
       const message = error instanceof ApiError ? error.message : "Nao foi possivel selecionar o plano. Tente novamente.";
@@ -418,18 +427,20 @@ export default function OnboardingPage() {
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>Fuso horario</FormLabel>
-                      <FormControl>
-                        <select
-                          {...field}
-                          className="border-input bg-background flex h-9 w-full rounded-md border px-3 text-sm shadow-xs outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
-                        >
+                      <Select value={field.value} onValueChange={field.onChange}>
+                        <FormControl>
+                          <SelectTrigger className="w-full">
+                            <SelectValue />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
                           {[...new Set([field.value, ...COMMON_TIME_ZONES])].map((tz) => (
-                            <option key={tz} value={tz}>
+                            <SelectItem key={tz} value={tz}>
                               {tz}
-                            </option>
+                            </SelectItem>
                           ))}
-                        </select>
-                      </FormControl>
+                        </SelectContent>
+                      </Select>
                       <FormMessage />
                     </FormItem>
                   )}

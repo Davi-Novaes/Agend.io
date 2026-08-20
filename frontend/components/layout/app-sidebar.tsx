@@ -2,10 +2,13 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useQuery } from "@tanstack/react-query";
 import { Bot } from "lucide-react";
 
 import { Logo } from "@/components/logo";
-import { NAV_GROUPS } from "@/components/layout/nav-config";
+import { NAV_GROUPS, resolveNavLabel } from "@/components/layout/nav-config";
+import { getTenantProfile } from "@/lib/api/client";
+import { useSession } from "@/lib/auth/session-context";
 import {
   Sidebar,
   SidebarContent,
@@ -27,6 +30,13 @@ const ASSISTANT_HREF = "/assistente";
 
 export function AppSidebar() {
   const pathname = usePathname();
+  const { session } = useSession();
+  const profileQuery = useQuery({
+    queryKey: ["tenant-profile"],
+    queryFn: () => getTenantProfile(session!.accessToken),
+    enabled: Boolean(session),
+  });
+  const staffPlural = profileQuery.data?.terminology.staffPlural;
 
   return (
     <Sidebar collapsible="icon">
@@ -46,21 +56,24 @@ export function AppSidebar() {
               <SidebarGroupLabel>{group.label}</SidebarGroupLabel>
               <SidebarGroupContent>
                 <SidebarMenu>
-                  {items.map((item) => (
-                    <SidebarMenuItem key={item.href}>
-                      <SidebarMenuButton
-                        asChild
-                        isActive={pathname === item.href}
-                        tooltip={item.label}
-                        className="data-active:bg-primary data-active:text-primary-foreground data-active:hover:bg-primary data-active:hover:text-primary-foreground"
-                      >
-                        <Link href={item.href}>
-                          <item.icon />
-                          <span>{item.label}</span>
-                        </Link>
-                      </SidebarMenuButton>
-                    </SidebarMenuItem>
-                  ))}
+                  {items.map((item) => {
+                    const label = resolveNavLabel(item.href, item.label, staffPlural);
+                    return (
+                      <SidebarMenuItem key={item.href}>
+                        <SidebarMenuButton
+                          asChild
+                          isActive={pathname === item.href}
+                          tooltip={label}
+                          className="data-active:bg-primary data-active:text-primary-foreground data-active:hover:bg-primary data-active:hover:text-primary-foreground"
+                        >
+                          <Link href={item.href}>
+                            <item.icon />
+                            <span>{label}</span>
+                          </Link>
+                        </SidebarMenuButton>
+                      </SidebarMenuItem>
+                    );
+                  })}
                 </SidebarMenu>
               </SidebarGroupContent>
             </SidebarGroup>

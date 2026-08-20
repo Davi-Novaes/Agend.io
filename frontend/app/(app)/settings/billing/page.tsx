@@ -12,6 +12,7 @@ import {
   getMySubscription,
   subscribeToPlan,
   cancelSubscription,
+  activateFreePlan,
   ApiError,
 } from "@/lib/api/client";
 import { useSession } from "@/lib/auth/session-context";
@@ -21,6 +22,16 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 const subscribeSchema = z.object({
   fullName: z.string().min(1, "Informe o nome."),
@@ -51,6 +62,10 @@ function daysUntil(isoDate: string): number {
 export default function BillingSettingsPage() {
   const { session } = useSession();
   const queryClient = useQueryClient();
+  // Cancelamento de assinatura paga e destrutivo (receita perdida, sem
+  // desfazer) — precisa do mesmo AlertDialog de confirmacao ja usado no
+  // Financeiro para acoes equivalentes (BL-02, docs/BACKLOG.md).
+  const [confirmingCancel, setConfirmingCancel] = React.useState(false);
 
   const accessToken = session?.accessToken ?? "";
 
@@ -98,6 +113,7 @@ export default function BillingSettingsPage() {
     mutationFn: () => cancelSubscription(accessToken),
     onSuccess: () => {
       toast.success("Assinatura cancelada.");
+      setConfirmingCancel(false);
       queryClient.invalidateQueries({ queryKey: ["billing", "subscription"] });
     },
     onError: (error: unknown) => {
@@ -105,8 +121,24 @@ export default function BillingSettingsPage() {
     },
   });
 
+  // Plano Free nao pode passar pelo formulario de plano pago (CPF/CNPJ +
+  // texto de pagamento nao fazem sentido pra um plano sem cobranca, e o
+  // submit tentava criar uma assinatura de R$0 na Asaas) — endpoint proprio,
+  // sem Asaas (BL-23, docs/BACKLOG.md).
+  const activateFreeMutation = useMutation({
+    mutationFn: () => activateFreePlan(accessToken),
+    onSuccess: () => {
+      toast.success("Plano Gratis ativado.");
+      queryClient.invalidateQueries({ queryKey: ["billing", "subscription"] });
+    },
+    onError: (error: unknown) => {
+      toast.error(error instanceof ApiError ? error.message : "Nao foi possivel ativar o plano Gratis.");
+    },
+  });
+
   const subscription = subscriptionQuery.data;
   const plan = plansQuery.data?.[0];
+  const isFreePlan = plan?.priceAmount === 0;
 
   return (
     <div className="mx-auto flex w-full max-w-lg flex-1 flex-col">
@@ -160,7 +192,7 @@ export default function BillingSettingsPage() {
               <Button
                 variant="outline"
                 disabled={cancelMutation.isPending}
-                onClick={() => cancelMutation.mutate()}
+                onClick={() => setConfirmingCancel(true)}
               >
                 {cancelMutation.isPending ? "Cancelando..." : "Cancelar assinatura"}
               </Button>
@@ -169,7 +201,25 @@ export default function BillingSettingsPage() {
         </Card>
       ) : null}
 
-      {subscription && subscription.status !== "Active" && plan && (
+      {subscription && subscription.status !== "Active" && plan && isFreePlan && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Ativar {plan.name}</CardTitle>
+            <CardDescription>Sem cartao, sem compromisso — comece a usar agora.</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Button
+              onClick={() => activateFreeMutation.mutate()}
+              disabled={activateFreeMutation.isPending}
+              className="w-fit"
+            >
+              {activateFreeMutation.isPending ? "Ativando..." : `Ativar ${plan.name}`}
+            </Button>
+          </CardContent>
+        </Card>
+      )}
+
+      {subscription && subscription.status !== "Active" && plan && !isFreePlan && (
         <Card>
           <CardHeader>
             <CardTitle>Assinar {plan.name}</CardTitle>
@@ -227,6 +277,24 @@ export default function BillingSettingsPage() {
           </CardContent>
         </Card>
       )}
+
+      <AlertDialog open={confirmingCancel} onOpenChange={setConfirmingCancel}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Cancelar assinatura?</AlertDialogTitle>
+            <AlertDialogDescription>
+              {subscription &&
+                `Isso cancela imediatamente a assinatura do plano "${subscription.planName}". Essa acao nao pode ser desfeita — para voltar a usar um plano pago, sera preciso assinar novamente.`}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Voltar</AlertDialogCancel>
+            <AlertDialogAction variant="destructive" disabled={cancelMutation.isPending} onClick={() => cancelMutation.mutate()}>
+              {cancelMutation.isPending ? "Cancelando..." : "Cancelar assinatura"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
