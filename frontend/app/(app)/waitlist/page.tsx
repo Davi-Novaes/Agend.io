@@ -25,6 +25,16 @@ import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from "@
 import { Skeleton } from "@/components/ui/skeleton";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
@@ -76,6 +86,7 @@ export default function WaitlistPage() {
   const [statusFilter, setStatusFilter] = React.useState<WaitlistStatus | "all">("all");
   const [page, setPage] = React.useState(1);
   const [convertTarget, setConvertTarget] = React.useState<WaitlistEntry | null>(null);
+  const [cancelTarget, setCancelTarget] = React.useState<WaitlistEntry | null>(null);
 
   const listQuery = useQuery({
     queryKey: ["waitlist", { statusFilter, page }],
@@ -113,6 +124,7 @@ export default function WaitlistPage() {
     onSuccess: () => {
       toast.success("Entrada removida da fila de espera.");
       queryClient.invalidateQueries({ queryKey: ["waitlist"] });
+      setCancelTarget(null);
     },
     onError: (error) => {
       toast.error(error instanceof ApiError ? error.message : "Nao foi possivel remover esta entrada.");
@@ -207,7 +219,7 @@ export default function WaitlistPage() {
                           <Button size="sm" onClick={() => openConvertDialog(entry)}>
                             Confirmar
                           </Button>
-                          <Button size="sm" variant="outline" disabled={cancelMutation.isPending} onClick={() => cancelMutation.mutate(entry.id)}>
+                          <Button size="sm" variant="outline" disabled={cancelMutation.isPending} onClick={() => setCancelTarget(entry)}>
                             Cancelar
                           </Button>
                         </div>
@@ -293,6 +305,32 @@ export default function WaitlistPage() {
           </Form>
         </DialogContent>
       </Dialog>
+
+      <AlertDialog open={cancelTarget !== null} onOpenChange={(open) => !open && setCancelTarget(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Cancelar entrada na lista de espera?</AlertDialogTitle>
+            <AlertDialogDescription>
+              {cancelTarget &&
+                `Remove "${cancelTarget.customerName}" da fila de espera para ${cancelTarget.serviceName}. Essa acao nao pode ser desfeita.`}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Voltar</AlertDialogCancel>
+            <AlertDialogAction
+              variant="destructive"
+              disabled={cancelMutation.isPending}
+              onClick={() => {
+                if (cancelTarget) {
+                  cancelMutation.mutate(cancelTarget.id);
+                }
+              }}
+            >
+              {cancelMutation.isPending ? "Cancelando..." : "Cancelar entrada"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
