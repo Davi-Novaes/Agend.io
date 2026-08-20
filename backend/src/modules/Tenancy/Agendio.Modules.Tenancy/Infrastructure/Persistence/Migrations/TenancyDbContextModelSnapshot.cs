@@ -144,10 +144,8 @@ namespace Agendio.Modules.Tenancy.Infrastructure.Persistence.Migrations
 
                     b.Property<string>("BusinessType")
                         .IsRequired()
-                        .ValueGeneratedOnAdd()
                         .HasMaxLength(50)
                         .HasColumnType("character varying(50)")
-                        .HasDefaultValue("Other")
                         .HasColumnName("business_type");
 
                     b.Property<string>("ButtonStyle")
