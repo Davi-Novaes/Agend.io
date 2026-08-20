@@ -25,14 +25,20 @@ public sealed class TenantConfiguration : IEntityTypeConfiguration<Tenant>
             .IsRequired();
         builder.HasIndex(t => t.Slug).IsUnique();
 
-        // Default de banco (nao so na aplicacao) para tenants que ja existiam
-        // antes desta coluna: ficam classificados como "Other" em vez de
-        // quebrar a migration.
+        // SEM HasDefaultValue de proposito (achado durante o BL-14, ver
+        // docs/BACKLOG.md): um default de banco aqui faz o EF Core tratar a
+        // coluna como "store-generated" e OMITIR o valor do INSERT sempre que
+        // ele bate com o default do CLR do enum — que e Barbershop (primeiro
+        // valor declarado, 0). Resultado real, confirmado por teste: todo
+        // tenant criado com BusinessType=Barbershop tinha esse valor
+        // silenciosamente trocado por "Other" no banco, sem erro nenhum.
+        // Tenant.Create sempre recebe e valida um BusinessType explicito —
+        // nao ha caminho de codigo que insira sem isso, entao nao precisa de
+        // default nenhum (nem de banco nem de aplicacao).
         builder.Property(t => t.BusinessType)
             .HasConversion<string>()
             .HasMaxLength(50)
-            .IsRequired()
-            .HasDefaultValue(BusinessType.Other);
+            .IsRequired();
 
         builder.Property(t => t.TimeZoneId).IsRequired().HasMaxLength(64);
         builder.Property(t => t.IsActive).IsRequired();

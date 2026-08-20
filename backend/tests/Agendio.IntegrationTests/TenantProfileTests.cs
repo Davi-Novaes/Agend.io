@@ -49,6 +49,47 @@ public class TenantProfileTests(IntegrationTestFixture fixture)
     }
 
     [Fact]
+    public async Task Tenant_Profile_Should_Expose_The_Terminology_Pack_For_Its_Business_Type()
+    {
+        // Regressao do BL-14 (docs/BACKLOG.md): o onboarding promete "Profissional"
+        // virar "Barbeiro" pra uma barbearia, mas a pagina de gestao continuava
+        // rotulada genericamente porque nada expunha a terminologia resolvida
+        // pra uma tenant ja autenticada (so existia no preview publico do onboarding).
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var client = fixture.CreateClient();
+
+        var tenantResponse = await client.PostAsJsonAsync("/api/tenants", new
+        {
+            name = $"Barbearia {Guid.NewGuid():N}",
+            slug = $"barbearia-{Guid.NewGuid():N}",
+            businessType = "Barbershop",
+            timeZoneId = "America/Sao_Paulo",
+        }, cancellationToken);
+        tenantResponse.EnsureSuccessStatusCode();
+        var tenantBody = await tenantResponse.Content.ReadFromJsonAsync<JsonElement>(cancellationToken);
+        var tenantId = tenantBody.GetProperty("id").GetGuid();
+
+        var ownerEmail = $"owner-{Guid.NewGuid():N}@example.com";
+        await client.PostAsJsonAsync(
+            "/api/auth/register", new { tenantId, email = ownerEmail, password = Password, fullName = "Dono" }, cancellationToken);
+        await fixture.ConfirmEmailDirectlyAsync(tenantId, ownerEmail, cancellationToken);
+        var loginResponse = await client.PostAsJsonAsync(
+            "/api/auth/login", new { tenantId, email = ownerEmail, password = Password }, cancellationToken);
+        var loginBody = await loginResponse.Content.ReadFromJsonAsync<JsonElement>(cancellationToken);
+        var accessToken = loginBody.GetProperty("accessToken").GetString()!;
+
+        var profileResponse = await AuthorizedRequestHelpers.GetAuthorizedAsync(client, accessToken, "/api/tenants/profile", cancellationToken);
+        profileResponse.StatusCode.ShouldBe(HttpStatusCode.OK);
+        var profile = await profileResponse.Content.ReadFromJsonAsync<JsonElement>(cancellationToken);
+
+        var terminology = profile.GetProperty("terminology");
+        terminology.GetProperty("staff").GetString().ShouldBe("Barbeiro");
+        terminology.GetProperty("staffPlural").GetString().ShouldBe("Barbeiros");
+        terminology.GetProperty("customer").GetString().ShouldBe("Cliente");
+        terminology.GetProperty("service").GetString().ShouldBe("Servico");
+    }
+
+    [Fact]
     public async Task Updating_Profile_With_An_Invalid_Email_Should_Be_Rejected()
     {
         var cancellationToken = TestContext.Current.CancellationToken;

@@ -26,9 +26,19 @@ public sealed class GetTenantProfileQueryHandler(TenancyDbContext dbContext, ITe
             .OrderBy(d => d.Date)
             .ToList();
 
+        var terminology = BusinessTypeCatalog.Get(tenant.BusinessType).Terminology;
+
         var profile = new TenantProfile(
             tenant.Name,
             tenant.Slug.Value,
+            new TerminologyPackResult(
+                terminology.Customer,
+                terminology.CustomerPlural,
+                terminology.Service,
+                terminology.ServicePlural,
+                terminology.Staff,
+                terminology.StaffPlural,
+                terminology.Appointment),
             tenant.PrimaryColorHex,
             tenant.LogoUrl,
             tenant.BannerUrl,

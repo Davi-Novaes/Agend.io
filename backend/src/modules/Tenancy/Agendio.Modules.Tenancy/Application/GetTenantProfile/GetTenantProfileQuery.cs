@@ -9,9 +9,19 @@ public sealed record BusinessHoursEntryResult(DayOfWeek DayOfWeek, TimeOnly Star
 
 public sealed record ClosedDateResult(DateOnly Date, string? Reason);
 
+public sealed record TerminologyPackResult(
+    string Customer,
+    string CustomerPlural,
+    string Service,
+    string ServicePlural,
+    string Staff,
+    string StaffPlural,
+    string Appointment);
+
 public sealed record TenantProfile(
     string Name,
     string Slug,
+    TerminologyPackResult Terminology,
     string? PrimaryColorHex,
     string? LogoUrl,
     string? BannerUrl,
