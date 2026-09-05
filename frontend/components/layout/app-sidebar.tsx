@@ -9,6 +9,7 @@ import { Logo } from "@/components/logo";
 import { NAV_GROUPS, resolveNavLabel } from "@/components/layout/nav-config";
 import { getTenantProfile } from "@/lib/api/client";
 import { useSession } from "@/lib/auth/session-context";
+import { decodeJwtRole } from "@/lib/auth/decode-jwt";
 import {
   Sidebar,
   SidebarContent,
@@ -37,6 +38,7 @@ export function AppSidebar() {
     enabled: Boolean(session),
   });
   const staffPlural = profileQuery.data?.terminology.staffPlural;
+  const isOwner = session ? decodeJwtRole(session.accessToken) === "Owner" : false;
 
   return (
     <Sidebar collapsible="icon">
@@ -47,7 +49,7 @@ export function AppSidebar() {
       </SidebarHeader>
       <SidebarContent>
         {NAV_GROUPS.map((group) => {
-          const items = group.items.filter((item) => item.href !== ASSISTANT_HREF);
+          const items = group.items.filter((item) => item.href !== ASSISTANT_HREF && (!item.ownerOnly || isOwner));
           if (items.length === 0) {
             return null;
           }
@@ -58,11 +60,15 @@ export function AppSidebar() {
                 <SidebarMenu>
                   {items.map((item) => {
                     const label = resolveNavLabel(item.href, item.label, staffPlural);
+                    // matchPrefix: Marca tem sub-navegacao interna
+                    // (/settings/branding/aparencia etc.) -- sem isto, o item
+                    // ficava sem destaque de "ativo" em qualquer sub-aba.
+                    const isActive = item.matchPrefix ? pathname.startsWith(item.href) : pathname === item.href;
                     return (
                       <SidebarMenuItem key={item.href}>
                         <SidebarMenuButton
                           asChild
-                          isActive={pathname === item.href}
+                          isActive={isActive}
                           tooltip={label}
                           className="data-active:bg-primary data-active:text-primary-foreground data-active:hover:bg-primary data-active:hover:text-primary-foreground"
                         >

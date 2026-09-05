@@ -146,7 +146,11 @@ export default async function TenantPortalPage({ params, searchParams }: PagePro
   const { preview } = await searchParams;
   const tenant = await loadTenant(slug);
 
-  if (!tenant || !tenant.isActive) {
+  // publicPageEnabled e independente de isActive: aquele e exclusivo do Super
+  // Admin (suspende o tenant inteiro, ate login) -- este e um toggle do
+  // proprio dono (Marca -> Pagina publica) so pra esconder o portal, sem
+  // afetar login nem cobranca.
+  if (!tenant || !tenant.isActive || !tenant.publicPageEnabled) {
     notFound();
   }
 
@@ -228,15 +232,15 @@ export default async function TenantPortalPage({ params, searchParams }: PagePro
               </div>
             )}
             <h1 className="text-3xl font-semibold tracking-tight text-white text-balance drop-shadow-sm sm:text-4xl">
-              {tenant.name}
+              {tenant.homeHeroTitle || tenant.name}
             </h1>
-            {customization.showAboutSection && tenant.description && (
+            {customization.showAboutSection && (tenant.homeHeroDescription || tenant.description) && (
               <p className="max-w-xl text-sm text-white/90 text-balance drop-shadow-sm sm:text-base">
-                {tenant.description}
+                {tenant.homeHeroDescription || tenant.description}
               </p>
             )}
             <Button size="lg" className={`mt-2 shadow-md ${buttonRadiusClassName}`} asChild>
-              <Link href="#agendar">Agendar horario</Link>
+              <Link href="#agendar">{tenant.homeCtaText || "Agendar horario"}</Link>
             </Button>
           </div>
         </header>
@@ -355,6 +359,9 @@ export default async function TenantPortalPage({ params, searchParams }: PagePro
               <h2 id="agendar-heading" className="text-2xl font-semibold tracking-tight sm:text-3xl">
                 Agende seu horario
               </h2>
+              {tenant.bookingInstructionsText && (
+                <p className="text-muted-foreground mt-1 text-sm">{tenant.bookingInstructionsText}</p>
+              )}
             </div>
             <Card className="mx-auto w-full max-w-lg">
               <CardContent>

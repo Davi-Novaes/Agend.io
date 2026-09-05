@@ -56,6 +56,7 @@ export type TenantPublicProfile = {
   name: string;
   slug: string;
   isActive: boolean;
+  publicPageEnabled: boolean;
   primaryColorHex: string | null;
   logoUrl: string | null;
   bannerUrl: string | null;
@@ -66,6 +67,10 @@ export type TenantPublicProfile = {
   address: string | null;
   instagramUrl: string | null;
   facebookUrl: string | null;
+  homeHeroTitle: string | null;
+  homeHeroDescription: string | null;
+  homeCtaText: string | null;
+  bookingInstructionsText: string | null;
   secondaryColorHex: string | null;
   font: PublicPageFont;
   buttonStyle: PublicPageButtonStyle;
@@ -285,8 +290,18 @@ export type TenantProfile = {
   whatsApp: string | null;
   email: string | null;
   address: string | null;
+  city: string | null;
+  state: string | null;
+  zipCode: string | null;
   instagramUrl: string | null;
   facebookUrl: string | null;
+  legalName: string | null;
+  document: string | null;
+  publicPageEnabled: boolean;
+  homeHeroTitle: string | null;
+  homeHeroDescription: string | null;
+  homeCtaText: string | null;
+  bookingInstructionsText: string | null;
   secondaryColorHex: string | null;
   font: PublicPageFont;
   buttonStyle: PublicPageButtonStyle;
@@ -338,8 +353,36 @@ export function getTenantProfile(accessToken: string): Promise<TenantProfile> {
   return request("/api/tenants/profile", {}, accessToken);
 }
 
+// Key unica pro perfil do tenant (nome/marca/cores/terminologia). Antes o app
+// shell (Sidebar/Header/AppLayout) usava ["tenant-profile"] e as paginas de
+// configuracao usavam ["tenant","profile"] — chaves diferentes pro MESMO dado
+// nao se invalidam entre si, entao salvar uma cor em Marca nunca atualizava o
+// resto do app (sidebar, fundo animado, cards) sem F5.
+export const TENANT_PROFILE_QUERY_KEY = ["tenant-profile"] as const;
+
 export function updateTenantProfile(input: TenantProfileInput, accessToken: string): Promise<void> {
   return request("/api/tenants/profile", { method: "PUT", body: JSON.stringify(input) }, accessToken);
+}
+
+// Dado cadastral (razao social/CNPJ/endereco estruturado) — distinto de
+// TenantProfileInput (contato exibido na pagina publica). Nunca vaza no
+// perfil publico (TenantPublicProfile nao tem legalName/document).
+export type TenantCompanyInfoInput = {
+  name: string;
+  legalName?: string | null;
+  document?: string | null;
+  city?: string | null;
+  state?: string | null;
+  zipCode?: string | null;
+};
+
+export function updateTenantCompanyInfo(input: TenantCompanyInfoInput, accessToken: string): Promise<void> {
+  return request("/api/tenants/company-info", { method: "PUT", body: JSON.stringify(input) }, accessToken);
+}
+
+// So a pagina publica ([slug]) — independente de isActive (exclusivo do Super Admin).
+export function updateTenantPublicPageStatus(enabled: boolean, accessToken: string): Promise<void> {
+  return request("/api/tenants/publish-status", { method: "PUT", body: JSON.stringify({ enabled }) }, accessToken);
 }
 
 export function setTenantBusinessHours(entries: WorkingHourEntry[], accessToken: string): Promise<void> {
@@ -463,6 +506,10 @@ export type TenantPageCustomizationInput = {
   showTeamSection: boolean;
   showHoursSection: boolean;
   showContactSection: boolean;
+  homeHeroTitle?: string | null;
+  homeHeroDescription?: string | null;
+  homeCtaText?: string | null;
+  bookingInstructionsText?: string | null;
 };
 
 export function updateTenantPageCustomization(input: TenantPageCustomizationInput, accessToken: string): Promise<void> {

@@ -9,12 +9,14 @@ using Agendio.Modules.Tenancy.Application.SetTenantBusinessHours;
 using Agendio.Modules.Tenancy.Application.SetUnitActiveStatus;
 using Agendio.Modules.Tenancy.Application.UpdateTenantBanner;
 using Agendio.Modules.Tenancy.Application.UpdateTenantBranding;
+using Agendio.Modules.Tenancy.Application.UpdateTenantCompanyInfo;
 using Agendio.Modules.Tenancy.Application.UpdateTenantLogo;
 using Agendio.Modules.Tenancy.Application.UpdateTenantLoyaltySettings;
 using Agendio.Modules.Tenancy.Application.UpdateTenantNoShowPolicy;
 using Agendio.Modules.Tenancy.Application.UpdateTenantPageCustomization;
 using Agendio.Modules.Tenancy.Application.UpdateTenantPaymentSettings;
 using Agendio.Modules.Tenancy.Application.UpdateTenantProfile;
+using Agendio.Modules.Tenancy.Application.UpdateTenantPublicPageStatus;
 using Agendio.Modules.Tenancy.Application.UpdateTenantReminderSettings;
 using Agendio.Modules.Tenancy.Application.UpdateTenantSchedulingSettings;
 using Agendio.Modules.Tenancy.Application.UpdateTenantWhatsAppSettings;
@@ -115,9 +117,18 @@ public sealed class TenancyEndpoints : IEndpointModule
             var result = await dispatcher.Query(new GetTenantProfileQuery(), cancellationToken);
             return result.IsSuccess ? Results.Ok(result.Value) : result.Error.ToProblemResult();
         })
-        .RequireAuthorization(policy => policy.RequireRole("Owner"))
+        // Sem RequireRole("Owner") DE PROPOSITO (achado numa auditoria pos-fato,
+        // nao um relaxamento casual): nenhum campo aqui e sigiloso (o token do
+        // WhatsApp so aparece como booleano "configurado", nunca o valor), e
+        // este MESMO endpoint e a fonte de dado de Sidebar/Header/
+        // TenantThemeProvider/todas as abas do hub de Configuracoes — restringir
+        // a leitura a Owner (pensado so pro formulario de edicao, ver PUT
+        // abaixo) deixava Staff sem cor de marca, terminologia customizada ou
+        // qualquer aba de Configuracoes, sempre caindo em 403 silencioso.
+        // Escrita (PUT/POST abaixo) continua Owner-only.
+        .RequireAuthorization()
         .WithName("GetTenantProfile")
-        .WithSummary("Retorna os dados completos de perfil do estabelecimento (para preencher o formulario de edicao).");
+        .WithSummary("Retorna os dados completos de perfil do estabelecimento (leitura liberada a qualquer papel; edicao continua so-Owner).");
 
         group.MapPut("/profile", async (UpdateProfileRequest request, IDispatcher dispatcher, CancellationToken cancellationToken) =>
         {
@@ -136,14 +147,35 @@ public sealed class TenancyEndpoints : IEndpointModule
         {
             var command = new UpdateTenantPageCustomizationCommand(
                 request.SecondaryColorHex, request.Font, request.ButtonStyle, request.ShowAboutSection, request.ShowServicesSection,
-                request.ShowTeamSection, request.ShowHoursSection, request.ShowContactSection);
+                request.ShowTeamSection, request.ShowHoursSection, request.ShowContactSection, request.HomeHeroTitle,
+                request.HomeHeroDescription, request.HomeCtaText, request.BookingInstructionsText);
             var result = await dispatcher.Send(command, cancellationToken);
 
             return result.IsSuccess ? Results.NoContent() : result.Error.ToProblemResult();
         })
         .RequireAuthorization(policy => policy.RequireRole("Owner"))
         .WithName("UpdateTenantPageCustomization")
-        .WithSummary("Atualiza a personalizacao da pagina publica: cor secundaria, fonte, estilo de botao e visibilidade de secoes.");
+        .WithSummary("Atualiza a personalizacao da pagina publica: cor secundaria, fonte, estilo de botao, textos de conteudo e visibilidade de secoes.");
+
+        group.MapPut("/company-info", async (UpdateCompanyInfoRequest request, IDispatcher dispatcher, CancellationToken cancellationToken) =>
+        {
+            var command = new UpdateTenantCompanyInfoCommand(request.Name, request.LegalName, request.Document, request.City, request.State, request.ZipCode);
+            var result = await dispatcher.Send(command, cancellationToken);
+
+            return result.IsSuccess ? Results.NoContent() : result.Error.ToProblemResult();
+        })
+        .RequireAuthorization(policy => policy.RequireRole("Owner"))
+        .WithName("UpdateTenantCompanyInfo")
+        .WithSummary("Atualiza os dados cadastrais do estabelecimento (nome, razao social, CNPJ/CPF, cidade, estado, CEP) — nunca exposto no perfil publico.");
+
+        group.MapPut("/publish-status", async (UpdatePublishStatusRequest request, IDispatcher dispatcher, CancellationToken cancellationToken) =>
+        {
+            var result = await dispatcher.Send(new UpdateTenantPublicPageStatusCommand(request.Enabled), cancellationToken);
+            return result.IsSuccess ? Results.NoContent() : result.Error.ToProblemResult();
+        })
+        .RequireAuthorization(policy => policy.RequireRole("Owner"))
+        .WithName("UpdateTenantPublicPageStatus")
+        .WithSummary("Publica ou despublica a pagina publica do estabelecimento — independente de IsActive (exclusivo do Super Admin).");
 
         group.MapPut("/scheduling-settings", async (UpdateSchedulingSettingsRequest request, IDispatcher dispatcher, CancellationToken cancellationToken) =>
         {
@@ -311,7 +343,15 @@ public sealed class TenancyEndpoints : IEndpointModule
         bool ShowServicesSection,
         bool ShowTeamSection,
         bool ShowHoursSection,
-        bool ShowContactSection);
+        bool ShowContactSection,
+        string? HomeHeroTitle,
+        string? HomeHeroDescription,
+        string? HomeCtaText,
+        string? BookingInstructionsText);
+
+    private sealed record UpdateCompanyInfoRequest(string Name, string? LegalName, string? Document, string? City, string? State, string? ZipCode);
+
+    private sealed record UpdatePublishStatusRequest(bool Enabled);
 
     private sealed record BusinessHoursEntryRequest(DayOfWeek DayOfWeek, TimeOnly StartTime, TimeOnly EndTime);
 

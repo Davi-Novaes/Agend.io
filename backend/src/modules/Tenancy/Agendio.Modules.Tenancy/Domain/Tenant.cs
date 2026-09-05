@@ -26,6 +26,15 @@ public sealed class Tenant : AggregateRoot<TenantId>, IAuditable, ISoftDeletable
     public bool IsActive { get; private set; }
 
     /// <summary>
+    /// Null ate o primeiro usuario confirmar o registro (ver TenancyIntegrationEventConsumer,
+    /// que escuta UserRegistered do Identity). Usado so por OrphanTenantCleanupJob
+    /// para distinguir "estabelecimento de verdade, ainda sem ninguem cadastrado
+    /// por coincidencia de timing" de "abandonado no meio do wizard" — nunca
+    /// consultado em nenhum fluxo de autenticacao/autorizacao.
+    /// </summary>
+    public DateTimeOffset? FirstUserRegisteredAtUtc { get; private set; }
+
+    /// <summary>
     /// Cor de marca em #RRGGBB, pareada com texto branco em toda a UI. Null usa
     /// a cor padrao da plataforma. Contraste AA e verificado no momento de
     /// salvar (<see cref="UpdateBranding"/>) — nunca depois.
@@ -50,9 +59,40 @@ public sealed class Tenant : AggregateRoot<TenantId>, IAuditable, ISoftDeletable
 
     public string? Address { get; private set; }
 
+    public string? City { get; private set; }
+
+    public string? State { get; private set; }
+
+    public string? ZipCode { get; private set; }
+
     public string? InstagramUrl { get; private set; }
 
     public string? FacebookUrl { get; private set; }
+
+    /// <summary>Razao social — distinta do Name (nome fantasia/exibido), so aparece na tela administrativa Empresa &gt; Dados da empresa, nunca na pagina publica.</summary>
+    public string? LegalName { get; private set; }
+
+    /// <summary>CPF (autonomo) ou CNPJ, opcional — nem todo estabelecimento informal tem um. Nunca exposto no perfil publico.</summary>
+    public CpfCnpj? Document { get; private set; }
+
+    /// <summary>
+    /// Controla so a pagina publica ([slug]) — distinto de <see cref="IsActive"/>,
+    /// que e exclusivo do Super Admin da plataforma pra suspender o tenant
+    /// inteiro (bloqueia ate login). Despublicar aqui nunca afeta login nem
+    /// cobranca; so esconde o portal do cliente.
+    /// </summary>
+    public bool PublicPageEnabled { get; private set; } = true;
+
+    /// <summary>Titulo do hero da home publica. Null usa o texto padrao (ver TenantPortalView).</summary>
+    public string? HomeHeroTitle { get; private set; }
+
+    public string? HomeHeroDescription { get; private set; }
+
+    /// <summary>Texto do botao de call-to-action da home (ex.: "Agendar agora"). Null usa o texto padrao.</summary>
+    public string? HomeCtaText { get; private set; }
+
+    /// <summary>Instrucoes livres mostradas acima do fluxo de agendamento publico. Null nao mostra nada extra.</summary>
+    public string? BookingInstructionsText { get; private set; }
 
     /// <summary>
     /// Cor de apoio da pagina publica (badges, acentos). Mesma regra de
@@ -222,6 +262,37 @@ public sealed class Tenant : AggregateRoot<TenantId>, IAuditable, ISoftDeletable
 
     public void Activate() => IsActive = true;
 
+    public void MarkFirstUserRegistered(DateTimeOffset nowUtc) => FirstUserRegisteredAtUtc ??= nowUtc;
+
+    /// <summary>
+    /// Chamado so por OrphanTenantCleanupJob (P1-1, docs/AUTH_BILLING_SECURITY_AUDIT.md):
+    /// libera o slug original pra um cadastro novo, renomeando para um valor
+    /// tecnicamente unico que ninguem vai digitar de proposito, e desativa —
+    /// reaproveita o MESMO mecanismo que ja bloqueia login (LoginCommandHandler),
+    /// sem exigir exclusao em cascata de dados de outros modulos (Billing ja tem
+    /// uma Subscription pra todo tenant, mesmo os nunca confirmados — ver
+    /// TenantCreatedDomainEvent/BillingIntegrationEventConsumer — e um registro
+    /// orfao la e inofensivo, nao aparece em nenhuma tela).
+    /// </summary>
+    public Result ReleaseAbandonedSlug()
+    {
+        if (FirstUserRegisteredAtUtc is not null)
+        {
+            return Result.Failure(Error.Validation("Tenant.NotAbandoned", "Este estabelecimento ja tem um usuario registrado."));
+        }
+
+        var releasedSlugResult = Slug.Create($"tenant-abandonado-{Id.Value:N}");
+        if (releasedSlugResult.IsFailure)
+        {
+            return Result.Failure(releasedSlugResult.Error);
+        }
+
+        Slug = releasedSlugResult.Value;
+        IsActive = false;
+
+        return Result.Success();
+    }
+
     /// <summary>Foreground fixo: todo componente da UI pareia --primary com texto branco (ver app/globals.css).</summary>
     private const string BrandForegroundHex = "#FFFFFF";
 
@@ -307,6 +378,37 @@ public sealed class Tenant : AggregateRoot<TenantId>, IAuditable, ISoftDeletable
         return Result.Success();
     }
 
+    public Result UpdateCompanyInfo(string? name, string? legalName, string? document, string? city, string? state, string? zipCode)
+    {
+        if (string.IsNullOrWhiteSpace(name))
+        {
+            return Result.Failure(Error.Validation("Tenant.NameEmpty", "O nome do estabelecimento nao pode ser vazio."));
+        }
+
+        CpfCnpj? parsedDocument = null;
+        if (!string.IsNullOrWhiteSpace(document))
+        {
+            var documentResult = CpfCnpj.Create(document);
+            if (documentResult.IsFailure)
+            {
+                return Result.Failure(documentResult.Error);
+            }
+
+            parsedDocument = documentResult.Value;
+        }
+
+        Name = name.Trim();
+        LegalName = string.IsNullOrWhiteSpace(legalName) ? null : legalName.Trim();
+        Document = parsedDocument;
+        City = string.IsNullOrWhiteSpace(city) ? null : city.Trim();
+        State = string.IsNullOrWhiteSpace(state) ? null : state.Trim();
+        ZipCode = string.IsNullOrWhiteSpace(zipCode) ? null : zipCode.Trim();
+
+        return Result.Success();
+    }
+
+    public void SetPublicPageEnabled(bool enabled) => PublicPageEnabled = enabled;
+
     public Result UpdatePageCustomization(
         string? secondaryColorHex,
         PublicPageFont font,
@@ -315,7 +417,11 @@ public sealed class Tenant : AggregateRoot<TenantId>, IAuditable, ISoftDeletable
         bool showServicesSection,
         bool showTeamSection,
         bool showHoursSection,
-        bool showContactSection)
+        bool showContactSection,
+        string? homeHeroTitle,
+        string? homeHeroDescription,
+        string? homeCtaText,
+        string? bookingInstructionsText)
     {
         if (secondaryColorHex is not null)
         {
@@ -350,6 +456,10 @@ public sealed class Tenant : AggregateRoot<TenantId>, IAuditable, ISoftDeletable
         ShowTeamSection = showTeamSection;
         ShowHoursSection = showHoursSection;
         ShowContactSection = showContactSection;
+        HomeHeroTitle = string.IsNullOrWhiteSpace(homeHeroTitle) ? null : homeHeroTitle.Trim();
+        HomeHeroDescription = string.IsNullOrWhiteSpace(homeHeroDescription) ? null : homeHeroDescription.Trim();
+        HomeCtaText = string.IsNullOrWhiteSpace(homeCtaText) ? null : homeCtaText.Trim();
+        BookingInstructionsText = string.IsNullOrWhiteSpace(bookingInstructionsText) ? null : bookingInstructionsText.Trim();
 
         return Result.Success();
     }

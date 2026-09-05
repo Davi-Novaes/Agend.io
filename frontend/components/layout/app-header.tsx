@@ -4,7 +4,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
 import { Bell, ChevronDown, LogOut } from "lucide-react";
 
-import { NAV_ITEMS, resolveNavLabel } from "@/components/layout/nav-config";
+import { ALL_NAV_ITEMS, resolveNavLabel } from "@/components/layout/nav-config";
 import { getTenantProfile } from "@/lib/api/client";
 import { useSession } from "@/lib/auth/session-context";
 import { decodeJwtEmail, decodeJwtFullName, decodeJwtRole } from "@/lib/auth/decode-jwt";
@@ -52,7 +52,11 @@ export function AppHeader() {
     enabled: Boolean(session),
   });
 
-  const matchedItem = NAV_ITEMS.find((item) => item.href === pathname);
+  // matchPrefix (Marca): resolve o titulo tambem nas sub-rotas internas
+  // (/settings/branding/aparencia etc.), nao so no href exato.
+  const matchedItem =
+    ALL_NAV_ITEMS.find((item) => item.href === pathname) ??
+    ALL_NAV_ITEMS.find((item) => item.matchPrefix && pathname.startsWith(item.href));
   const title = matchedItem
     ? resolveNavLabel(matchedItem.href, matchedItem.label, profileQuery.data?.terminology.staffPlural)
     : "Agendio";

@@ -25,7 +25,11 @@ public sealed class UpdateTenantPageCustomizationCommandHandler(TenancyDbContext
             request.ShowServicesSection,
             request.ShowTeamSection,
             request.ShowHoursSection,
-            request.ShowContactSection);
+            request.ShowContactSection,
+            request.HomeHeroTitle,
+            request.HomeHeroDescription,
+            request.HomeCtaText,
+            request.BookingInstructionsText);
         if (updateResult.IsFailure)
         {
             return updateResult;

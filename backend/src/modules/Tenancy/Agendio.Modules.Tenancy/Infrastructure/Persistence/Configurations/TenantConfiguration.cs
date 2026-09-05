@@ -67,8 +67,26 @@ public sealed class TenantConfiguration : IEntityTypeConfiguration<Tenant>
             .HasMaxLength(320);
 
         builder.Property(t => t.Address).HasMaxLength(500);
+        builder.Property(t => t.City).HasMaxLength(120);
+        builder.Property(t => t.State).HasMaxLength(2);
+        builder.Property(t => t.ZipCode).HasMaxLength(9);
         builder.Property(t => t.InstagramUrl).HasMaxLength(500);
         builder.Property(t => t.FacebookUrl).HasMaxLength(500);
+
+        builder.Property(t => t.LegalName).HasMaxLength(200);
+
+        builder.Property(t => t.Document)
+            .HasConversion(
+                document => document == null ? null : document.Value,
+                value => value == null ? null : CpfCnpj.Create(value).Value)
+            .HasMaxLength(14);
+
+        builder.Property(t => t.PublicPageEnabled).IsRequired().HasDefaultValue(true);
+
+        builder.Property(t => t.HomeHeroTitle).HasMaxLength(200);
+        builder.Property(t => t.HomeHeroDescription).HasMaxLength(1000);
+        builder.Property(t => t.HomeCtaText).HasMaxLength(60);
+        builder.Property(t => t.BookingInstructionsText).HasMaxLength(1000);
 
         builder.Property(t => t.SecondaryColorHex).HasMaxLength(7);
 

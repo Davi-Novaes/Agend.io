@@ -12,4 +12,8 @@ public sealed record UpdateTenantPageCustomizationCommand(
     bool ShowServicesSection,
     bool ShowTeamSection,
     bool ShowHoursSection,
-    bool ShowContactSection) : ICommand;
+    bool ShowContactSection,
+    string? HomeHeroTitle,
+    string? HomeHeroDescription,
+    string? HomeCtaText,
+    string? BookingInstructionsText) : ICommand;
