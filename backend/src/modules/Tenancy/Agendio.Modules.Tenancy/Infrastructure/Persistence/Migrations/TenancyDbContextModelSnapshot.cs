@@ -142,6 +142,11 @@ namespace Agendio.Modules.Tenancy.Infrastructure.Persistence.Migrations
                         .HasColumnType("character varying(500)")
                         .HasColumnName("banner_url");
 
+                    b.Property<string>("BookingInstructionsText")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)")
+                        .HasColumnName("booking_instructions_text");
+
                     b.Property<string>("BusinessType")
                         .IsRequired()
                         .HasMaxLength(50)
@@ -155,6 +160,11 @@ namespace Agendio.Modules.Tenancy.Infrastructure.Persistence.Migrations
                         .HasColumnType("character varying(20)")
                         .HasDefaultValue("Rounded")
                         .HasColumnName("button_style");
+
+                    b.Property<string>("City")
+                        .HasMaxLength(120)
+                        .HasColumnType("character varying(120)")
+                        .HasColumnName("city");
 
                     b.Property<DateTimeOffset>("CreatedAtUtc")
                         .HasColumnType("timestamp with time zone")
@@ -180,6 +190,11 @@ namespace Agendio.Modules.Tenancy.Infrastructure.Persistence.Migrations
                         .HasColumnType("character varying(2000)")
                         .HasColumnName("description");
 
+                    b.Property<string>("Document")
+                        .HasMaxLength(14)
+                        .HasColumnType("character varying(14)")
+                        .HasColumnName("document");
+
                     b.Property<string>("Email")
                         .HasMaxLength(320)
                         .HasColumnType("character varying(320)")
@@ -190,6 +205,10 @@ namespace Agendio.Modules.Tenancy.Infrastructure.Persistence.Migrations
                         .HasColumnType("character varying(500)")
                         .HasColumnName("facebook_url");
 
+                    b.Property<DateTimeOffset?>("FirstUserRegisteredAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("first_user_registered_at_utc");
+
                     b.Property<string>("Font")
                         .IsRequired()
                         .ValueGeneratedOnAdd()
@@ -197,6 +216,21 @@ namespace Agendio.Modules.Tenancy.Infrastructure.Persistence.Migrations
                         .HasColumnType("character varying(30)")
                         .HasDefaultValue("Default")
                         .HasColumnName("font");
+
+                    b.Property<string>("HomeCtaText")
+                        .HasMaxLength(60)
+                        .HasColumnType("character varying(60)")
+                        .HasColumnName("home_cta_text");
+
+                    b.Property<string>("HomeHeroDescription")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)")
+                        .HasColumnName("home_hero_description");
+
+                    b.Property<string>("HomeHeroTitle")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("home_hero_title");
 
                     b.Property<string>("InstagramUrl")
                         .HasMaxLength(500)
@@ -210,6 +244,11 @@ namespace Agendio.Modules.Tenancy.Infrastructure.Persistence.Migrations
                     b.Property<bool>("IsDeleted")
                         .HasColumnType("boolean")
                         .HasColumnName("is_deleted");
+
+                    b.Property<string>("LegalName")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("legal_name");
 
                     b.Property<string>("LogoUrl")
                         .HasMaxLength(500)
@@ -272,6 +311,12 @@ namespace Agendio.Modules.Tenancy.Infrastructure.Persistence.Migrations
                         .HasColumnType("character varying(7)")
                         .HasColumnName("primary_color_hex");
 
+                    b.Property<bool>("PublicPageEnabled")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(true)
+                        .HasColumnName("public_page_enabled");
+
                     b.Property<bool>("Reminder24hEnabled")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("boolean")
@@ -330,6 +375,11 @@ namespace Agendio.Modules.Tenancy.Infrastructure.Persistence.Migrations
                         .HasMaxLength(63)
                         .HasColumnType("character varying(63)")
                         .HasColumnName("slug");
+
+                    b.Property<string>("State")
+                        .HasMaxLength(2)
+                        .HasColumnType("character varying(2)")
+                        .HasColumnName("state");
 
                     b.Property<string>("TimeZoneId")
                         .IsRequired()
@@ -395,6 +445,11 @@ namespace Agendio.Modules.Tenancy.Infrastructure.Persistence.Migrations
                         .HasMaxLength(1000)
                         .HasColumnType("character varying(1000)")
                         .HasColumnName("whats_app_scheduled_template");
+
+                    b.Property<string>("ZipCode")
+                        .HasMaxLength(9)
+                        .HasColumnType("character varying(9)")
+                        .HasColumnName("zip_code");
 
                     b.HasKey("Id")
                         .HasName("pk_tenants");

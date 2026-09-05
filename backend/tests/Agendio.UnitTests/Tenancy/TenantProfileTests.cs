@@ -126,12 +126,74 @@ public class TenantProfileTests
     }
 
     [Fact]
+    public void UpdateCompanyInfo_Should_Set_All_Fields_With_Valid_Data()
+    {
+        var tenant = CreateTenant();
+
+        var result = tenant.UpdateCompanyInfo(
+            "Barbearia do Ze", "Jose da Silva Servicos Ltda", "11222333000181", "Sao Paulo", "SP", "01310-100");
+
+        result.IsSuccess.ShouldBeTrue();
+        tenant.Name.ShouldBe("Barbearia do Ze");
+        tenant.LegalName.ShouldBe("Jose da Silva Servicos Ltda");
+        tenant.Document!.Value.ShouldBe("11222333000181");
+        tenant.City.ShouldBe("Sao Paulo");
+        tenant.State.ShouldBe("SP");
+        tenant.ZipCode.ShouldBe("01310-100");
+    }
+
+    [Fact]
+    public void UpdateCompanyInfo_Should_Accept_Optional_Fields_As_Null()
+    {
+        var tenant = CreateTenant();
+
+        var result = tenant.UpdateCompanyInfo("Barbearia do Ze", null, null, null, null, null);
+
+        result.IsSuccess.ShouldBeTrue();
+        tenant.LegalName.ShouldBeNull();
+        tenant.Document.ShouldBeNull();
+    }
+
+    [Fact]
+    public void UpdateCompanyInfo_Should_Reject_An_Empty_Name()
+    {
+        var tenant = CreateTenant();
+
+        var result = tenant.UpdateCompanyInfo(string.Empty, null, null, null, null, null);
+
+        result.IsFailure.ShouldBeTrue();
+    }
+
+    [Fact]
+    public void UpdateCompanyInfo_Should_Reject_An_Invalid_Document()
+    {
+        var tenant = CreateTenant();
+
+        var result = tenant.UpdateCompanyInfo("Barbearia do Ze", null, "000", null, null, null);
+
+        result.IsFailure.ShouldBeTrue();
+        tenant.Document.ShouldBeNull();
+    }
+
+    [Fact]
+    public void SetPublicPageEnabled_Should_Toggle_Without_Affecting_IsActive()
+    {
+        var tenant = CreateTenant();
+
+        tenant.SetPublicPageEnabled(false);
+
+        tenant.PublicPageEnabled.ShouldBeFalse();
+        tenant.IsActive.ShouldBeTrue();
+    }
+
+    [Fact]
     public void UpdatePageCustomization_Should_Set_All_Fields_With_Valid_Data()
     {
         var tenant = CreateTenant();
 
         var result = tenant.UpdatePageCustomization(
-            "#0F172A", PublicPageFont.Poppins, PublicPageButtonStyle.Pill, false, true, false, true, false);
+            "#0F172A", PublicPageFont.Poppins, PublicPageButtonStyle.Pill, false, true, false, true, false,
+            "Bem-vindo", "Descricao", "Agendar agora", "Escolha um horario");
 
         result.IsSuccess.ShouldBeTrue();
         tenant.SecondaryColorHex.ShouldBe("#0F172A");
@@ -142,6 +204,10 @@ public class TenantProfileTests
         tenant.ShowTeamSection.ShouldBeFalse();
         tenant.ShowHoursSection.ShouldBeTrue();
         tenant.ShowContactSection.ShouldBeFalse();
+        tenant.HomeHeroTitle.ShouldBe("Bem-vindo");
+        tenant.HomeHeroDescription.ShouldBe("Descricao");
+        tenant.HomeCtaText.ShouldBe("Agendar agora");
+        tenant.BookingInstructionsText.ShouldBe("Escolha um horario");
     }
 
     [Fact]
@@ -150,7 +216,7 @@ public class TenantProfileTests
         var tenant = CreateTenant();
 
         var result = tenant.UpdatePageCustomization(
-            null, PublicPageFont.Default, PublicPageButtonStyle.Rounded, true, true, true, true, true);
+            null, PublicPageFont.Default, PublicPageButtonStyle.Rounded, true, true, true, true, true, null, null, null, null);
 
         result.IsSuccess.ShouldBeTrue();
         tenant.SecondaryColorHex.ShouldBeNull();
@@ -163,7 +229,7 @@ public class TenantProfileTests
 
         // Amarelo claro: falha o minimo AA de 4.5:1 contra texto branco.
         var result = tenant.UpdatePageCustomization(
-            "#FFFF00", PublicPageFont.Default, PublicPageButtonStyle.Rounded, true, true, true, true, true);
+            "#FFFF00", PublicPageFont.Default, PublicPageButtonStyle.Rounded, true, true, true, true, true, null, null, null, null);
 
         result.IsFailure.ShouldBeTrue();
         tenant.SecondaryColorHex.ShouldBeNull();
@@ -175,7 +241,7 @@ public class TenantProfileTests
         var tenant = CreateTenant();
 
         var result = tenant.UpdatePageCustomization(
-            "azul", PublicPageFont.Default, PublicPageButtonStyle.Rounded, true, true, true, true, true);
+            "azul", PublicPageFont.Default, PublicPageButtonStyle.Rounded, true, true, true, true, true, null, null, null, null);
 
         result.IsFailure.ShouldBeTrue();
     }

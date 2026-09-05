@@ -307,6 +307,166 @@ public class TenantProfileTests(IntegrationTestFixture fixture)
     }
 
     [Fact]
+    public async Task Owner_Can_Update_And_Read_Back_Company_Info()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var client = fixture.CreateClient();
+        var accessToken = await CreateTenantWithOwnerAndLoginAsync(client, cancellationToken);
+
+        var updateResponse = await AuthorizedRequestHelpers.PutAuthorizedAsync(
+            client, accessToken, "/api/tenants/company-info",
+            new
+            {
+                name = "Barbearia do Ze",
+                legalName = "Jose da Silva Servicos Ltda",
+                document = "11222333000181",
+                city = "Sao Paulo",
+                state = "SP",
+                zipCode = "01310-100",
+            },
+            cancellationToken);
+        updateResponse.StatusCode.ShouldBe(HttpStatusCode.NoContent);
+
+        var profileResponse = await AuthorizedRequestHelpers.GetAuthorizedAsync(client, accessToken, "/api/tenants/profile", cancellationToken);
+        var profile = await profileResponse.Content.ReadFromJsonAsync<JsonElement>(cancellationToken);
+        profile.GetProperty("name").GetString().ShouldBe("Barbearia do Ze");
+        profile.GetProperty("legalName").GetString().ShouldBe("Jose da Silva Servicos Ltda");
+        profile.GetProperty("document").GetString().ShouldBe("11222333000181");
+        profile.GetProperty("city").GetString().ShouldBe("Sao Paulo");
+        profile.GetProperty("state").GetString().ShouldBe("SP");
+        profile.GetProperty("zipCode").GetString().ShouldBe("01310-100");
+    }
+
+    [Fact]
+    public async Task Updating_Company_Info_With_An_Invalid_Document_Should_Be_Rejected()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var client = fixture.CreateClient();
+        var accessToken = await CreateTenantWithOwnerAndLoginAsync(client, cancellationToken);
+
+        var response = await AuthorizedRequestHelpers.PutAuthorizedAsync(
+            client, accessToken, "/api/tenants/company-info",
+            new { name = "Barbearia do Ze", legalName = (string?)null, document = "000", city = (string?)null, state = (string?)null, zipCode = (string?)null },
+            cancellationToken);
+
+        response.StatusCode.ShouldBe(HttpStatusCode.BadRequest);
+    }
+
+    [Fact]
+    public async Task A_Staff_Member_Should_Not_Be_Able_To_Update_Company_Info()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var client = fixture.CreateClient();
+        var (tenantId, ownerToken) = await CreateTenantWithOwnerAndLoginAsyncWithId(client, cancellationToken);
+        var staffToken = await InviteAndLoginAsStaffAsync(client, tenantId, ownerToken, cancellationToken);
+
+        var response = await AuthorizedRequestHelpers.PutAuthorizedAsync(
+            client, staffToken, "/api/tenants/company-info",
+            new { name = "Tentativa nao autorizada", legalName = (string?)null, document = (string?)null, city = (string?)null, state = (string?)null, zipCode = (string?)null },
+            cancellationToken);
+
+        response.StatusCode.ShouldBe(HttpStatusCode.Forbidden);
+    }
+
+    [Fact]
+    public async Task Anonymous_Request_To_Update_Company_Info_Should_Be_Unauthorized()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var client = fixture.CreateClient();
+
+        var response = await client.PutAsJsonAsync(
+            "/api/tenants/company-info",
+            new { name = "x", legalName = (string?)null, document = (string?)null, city = (string?)null, state = (string?)null, zipCode = (string?)null },
+            cancellationToken);
+
+        response.StatusCode.ShouldBe(HttpStatusCode.Unauthorized);
+    }
+
+    [Fact]
+    public async Task Owner_Can_Publish_And_Unpublish_The_Public_Page()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var client = fixture.CreateClient();
+        var accessToken = await CreateTenantWithOwnerAndLoginAsync(client, cancellationToken);
+
+        // Nasce publicada (zero-config) — confirma isso antes de despublicar.
+        var initialProfileResponse = await AuthorizedRequestHelpers.GetAuthorizedAsync(client, accessToken, "/api/tenants/profile", cancellationToken);
+        var initialProfile = await initialProfileResponse.Content.ReadFromJsonAsync<JsonElement>(cancellationToken);
+        initialProfile.GetProperty("publicPageEnabled").GetBoolean().ShouldBeTrue();
+
+        var updateResponse = await AuthorizedRequestHelpers.PutAuthorizedAsync(
+            client, accessToken, "/api/tenants/publish-status", new { enabled = false }, cancellationToken);
+        updateResponse.StatusCode.ShouldBe(HttpStatusCode.NoContent);
+
+        var profileResponse = await AuthorizedRequestHelpers.GetAuthorizedAsync(client, accessToken, "/api/tenants/profile", cancellationToken);
+        var profile = await profileResponse.Content.ReadFromJsonAsync<JsonElement>(cancellationToken);
+        profile.GetProperty("publicPageEnabled").GetBoolean().ShouldBeFalse();
+    }
+
+    [Fact]
+    public async Task A_Staff_Member_Should_Not_Be_Able_To_Update_The_Publish_Status()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var client = fixture.CreateClient();
+        var (tenantId, ownerToken) = await CreateTenantWithOwnerAndLoginAsyncWithId(client, cancellationToken);
+        var staffToken = await InviteAndLoginAsStaffAsync(client, tenantId, ownerToken, cancellationToken);
+
+        var response = await AuthorizedRequestHelpers.PutAuthorizedAsync(
+            client, staffToken, "/api/tenants/publish-status", new { enabled = false }, cancellationToken);
+
+        response.StatusCode.ShouldBe(HttpStatusCode.Forbidden);
+    }
+
+    [Fact]
+    public async Task Anonymous_Request_To_Update_Publish_Status_Should_Be_Unauthorized()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var client = fixture.CreateClient();
+
+        var response = await client.PutAsJsonAsync("/api/tenants/publish-status", new { enabled = false }, cancellationToken);
+
+        response.StatusCode.ShouldBe(HttpStatusCode.Unauthorized);
+    }
+
+    [Fact]
+    public async Task Owner_Can_Update_And_Read_Back_Content_Customization_Fields()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var client = fixture.CreateClient();
+        var (slug, accessToken) = await CreateTenantWithOwnerAndLoginAsyncWithSlug(client, cancellationToken);
+
+        var updateResponse = await AuthorizedRequestHelpers.PutAuthorizedAsync(
+            client, accessToken, "/api/tenants/page-customization",
+            new
+            {
+                secondaryColorHex = (string?)null,
+                font = "Default",
+                buttonStyle = "Rounded",
+                showAboutSection = true,
+                showServicesSection = true,
+                showTeamSection = true,
+                showHoursSection = true,
+                showContactSection = true,
+                homeHeroTitle = "Bem-vindo a Barbearia do Ze",
+                homeHeroDescription = "Cortes classicos e modernos no coracao da cidade.",
+                homeCtaText = "Agendar agora",
+                bookingInstructionsText = "Escolha o servico e o horario que preferir.",
+            },
+            cancellationToken);
+        updateResponse.StatusCode.ShouldBe(HttpStatusCode.NoContent);
+
+        var publicResponse = await client.GetAsync($"/api/tenants/by-slug/{slug}", cancellationToken);
+        var publicProfile = await publicResponse.Content.ReadFromJsonAsync<JsonElement>(cancellationToken);
+        publicProfile.GetProperty("homeHeroTitle").GetString().ShouldBe("Bem-vindo a Barbearia do Ze");
+        publicProfile.GetProperty("homeCtaText").GetString().ShouldBe("Agendar agora");
+        publicProfile.GetProperty("bookingInstructionsText").GetString().ShouldBe("Escolha o servico e o horario que preferir.");
+
+        // Dado cadastral (razao social/documento) nunca pode vazar no perfil publico.
+        publicProfile.TryGetProperty("legalName", out _).ShouldBeFalse();
+        publicProfile.TryGetProperty("document", out _).ShouldBeFalse();
+    }
+
+    [Fact]
     public async Task Owner_Can_Update_And_Read_Back_Reminder_Settings()
     {
         var cancellationToken = TestContext.Current.CancellationToken;
@@ -553,6 +713,22 @@ public class TenantProfileTests(IntegrationTestFixture fixture)
             cancellationToken);
 
         response.StatusCode.ShouldBe(HttpStatusCode.Unauthorized);
+    }
+
+    private static async Task<string> InviteAndLoginAsStaffAsync(HttpClient client, Guid tenantId, string ownerToken, CancellationToken cancellationToken)
+    {
+        var staffEmail = $"staff-{Guid.NewGuid():N}@example.com";
+        var inviteResponse = await AuthorizedRequestHelpers.PostAuthorizedAsync(
+            client, ownerToken, "/api/team/invitations", new { email = staffEmail, role = "Staff" }, cancellationToken);
+        var inviteBody = await inviteResponse.Content.ReadFromJsonAsync<JsonElement>(cancellationToken);
+        var token = inviteBody.GetProperty("token").GetString()!;
+        await client.PostAsJsonAsync(
+            $"/api/team/invitations/{token}/accept", new { fullName = "Funcionario", password = Password }, cancellationToken);
+
+        var loginResponse = await client.PostAsJsonAsync(
+            "/api/auth/login", new { tenantId, email = staffEmail, password = Password }, cancellationToken);
+        var loginBody = await loginResponse.Content.ReadFromJsonAsync<JsonElement>(cancellationToken);
+        return loginBody.GetProperty("accessToken").GetString()!;
     }
 
     private async Task<string> CreateTenantWithOwnerAndLoginAsync(HttpClient client, CancellationToken cancellationToken)
