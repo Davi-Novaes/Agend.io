@@ -13,11 +13,13 @@ import {
   updateTenantReminderSettings,
   updateTenantNoShowPolicy,
   listNotificationHistory,
+  TENANT_PROFILE_QUERY_KEY,
   ApiError,
   type TenantProfile,
   type NotificationLogItem,
 } from "@/lib/api/client";
 import { useSession } from "@/lib/auth/session-context";
+import { decodeJwtRole } from "@/lib/auth/decode-jwt";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -67,9 +69,14 @@ function formatDateTime(value: string): string {
 export default function NotificationsSettingsPage() {
   const { session } = useSession();
   const accessToken = session?.accessToken ?? "";
+  // Escrita (lembretes/politica de faltas) e Owner-only no backend -- a
+  // leitura do perfil foi liberada pra qualquer papel, entao sem isto Staff
+  // veria os formularios normais e so descobriria o bloqueio com um 403
+  // confuso ao clicar em salvar.
+  const isOwner = session ? decodeJwtRole(session.accessToken) === "Owner" : false;
 
   const profileQuery = useQuery({
-    queryKey: ["tenant", "profile"],
+    queryKey: TENANT_PROFILE_QUERY_KEY,
     queryFn: () => getTenantProfile(accessToken),
     enabled: Boolean(session),
   });
@@ -79,21 +86,24 @@ export default function NotificationsSettingsPage() {
   }
 
   return (
-    <div className="mx-auto flex w-full max-w-3xl flex-1 flex-col gap-6">
+    <div className="flex w-full flex-1 flex-col gap-6">
       <p className="text-muted-foreground text-sm">
         Controle os lembretes automáticos enviados aos clientes e veja o histórico de mensagens já enviadas.
       </p>
+      {!isOwner && (
+        <p className="text-muted-foreground text-sm">Somente o administrador da conta pode alterar estas configurações.</p>
+      )}
 
       {profileQuery.isLoading || !profileQuery.data ? (
         <Skeleton className="h-64 w-full" />
       ) : (
-        <ReminderSettingsCard profile={profileQuery.data} accessToken={accessToken} />
+        <ReminderSettingsCard profile={profileQuery.data} accessToken={accessToken} readOnly={!isOwner} />
       )}
 
       {profileQuery.isLoading || !profileQuery.data ? (
         <Skeleton className="h-48 w-full" />
       ) : (
-        <NoShowPolicyCard profile={profileQuery.data} accessToken={accessToken} />
+        <NoShowPolicyCard profile={profileQuery.data} accessToken={accessToken} readOnly={!isOwner} />
       )}
 
       <NotificationHistoryCard accessToken={accessToken} enabled={Boolean(session)} />
@@ -101,7 +111,15 @@ export default function NotificationsSettingsPage() {
   );
 }
 
-function ReminderSettingsCard({ profile, accessToken }: { profile: TenantProfile; accessToken: string }) {
+function ReminderSettingsCard({
+  profile,
+  accessToken,
+  readOnly,
+}: {
+  profile: TenantProfile;
+  accessToken: string;
+  readOnly: boolean;
+}) {
   const queryClient = useQueryClient();
 
   const form = useForm<SettingsFormValues>({
@@ -117,7 +135,7 @@ function ReminderSettingsCard({ profile, accessToken }: { profile: TenantProfile
     mutationFn: (values: SettingsFormValues) => updateTenantReminderSettings(values, accessToken),
     onSuccess: () => {
       toast.success("Configurações de lembrete atualizadas.");
-      queryClient.invalidateQueries({ queryKey: ["tenant", "profile"] });
+      queryClient.invalidateQueries({ queryKey: TENANT_PROFILE_QUERY_KEY });
     },
     onError: (error) => toast.error(error instanceof ApiError ? error.message : "Não foi possível salvar as configurações."),
   });
@@ -133,6 +151,7 @@ function ReminderSettingsCard({ profile, accessToken }: { profile: TenantProfile
       <CardContent>
         <Form {...form}>
           <form onSubmit={form.handleSubmit((values) => mutation.mutate(values))} className="flex flex-col gap-4">
+          <fieldset disabled={readOnly} className="contents">
             <FormField
               control={form.control}
               name="reminder24hEnabled"
@@ -173,6 +192,7 @@ function ReminderSettingsCard({ profile, accessToken }: { profile: TenantProfile
             <Button type="submit" disabled={mutation.isPending} className="mt-2 w-fit">
               {mutation.isPending ? "Salvando..." : "Salvar lembretes"}
             </Button>
+          </fieldset>
           </form>
         </Form>
       </CardContent>
@@ -180,7 +200,15 @@ function ReminderSettingsCard({ profile, accessToken }: { profile: TenantProfile
   );
 }
 
-function NoShowPolicyCard({ profile, accessToken }: { profile: TenantProfile; accessToken: string }) {
+function NoShowPolicyCard({
+  profile,
+  accessToken,
+  readOnly,
+}: {
+  profile: TenantProfile;
+  accessToken: string;
+  readOnly: boolean;
+}) {
   const queryClient = useQueryClient();
 
   const form = useForm<NoShowPolicyFormInput, unknown, NoShowPolicyFormValues>({
@@ -195,7 +223,7 @@ function NoShowPolicyCard({ profile, accessToken }: { profile: TenantProfile; ac
     mutationFn: (values: NoShowPolicyFormValues) => updateTenantNoShowPolicy(values, accessToken),
     onSuccess: () => {
       toast.success("Política de faltas atualizada.");
-      queryClient.invalidateQueries({ queryKey: ["tenant", "profile"] });
+      queryClient.invalidateQueries({ queryKey: TENANT_PROFILE_QUERY_KEY });
     },
     onError: (error) => toast.error(error instanceof ApiError ? error.message : "Não foi possível salvar a política de faltas."),
   });
@@ -212,6 +240,7 @@ function NoShowPolicyCard({ profile, accessToken }: { profile: TenantProfile; ac
       <CardContent>
         <Form {...form}>
           <form onSubmit={form.handleSubmit((values) => mutation.mutate(values))} className="flex flex-col gap-4">
+          <fieldset disabled={readOnly} className="contents">
             <FormField
               control={form.control}
               name="requireDepositAfterNoShows"
@@ -241,6 +270,7 @@ function NoShowPolicyCard({ profile, accessToken }: { profile: TenantProfile; ac
             <Button type="submit" disabled={mutation.isPending} className="mt-2 w-fit">
               {mutation.isPending ? "Salvando..." : "Salvar política de faltas"}
             </Button>
+          </fieldset>
           </form>
         </Form>
       </CardContent>

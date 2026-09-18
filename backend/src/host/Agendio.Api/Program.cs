@@ -14,6 +14,7 @@ using Agendio.Modules.Catalog.DependencyInjection;
 using Agendio.Modules.Customers.DependencyInjection;
 using Agendio.Modules.Estoque.DependencyInjection;
 using Agendio.Modules.Assistant.DependencyInjection;
+using Agendio.Modules.Feedback.DependencyInjection;
 using Agendio.Modules.Marketing.DependencyInjection;
 using Agendio.Modules.Financeiro.DependencyInjection;
 using Agendio.Modules.Identity.DependencyInjection;
@@ -25,6 +26,7 @@ using Hangfire;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
+using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.Extensions.FileProviders;
 using Microsoft.IdentityModel.Tokens;
@@ -82,7 +84,8 @@ try
     builder.Services.AddFinanceiroModule(builder.Configuration);
     builder.Services.AddEstoqueModule(builder.Configuration);
     builder.Services.AddMarketingModule(builder.Configuration);
-    builder.Services.AddAssistantModule();
+    builder.Services.AddAssistantModule(builder.Configuration);
+    builder.Services.AddFeedbackModule(builder.Configuration);
     builder.Services.AddAgendioHangfire(builder.Configuration);
 
     // ---------- Autenticacao / Autorizacao ----------
@@ -303,6 +306,14 @@ try
     app.Services.GetRequiredService<IRecurringJobManager>().AddOrUpdate<BillingReconciliationJob>(
         "billing-reconciliation", job => job.RunAsync(CancellationToken.None), Cron.Daily(3));
 
+    // ---------- Limpeza de tenants abandonados no wizard de cadastro (diaria, P1-1) ----------
+    app.Services.GetRequiredService<IRecurringJobManager>().AddOrUpdate<Agendio.Modules.Tenancy.Infrastructure.Jobs.OrphanTenantCleanupJob>(
+        "orphan-tenant-cleanup", job => job.RunAsync(CancellationToken.None), Cron.Daily(4));
+
+    // ---------- Deteccao de atividade suspeita (login/cadastro) a cada 15min ----------
+    app.Services.GetRequiredService<IRecurringJobManager>().AddOrUpdate<Agendio.Modules.Platform.Infrastructure.Jobs.SecurityAlertJob>(
+        "security-alert", job => job.RunAsync(CancellationToken.None), Cron.MinuteInterval(15));
+
     // ---------- Seed do primeiro Super Admin (Development apenas) ----------
     // Provisionamento de producao (rotacao de senha obrigatoria no primeiro
     // login, MFA, convite em vez de credencial fixa) fica fora do MVP de
@@ -328,6 +339,20 @@ try
         app.MapOpenApi();
         app.MapScalarApiReference();
     }
+
+    // Atras do Caddy (reverse proxy no mesmo docker-compose, container irmao —
+    // sem IP fixo pra listar como KnownProxies) em producao: sem isto,
+    // UseHttpsRedirection abaixo nunca vê X-Forwarded-Proto=https e entra em
+    // loop de redirect, e o cookie Secure do refresh token nunca seria aceito
+    // como "contexto https" de verdade. KnownNetworks/KnownProxies limpos e
+    // seguro aqui porque o Kestrel do backend nunca fica exposto direto na
+    // internet — so o Caddy tem a porta 80/443 publicada.
+    app.UseForwardedHeaders(new ForwardedHeadersOptions
+    {
+        ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto,
+        KnownIPNetworks = { },
+        KnownProxies = { },
+    });
 
     // ---------- Cabecalhos de seguranca ----------
     // CSP restritiva de proposito: a API so serve JSON, nunca HTML renderizado

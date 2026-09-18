@@ -20,15 +20,38 @@ public sealed class Plan : AggregateRoot<PlanId>
 
     public bool IsActive { get; private set; }
 
+    /// <summary>Numero maximo de unidades/profissionais/clientes que o plano permite — null = sem limite.</summary>
+    public int? MaxUnits { get; private set; }
+
+    public int? MaxProfessionals { get; private set; }
+
+    public int? MaxCustomers { get; private set; }
+
+    /// <summary>So decorativo (badge "Mais popular") — nao carrega nenhuma regra de negocio.</summary>
+    public bool IsFeatured { get; private set; }
+
     private Plan()
     {
     }
 
-    public Plan(PlanId id, string name, decimal priceAmount, BillingCycle billingCycle) : base(id)
+    public Plan(
+        PlanId id,
+        string name,
+        decimal priceAmount,
+        BillingCycle billingCycle,
+        bool isActive = true,
+        int? maxUnits = null,
+        int? maxProfessionals = null,
+        int? maxCustomers = null,
+        bool isFeatured = false) : base(id)
     {
         Name = name;
         PriceAmount = priceAmount;
         BillingCycle = billingCycle;
-        IsActive = true;
+        IsActive = isActive;
+        MaxUnits = maxUnits;
+        MaxProfessionals = maxProfessionals;
+        MaxCustomers = maxCustomers;
+        IsFeatured = isFeatured;
     }
 }

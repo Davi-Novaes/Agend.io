@@ -33,8 +33,11 @@ const FOREGROUND_HEX = "#FFFFFF";
 
 const FONT_OPTIONS: { value: PublicPageFont; label: string }[] = [
   { value: "Default", label: "Padrão do sistema" },
+  { value: "Inter", label: "Inter" },
   { value: "Poppins", label: "Poppins" },
+  { value: "Montserrat", label: "Montserrat" },
   { value: "PlayfairDisplay", label: "Playfair Display" },
+  { value: "Lora", label: "Lora" },
   { value: "Merriweather", label: "Merriweather" },
 ];
 
@@ -43,6 +46,11 @@ const BUTTON_STYLE_OPTIONS: { value: PublicPageButtonStyle; label: string }[] = 
   { value: "Square", label: "Reto" },
   { value: "Pill", label: "Pílula" },
 ];
+
+// Hierarquia label/valor: rotulo pequeno/discreto/uppercase, valor grande/forte
+// — mesma escala usada nas outras sub-abas de Marca (Conteudo/Informacoes).
+const FIELD_LABEL_CLASS = "text-[13px] font-medium tracking-wide text-muted-foreground uppercase";
+const FIELD_VALUE_CLASS = "text-[15px] font-semibold text-foreground";
 
 export default function BrandingAppearancePage() {
   const { session } = useSession();
@@ -263,14 +271,16 @@ export default function BrandingAppearancePage() {
                 className="h-10 w-14 cursor-pointer rounded-md border border-input"
                 aria-label="Selecionar cor principal"
               />
-              <div className="grid gap-1">
-                <Label htmlFor="color-hex">Cor principal</Label>
+              <div className="grid gap-1.5">
+                <Label htmlFor="color-hex" className={FIELD_LABEL_CLASS}>
+                  Cor principal
+                </Label>
                 <input
                   id="color-hex"
                   value={color}
                   onChange={(event) => update({ primaryColorHex: event.target.value.toUpperCase() })}
                   maxLength={7}
-                  className="border-input bg-background h-8 w-28 rounded-md border px-2 font-mono text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
+                  className={`border-input bg-background h-8 w-28 rounded-md border px-2 font-mono outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 ${FIELD_VALUE_CLASS}`}
                 />
               </div>
             </div>
@@ -292,8 +302,10 @@ export default function BrandingAppearancePage() {
                 className="h-10 w-14 cursor-pointer rounded-md border border-input"
                 aria-label="Selecionar cor secundária"
               />
-              <div className="grid gap-1">
-                <Label htmlFor="secondary-color-hex">Cor de apoio (opcional)</Label>
+              <div className="grid gap-1.5">
+                <Label htmlFor="secondary-color-hex" className={FIELD_LABEL_CLASS}>
+                  Cor de apoio (opcional)
+                </Label>
                 <div className="flex items-center gap-2">
                   <input
                     id="secondary-color-hex"
@@ -301,7 +313,7 @@ export default function BrandingAppearancePage() {
                     onChange={(event) => update({ secondaryColorHex: event.target.value.toUpperCase() })}
                     placeholder="Sem cor de apoio"
                     maxLength={7}
-                    className="border-input bg-background h-8 w-32 rounded-md border px-2 font-mono text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
+                    className={`border-input bg-background h-8 w-32 rounded-md border px-2 font-mono outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 ${FIELD_VALUE_CLASS}`}
                   />
                   {hasSecondaryColor && (
                     <Button type="button" variant="ghost" size="sm" onClick={() => update({ secondaryColorHex: "" })}>
@@ -328,10 +340,10 @@ export default function BrandingAppearancePage() {
         </CardHeader>
         <CardContent className="grid gap-4">
           <div className="grid gap-4 sm:grid-cols-2">
-            <div className="grid gap-1">
-              <Label>Fonte</Label>
+            <div className="grid gap-1.5">
+              <Label className={FIELD_LABEL_CLASS}>Fonte</Label>
               <Select value={draft.font} onValueChange={(value) => update({ font: value as PublicPageFont })}>
-                <SelectTrigger className="w-full">
+                <SelectTrigger className={`w-full ${FIELD_VALUE_CLASS}`}>
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -343,10 +355,10 @@ export default function BrandingAppearancePage() {
                 </SelectContent>
               </Select>
             </div>
-            <div className="grid gap-1">
-              <Label>Estilo de botão</Label>
+            <div className="grid gap-1.5">
+              <Label className={FIELD_LABEL_CLASS}>Estilo de botão</Label>
               <Select value={draft.buttonStyle} onValueChange={(value) => update({ buttonStyle: value as PublicPageButtonStyle })}>
-                <SelectTrigger className="w-full">
+                <SelectTrigger className={`w-full ${FIELD_VALUE_CLASS}`}>
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>

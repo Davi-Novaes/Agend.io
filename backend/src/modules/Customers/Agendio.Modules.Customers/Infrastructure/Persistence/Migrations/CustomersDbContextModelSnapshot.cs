@@ -175,6 +175,10 @@ namespace Agendio.Modules.Customers.Infrastructure.Persistence.Migrations
                         .HasColumnType("boolean")
                         .HasColumnName("is_deleted");
 
+                    b.Property<DateTimeOffset?>("LastContactedAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("last_contacted_at_utc");
+
                     b.Property<int>("LoyaltyPoints")
                         .HasColumnType("integer")
                         .HasColumnName("loyalty_points");

@@ -155,5 +155,7 @@ public static class InfrastructureServiceCollectionExtensions
             redisOptions.Configuration = connectionString;
             redisOptions.InstanceName = "agendio:";
         });
+
+        services.AddSingleton<Security.IEmailSendThrottle, Security.RedisEmailSendThrottle>();
     }
 }

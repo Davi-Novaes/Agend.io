@@ -14,6 +14,7 @@
   <ItemGroup>
     <PackageReference Include="FluentValidation" />
     <PackageReference Include="FluentValidation.DependencyInjectionExtensions" />
+    <PackageReference Include="Otp.NET" />
   </ItemGroup>
 
   <ItemGroup>
@@ -21,6 +22,8 @@
     <ProjectReference Include="..\..\..\shared\Agendio.Infrastructure\Agendio.Infrastructure.csproj" />
     <ProjectReference Include="..\..\Tenancy\Agendio.Modules.Tenancy.Contracts\Agendio.Modules.Tenancy.Contracts.csproj" />
     <ProjectReference Include="..\..\Billing\Agendio.Modules.Billing.Contracts\Agendio.Modules.Billing.Contracts.csproj" />
+    <ProjectReference Include="..\..\Identity\Agendio.Modules.Identity.Contracts\Agendio.Modules.Identity.Contracts.csproj" />
+    <ProjectReference Include="..\..\Feedback\Agendio.Modules.Feedback.Contracts\Agendio.Modules.Feedback.Contracts.csproj" />
   </ItemGroup>
 
 </Project>

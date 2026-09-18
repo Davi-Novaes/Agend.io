@@ -9,10 +9,12 @@ import { toast } from "sonner";
 import {
   getTenantProfile,
   updateTenantPaymentSettings,
+  TENANT_PROFILE_QUERY_KEY,
   ApiError,
   type TenantProfile,
 } from "@/lib/api/client";
 import { useSession } from "@/lib/auth/session-context";
+import { decodeJwtRole } from "@/lib/auth/decode-jwt";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -33,9 +35,14 @@ type SettingsFormInput = z.input<typeof settingsSchema>;
 export default function PaymentSettingsPage() {
   const { session } = useSession();
   const accessToken = session?.accessToken ?? "";
+  // Escrita (updateTenantPaymentSettings) e Owner-only no backend -- a
+  // leitura do perfil foi liberada pra qualquer papel, entao sem isto Staff
+  // veria o formulario normal e só descobriria o bloqueio com um 403 confuso
+  // ao clicar em salvar.
+  const isOwner = session ? decodeJwtRole(session.accessToken) === "Owner" : false;
 
   const profileQuery = useQuery({
-    queryKey: ["tenant", "profile"],
+    queryKey: TENANT_PROFILE_QUERY_KEY,
     queryFn: () => getTenantProfile(accessToken),
     enabled: Boolean(session),
   });
@@ -45,22 +52,33 @@ export default function PaymentSettingsPage() {
   }
 
   return (
-    <div className="mx-auto flex w-full max-w-3xl flex-1 flex-col gap-6">
+    <div className="flex w-full max-w-3xl flex-1 flex-col gap-6">
       <p className="text-muted-foreground text-sm">
         Desligado por padrão — o cliente agenda pelo portal público sem pagar nada. Se ativado, o cliente precisa
         pagar um sinal (via PIX, Asaas) e informar o CPF para confirmar o agendamento.
       </p>
+      {!isOwner && (
+        <p className="text-muted-foreground text-sm">Somente o administrador da conta pode alterar estas configurações.</p>
+      )}
 
       {profileQuery.isLoading || !profileQuery.data ? (
         <Skeleton className="h-64 w-full" />
       ) : (
-        <PaymentSettingsCard profile={profileQuery.data} accessToken={accessToken} />
+        <PaymentSettingsCard profile={profileQuery.data} accessToken={accessToken} readOnly={!isOwner} />
       )}
     </div>
   );
 }
 
-function PaymentSettingsCard({ profile, accessToken }: { profile: TenantProfile; accessToken: string }) {
+function PaymentSettingsCard({
+  profile,
+  accessToken,
+  readOnly,
+}: {
+  profile: TenantProfile;
+  accessToken: string;
+  readOnly: boolean;
+}) {
   const queryClient = useQueryClient();
 
   const form = useForm<SettingsFormInput, unknown, SettingsFormValues>({
@@ -75,7 +93,7 @@ function PaymentSettingsCard({ profile, accessToken }: { profile: TenantProfile;
     mutationFn: (values: SettingsFormValues) => updateTenantPaymentSettings(values, accessToken),
     onSuccess: () => {
       toast.success("Configurações de pagamento atualizadas.");
-      queryClient.invalidateQueries({ queryKey: ["tenant", "profile"] });
+      queryClient.invalidateQueries({ queryKey: TENANT_PROFILE_QUERY_KEY });
     },
     onError: (error) => toast.error(error instanceof ApiError ? error.message : "Não foi possível salvar as configurações."),
   });
@@ -91,6 +109,7 @@ function PaymentSettingsCard({ profile, accessToken }: { profile: TenantProfile;
       <CardContent>
         <Form {...form}>
           <form onSubmit={form.handleSubmit((values) => mutation.mutate(values))} className="flex flex-col gap-4">
+          <fieldset disabled={readOnly} className="contents">
             <FormField
               control={form.control}
               name="paymentRequired"
@@ -120,6 +139,7 @@ function PaymentSettingsCard({ profile, accessToken }: { profile: TenantProfile;
             <Button type="submit" disabled={mutation.isPending} className="mt-2 w-fit">
               {mutation.isPending ? "Salvando..." : "Salvar pagamento"}
             </Button>
+          </fieldset>
           </form>
         </Form>
       </CardContent>

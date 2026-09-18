@@ -33,6 +33,8 @@ public sealed class IdentityDbContext(
 
     public DbSet<MfaRecoveryCode> MfaRecoveryCodes => Set<MfaRecoveryCode>();
 
+    public DbSet<SecurityAuditLogEntry> SecurityAuditLog => Set<SecurityAuditLogEntry>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.HasDefaultSchema("identity");
@@ -40,6 +42,7 @@ public sealed class IdentityDbContext(
         base.OnModelCreating(modelBuilder);
 
         modelBuilder.ApplyConfigurationsFromAssembly(typeof(IdentityDbContext).Assembly);
+        modelBuilder.ConfigureSecurityAuditLog();
 
         // Um unico HasQueryFilter por entidade: chamar de novo SOBRESCREVE (nao
         // combina) o filtro anterior, entao tenant e soft-delete precisam vir
@@ -53,7 +56,9 @@ public sealed class IdentityDbContext(
         // criptografado depende de IEncryptionService, entao so pode ser
         // aplicado aqui (depois de ApplyConfigurationsFromAssembly), nunca
         // dentro de UserConfiguration (instanciada sem parametro).
-        modelBuilder.Entity<User>().Property(u => u.MfaSecretEncrypted).HasConversion(new EncryptedStringConverter(_encryptionService));
+        var encryptedConverter = new EncryptedStringConverter(_encryptionService);
+        modelBuilder.Entity<User>().Property(u => u.MfaSecretEncrypted).HasConversion(encryptedConverter);
+        modelBuilder.Entity<User>().Property(u => u.Cpf).HasConversion(encryptedConverter);
     }
 
     private TenantId CurrentTenantId() => _tenantContext.HasTenant ? _tenantContext.TenantId : TenantId.Empty;

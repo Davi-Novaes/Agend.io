@@ -1,10 +1,31 @@
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:5071";
+const SERVER_API_BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:5071";
+const ROOT_DOMAIN = process.env.NEXT_PUBLIC_ROOT_DOMAIN ?? "agendiobr.com.br";
+
+// No servidor (SSR/RSC) sempre usa a URL publica fixa da API. No browser, se
+// a pagina foi carregada em agendiobr.com.br OU num subdominio de tenant
+// (barber-teste.agendiobr.com.br -- ver proxy.ts), usa a MESMA origem: o
+// Caddy ja roteia /api/* por path em qualquer Host recebido, e isso evita
+// que a chamada vire cross-origin (sem precisar abrir CORS por wildcard pra
+// cada slug). Fora do dominio de producao (localhost, preview), cai no
+// fallback de sempre.
+function resolveApiBaseUrl(): string {
+  if (typeof window !== "undefined") {
+    const hostname = window.location.hostname;
+    if (hostname === ROOT_DOMAIN || hostname.endsWith(`.${ROOT_DOMAIN}`)) {
+      return window.location.origin;
+    }
+  }
+  return SERVER_API_BASE_URL;
+}
 
 export class ApiError extends Error {
   constructor(
     message: string,
     public readonly status: number,
-    public readonly code?: string
+    public readonly code?: string,
+    // Preenchido so pelo Auth.AccountLocked (ver Error.Extensions no backend) --
+    // instante em que o bloqueio de login por tentativas erradas expira.
+    public readonly lockedUntilUtc?: string
   ) {
     super(message);
     this.name = "ApiError";
@@ -17,6 +38,7 @@ type ProblemDetails = {
   detail?: string;
   status?: number;
   code?: string;
+  lockedUntilUtc?: string;
 };
 
 async function request<TResponse>(
@@ -24,7 +46,7 @@ async function request<TResponse>(
   options: RequestInit = {},
   accessToken?: string
 ): Promise<TResponse> {
-  const response = await fetch(`${API_BASE_URL}${path}`, {
+  const response = await fetch(`${resolveApiBaseUrl()}${path}`, {
     ...options,
     // Necessario para o cookie HttpOnly do refresh token (definido em /api/auth/*).
     credentials: "include",
@@ -40,7 +62,8 @@ async function request<TResponse>(
     throw new ApiError(
       problem?.detail ?? problem?.title ?? "Ocorreu um erro inesperado.",
       response.status,
-      problem?.code ?? problem?.title
+      problem?.code ?? problem?.title,
+      problem?.lockedUntilUtc
     );
   }
 
@@ -86,7 +109,7 @@ export type TenantPublicProfile = {
 
 /** Resolve um logoUrl relativo (ex.: "/uploads/tenant-logos/x.png") para a origem da API. */
 export function resolveAssetUrl(path: string): string {
-  return `${API_BASE_URL}${path}`;
+  return `${SERVER_API_BASE_URL}${path}`;
 }
 
 export function getTenantBySlug(slug: string): Promise<TenantPublicProfile> {
@@ -181,6 +204,64 @@ export function getMfaStatus(accessToken: string): Promise<{ mfaEnabled: boolean
   return request("/api/auth/mfa/status", {}, accessToken);
 }
 
+export type MyProfile = { email: string; fullName: string; avatarUrl: string | null; phone: string | null };
+
+export function getMyProfile(accessToken: string): Promise<MyProfile> {
+  return request("/api/auth/me", {}, accessToken);
+}
+
+export type UpdateMyProfileInput = { fullName: string; phone?: string | null };
+
+// E-mail fica de fora de proposito: mudar exigiria um fluxo de confirmacao que ainda nao existe.
+export function updateMyProfile(input: UpdateMyProfileInput, accessToken: string): Promise<void> {
+  return request<void>("/api/auth/me", { method: "PUT", body: JSON.stringify(input) }, accessToken);
+}
+
+export async function uploadUserAvatar(file: File, accessToken: string): Promise<{ avatarUrl: string }> {
+  const formData = new FormData();
+  formData.append("file", file);
+
+  // Nao usa request(): FormData precisa que o browser defina o Content-Type
+  // (multipart, com o boundary) sozinho -- setar "application/json" quebraria o upload.
+  const response = await fetch(`${SERVER_API_BASE_URL}/api/auth/me/avatar`, {
+    method: "POST",
+    credentials: "include",
+    headers: { Authorization: `Bearer ${accessToken}` },
+    body: formData,
+  });
+
+  if (!response.ok) {
+    const problem = (await response.json().catch(() => null)) as ProblemDetails | null;
+    throw new ApiError(problem?.detail ?? problem?.title ?? "Nao foi possivel enviar a foto.", response.status, problem?.code ?? problem?.title);
+  }
+
+  return (await response.json()) as { avatarUrl: string };
+}
+
+// Sempre 204, exista ou nao a conta — evita enumeracao (ver ForgotPasswordCommandHandler).
+export function forgotPassword(input: { tenantId: string; email: string }): Promise<void> {
+  return request<void>("/api/auth/forgot-password", {
+    method: "POST",
+    body: JSON.stringify(input),
+  });
+}
+
+export function resetPassword(input: { token: string; newPassword: string }): Promise<void> {
+  return request<void>("/api/auth/reset-password", {
+    method: "POST",
+    body: JSON.stringify(input),
+  });
+}
+
+// Revoga todas as sessoes ativas ao concluir (inclusive a que fez esta
+// chamada) — ver ChangePasswordCommandHandler.
+export function changePassword(
+  input: { currentPassword: string; newPassword: string },
+  accessToken: string
+): Promise<void> {
+  return request<void>("/api/auth/change-password", { method: "POST", body: JSON.stringify(input) }, accessToken);
+}
+
 // onboardingToken prova posse do tenant recem-criado pro resto do onboarding
 // (escolha de plano) — sem ele o endpoint antes era anonimo e ativava a
 // assinatura de QUALQUER tenant so com o Guid no corpo (BL-01, docs/BACKLOG.md).
@@ -189,6 +270,9 @@ export function registerUser(input: {
   email: string;
   password: string;
   fullName: string;
+  phone: string;
+  cpfCnpj: string;
+  termsAccepted: boolean;
 }): Promise<{ id: string; onboardingToken: string; onboardingTokenExpiresAtUtc: string }> {
   return request("/api/auth/register", {
     method: "POST",
@@ -218,6 +302,12 @@ export function logout(): Promise<void> {
   return request<void>("/api/auth/logout", { method: "POST" });
 }
 
+// Revoga TODOS os refresh tokens do usuario (todos os dispositivos/abas), nao
+// so a sessao atual — ver LogoutAllSessionsCommandHandler.
+export function logoutAllSessions(accessToken: string): Promise<void> {
+  return request<void>("/api/auth/logout-all", { method: "POST" }, accessToken);
+}
+
 export function updateTenantBranding(primaryColorHex: string, accessToken: string): Promise<void> {
   return request<void>(
     "/api/tenants/branding",
@@ -232,7 +322,7 @@ export async function uploadTenantLogo(file: File, accessToken: string): Promise
 
   // Nao usa request(): FormData precisa que o browser defina o Content-Type
   // (com o boundary do multipart) sozinho — setar "application/json" quebraria o upload.
-  const response = await fetch(`${API_BASE_URL}/api/tenants/logo`, {
+  const response = await fetch(`${SERVER_API_BASE_URL}/api/tenants/logo`, {
     method: "POST",
     credentials: "include",
     headers: { Authorization: `Bearer ${accessToken}` },
@@ -255,7 +345,7 @@ export async function uploadTenantBanner(file: File, accessToken: string): Promi
   const formData = new FormData();
   formData.append("file", file);
 
-  const response = await fetch(`${API_BASE_URL}/api/tenants/banner`, {
+  const response = await fetch(`${SERVER_API_BASE_URL}/api/tenants/banner`, {
     method: "POST",
     credentials: "include",
     headers: { Authorization: `Bearer ${accessToken}` },
@@ -274,7 +364,14 @@ export async function uploadTenantBanner(file: File, accessToken: string): Promi
   return response.json();
 }
 
-export type PublicPageFont = "Default" | "Poppins" | "PlayfairDisplay" | "Merriweather";
+export type PublicPageFont =
+  | "Default"
+  | "Poppins"
+  | "PlayfairDisplay"
+  | "Merriweather"
+  | "Inter"
+  | "Montserrat"
+  | "Lora";
 
 export type PublicPageButtonStyle = "Rounded" | "Square" | "Pill";
 
@@ -290,13 +387,8 @@ export type TenantProfile = {
   whatsApp: string | null;
   email: string | null;
   address: string | null;
-  city: string | null;
-  state: string | null;
-  zipCode: string | null;
   instagramUrl: string | null;
   facebookUrl: string | null;
-  legalName: string | null;
-  document: string | null;
   publicPageEnabled: boolean;
   homeHeroTitle: string | null;
   homeHeroDescription: string | null;
@@ -378,6 +470,27 @@ export type TenantCompanyInfoInput = {
 
 export function updateTenantCompanyInfo(input: TenantCompanyInfoInput, accessToken: string): Promise<void> {
   return request("/api/tenants/company-info", { method: "PUT", body: JSON.stringify(input) }, accessToken);
+}
+
+// Owner-only tambem na leitura (backend rejeita Staff com 403) — dado
+// cadastral nunca fica no TenantProfile geral (ver comentario la).
+export type TenantCompanyInfo = {
+  name: string;
+  legalName: string | null;
+  document: string | null;
+  city: string | null;
+  state: string | null;
+  zipCode: string | null;
+};
+
+export function getTenantCompanyInfo(accessToken: string): Promise<TenantCompanyInfo> {
+  return request("/api/tenants/company-info", {}, accessToken);
+}
+
+// So grava no banco por enquanto (sem notificacao/e-mail) -- qualquer papel
+// autenticado pode enviar (Owner ou Staff).
+export function submitFeedback(input: { subject: string; body: string }, accessToken: string): Promise<void> {
+  return request("/api/feedback", { method: "POST", body: JSON.stringify(input) }, accessToken);
 }
 
 // So a pagina publica ([slug]) — independente de isActive (exclusivo do Super Admin).
@@ -659,7 +772,7 @@ export async function importCustomersFromCsv(file: File, accessToken: string): P
   const formData = new FormData();
   formData.append("file", file);
 
-  const response = await fetch(`${API_BASE_URL}/api/customers/import`, {
+  const response = await fetch(`${SERVER_API_BASE_URL}/api/customers/import`, {
     method: "POST",
     credentials: "include",
     headers: { Authorization: `Bearer ${accessToken}` },
@@ -733,7 +846,7 @@ export async function uploadServiceImage(id: string, file: File, accessToken: st
   const formData = new FormData();
   formData.append("file", file);
 
-  const response = await fetch(`${API_BASE_URL}/api/services/${id}/image`, {
+  const response = await fetch(`${SERVER_API_BASE_URL}/api/services/${id}/image`, {
     method: "POST",
     credentials: "include",
     headers: { Authorization: `Bearer ${accessToken}` },
@@ -834,7 +947,7 @@ export async function uploadResourcePhoto(id: string, file: File, accessToken: s
   const formData = new FormData();
   formData.append("file", file);
 
-  const response = await fetch(`${API_BASE_URL}/api/resources/${id}/photo`, {
+  const response = await fetch(`${SERVER_API_BASE_URL}/api/resources/${id}/photo`, {
     method: "POST",
     credentials: "include",
     headers: { Authorization: `Bearer ${accessToken}` },
@@ -879,12 +992,18 @@ export type UnitSummary = {
   id: string;
   name: string;
   address: string | null;
+  city: string | null;
+  state: string | null;
+  country: string | null;
   isActive: boolean;
 };
 
 export type UnitInput = {
   name: string;
   address?: string | null;
+  city?: string | null;
+  state?: string | null;
+  country?: string | null;
 };
 
 export function listUnits(accessToken: string): Promise<UnitSummary[]> {
@@ -1004,6 +1123,12 @@ export function getCustomerRecoveryCandidates(accessToken: string): Promise<Cust
   return request(`/api/appointments/customer-recovery`, {}, accessToken);
 }
 
+// Key unica para esta query — antes o Painel e a tela de Clientes usavam
+// chaves diferentes ("painel","recuperacao" vs "customers","recovery") pro
+// mesmo dado, entao invalidar uma nao atualizava a outra: um cliente que
+// acabava de agendar continuava aparecendo como "ausente" ate o F5.
+export const CUSTOMER_RECOVERY_QUERY_KEY = ["customer-recovery-candidates"] as const;
+
 export function scheduleAppointment(input: ScheduleAppointmentInput, accessToken: string): Promise<{ id: string }> {
   return request("/api/appointments", { method: "POST", body: JSON.stringify(input) }, accessToken);
 }
@@ -1028,12 +1153,16 @@ export function cancelAppointment(id: string, byStaff: boolean, reason: string |
   return request(`/api/appointments/${id}/cancel`, { method: "POST", body: JSON.stringify({ byStaff, reason }) }, accessToken);
 }
 
-export function rescheduleAppointment(id: string, newStartAtUtc: string, reason: string | null, accessToken: string): Promise<void> {
-  return request(
-    `/api/appointments/${id}/reschedule`,
-    { method: "PUT", body: JSON.stringify({ newStartAtUtc, reason }) },
-    accessToken
-  );
+// newDurationMinutes/newResourceId sao opcionais: omitidos, preservam duracao
+// e recurso originais (comportamento de sempre). Presentes, cobrem
+// redimensionar (arrastar a borda do card) e reatribuir profissional
+// (arrastar entre colunas) na Agenda — mesmo endpoint, so mais campos.
+export function rescheduleAppointment(
+  id: string,
+  input: { newStartAtUtc: string; reason: string | null; newDurationMinutes?: number; newResourceId?: string },
+  accessToken: string
+): Promise<void> {
+  return request(`/api/appointments/${id}/reschedule`, { method: "PUT", body: JSON.stringify(input) }, accessToken);
 }
 
 export type AppointmentChangeType = "Cancelled" | "Rescheduled";
@@ -1050,6 +1179,11 @@ export type AppointmentChangeLogItem = {
   reason: string | null;
   previousStartUtc: string;
   newStartUtc: string | null;
+  // Preenchidos so quando a remarcacao tambem redimensionou a duracao ou
+  // reatribuiu o profissional (arrastar na Agenda) — null pra remarcacao comum.
+  newEndUtc: string | null;
+  previousResourceId: string | null;
+  previousResourceName: string | null;
   byStaff: boolean;
   occurredAtUtc: string;
 };
@@ -1160,16 +1294,56 @@ export function joinWaitlist(tenantId: string, input: JoinWaitlistInput): Promis
 // AuthTokens/login/useSession do painel do estabelecimento.
 
 export type PlatformAuthTokens = {
+  mfaRequired: false;
   accessToken: string;
   expiresAtUtc: string;
   fullName: string;
 };
 
-export function platformLogin(input: { email: string; password: string }): Promise<PlatformAuthTokens> {
-  return request<PlatformAuthTokens>("/api/platform/auth/login", {
+export type PlatformMfaChallenge = {
+  mfaRequired: true;
+  mfaChallengeToken: string;
+  expiresAtUtc: string;
+};
+
+// Mesma uniao de LoginResult (painel do tenant): tokens de verdade, ou um
+// desafio de MFA pendente — ver LoginPlatformAdminCommandHandler.
+export type PlatformLoginResult = PlatformAuthTokens | PlatformMfaChallenge;
+
+export function platformLogin(input: { email: string; password: string }): Promise<PlatformLoginResult> {
+  return request<PlatformLoginResult>("/api/platform/auth/login", {
     method: "POST",
     body: JSON.stringify(input),
   });
+}
+
+export function verifyPlatformMfa(input: { mfaChallengeToken: string; code: string }): Promise<PlatformAuthTokens> {
+  return request<PlatformAuthTokens>("/api/platform/auth/mfa/verify", {
+    method: "POST",
+    body: JSON.stringify(input),
+  });
+}
+
+export function getPlatformMfaStatus(accessToken: string): Promise<{ mfaEnabled: boolean }> {
+  return request("/api/platform/auth/mfa/status", {}, accessToken);
+}
+
+export function setupPlatformMfa(accessToken: string): Promise<SetupMfaResult> {
+  return request<SetupMfaResult>("/api/platform/auth/mfa/setup", { method: "POST" }, accessToken);
+}
+
+// Ao contrario do MFA do tenant, o Super Admin nao tem codigos de recuperacao
+// (ver PlatformAdmin.DisableMfa) — enable so devolve 204, sem lista pra exibir.
+export function enablePlatformMfa(input: { secret: string; code: string }, accessToken: string): Promise<void> {
+  return request<void>("/api/platform/auth/mfa/enable", { method: "POST", body: JSON.stringify(input) }, accessToken);
+}
+
+export function disablePlatformMfa(input: { password: string; code: string }, accessToken: string): Promise<void> {
+  return request<void>(
+    "/api/platform/auth/mfa/disable",
+    { method: "POST", body: JSON.stringify(input) },
+    accessToken
+  );
 }
 
 export type TenantAdminSummary = {
@@ -1215,6 +1389,63 @@ export function getPlatformDashboardMetrics(accessToken: string): Promise<Platfo
   return request<PlatformDashboardMetrics>("/api/platform/dashboard", {}, accessToken);
 }
 
+export type SecurityActivityEntry = {
+  id: string;
+  source: "Identity" | "Platform";
+  tenantName: string | null;
+  eventType: string;
+  success: boolean;
+  ipAddress: string | null;
+  countryCode: string | null;
+  /** Regiao/estado -- so vem preenchido se a Cloudflare tiver "Add visitor location headers" habilitado na zona. */
+  region: string | null;
+  /** Cidade -- mesma condicao de region. */
+  city: string | null;
+  userAgent: string | null;
+  metadata: string | null;
+  occurredAtUtc: string;
+};
+
+export function getSecurityActivityLog(accessToken: string): Promise<SecurityActivityEntry[]> {
+  return request<SecurityActivityEntry[]>("/api/platform/security/activity", {}, accessToken);
+}
+
+// Ultimos 90 dias de eventos SO da propria conta do usuario autenticado --
+// distinto do getSecurityActivityLog acima, que e Super Admin-only e cobre
+// todos os tenants (usado no /admin/activity). A tela de Configuracoes/
+// Seguranca do tenant usava por engano o endpoint de Platform (sempre 403
+// pra Owner/Staff comum, entao "Atividade recente" nunca mostrava nada) --
+// este e o endpoint certo, exposto pelo proprio modulo Identity.
+export type MySecurityActivityEntry = {
+  id: string;
+  eventType: string;
+  success: boolean;
+  ipAddress: string | null;
+  countryCode: string | null;
+  region: string | null;
+  city: string | null;
+  userAgent: string | null;
+  occurredAtUtc: string;
+};
+
+export function getMySecurityActivityLog(accessToken: string): Promise<MySecurityActivityEntry[]> {
+  return request<MySecurityActivityEntry[]>("/api/auth/security/activity", {}, accessToken);
+}
+
+// Feedback livre enviado por usuarios de qualquer tenant -- Super Admin-only,
+// mesmo padrao de getSecurityActivityLog (tenantName resolvido no backend).
+export type PlatformFeedbackEntry = {
+  id: string;
+  tenantName: string | null;
+  subject: string;
+  body: string;
+  createdAtUtc: string;
+};
+
+export function getPlatformFeedback(accessToken: string): Promise<PlatformFeedbackEntry[]> {
+  return request<PlatformFeedbackEntry[]>("/api/platform/feedback", {}, accessToken);
+}
+
 // ---------- Billing (assinatura do estabelecimento) ----------
 
 export type PlanSummary = {
@@ -1223,6 +1454,10 @@ export type PlanSummary = {
   priceAmount: number;
   currency: string;
   billingCycle: string;
+  maxUnits: number | null;
+  maxProfessionals: number | null;
+  maxCustomers: number | null;
+  isFeatured: boolean;
 };
 
 // Sem accessToken: usado tambem no onboarding, antes de existir sessao — o
@@ -1240,15 +1475,32 @@ export type LatestPaymentSummary = {
 };
 
 export type MySubscription = {
+  planId: string;
   planName: string;
   status: string;
   trialEndsAtUtc: string;
   currentPeriodEndsAtUtc: string | null;
+  // Setado quando o cancelamento foi pedido mas ainda nao virou Status
+  // "Canceled" -- periodo ja pago continua valido ate currentPeriodEndsAtUtc
+  // (ver Subscription.Cancel no backend). null = nunca cancelada.
+  canceledAtUtc: string | null;
   latestPayment: LatestPaymentSummary | null;
 };
 
 export function getMySubscription(accessToken: string): Promise<MySubscription> {
   return request<MySubscription>("/api/billing/subscription", {}, accessToken);
+}
+
+export type SubscriptionGateStatus = {
+  status: string;
+};
+
+// Sem dado de billing (plano/valor/nota) de proposito — e o unico endpoint de
+// assinatura que Staff pode chamar, so pra saber se o app shell deve bloquear
+// o uso do sistema por pagamento pendente (ver AppLayout). Detalhe completo
+// fica em getMySubscription, agora restrito a Owner no backend.
+export function getSubscriptionGateStatus(accessToken: string): Promise<SubscriptionGateStatus> {
+  return request<SubscriptionGateStatus>("/api/billing/subscription/gate-status", {}, accessToken);
 }
 
 export function subscribeToPlan(
@@ -1273,10 +1525,13 @@ export function activateFreePlan(accessToken: string): Promise<void> {
 // normal (onboarding roda antes de e-mail confirmado). Sem nome/CPF/e-mail no
 // payload — o Checkout da Asaas coleta isso na propria pagina hospedada
 // quando o plano escolhido e pago (ver Fase 24).
+// So registra a intencao de plano — nao ativa nada ainda (P1-5, ver
+// OnboardSelectPlanCommandHandler). A ativacao de verdade acontece depois de
+// confirmar o e-mail e logar, em /settings/billing.
 export function onboardSelectPlan(
   input: { planId: string },
   onboardingToken: string
-): Promise<{ requiresPayment: boolean; checkoutLink: string | null }> {
+): Promise<{ requiresPayment: boolean }> {
   return request(
     "/api/billing/subscription/onboard-select-plan",
     { method: "POST", body: JSON.stringify(input) },
@@ -1743,6 +1998,27 @@ export type AskAssistantInput = {
   history: AssistantMessage[];
 };
 
-export function askAssistant(input: AskAssistantInput, accessToken: string): Promise<{ answer: string }> {
+export type AskAssistantResult = {
+  answer: string;
+  /** Preenchida so quando a resposta se refere a uma tela especifica -- usada pro botao "Ir para X". */
+  suggestedRoute: string | null;
+};
+
+export function askAssistant(input: AskAssistantInput, accessToken: string): Promise<AskAssistantResult> {
   return request("/api/assistant/ask", { method: "POST", body: JSON.stringify(input) }, accessToken);
+}
+
+export type AssistantFeature = {
+  id: string;
+  name: string;
+  description: string;
+  route: string;
+  capabilities: string[];
+  requiredRole: string;
+  relatedEntities: string[];
+  exampleQuestions: string[];
+};
+
+export function getAssistantFeatures(accessToken: string): Promise<AssistantFeature[]> {
+  return request("/api/assistant/features", {}, accessToken);
 }

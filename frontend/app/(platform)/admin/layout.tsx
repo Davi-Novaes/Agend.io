@@ -3,7 +3,7 @@ import type { ReactNode } from "react";
 
 // Sem SEO de proposito: painel interno do Super Admin, nunca indexado.
 export const metadata: Metadata = {
-  title: "Agendio Platform",
+  title: "AgendioBR Platform",
   robots: { index: false, follow: false },
 };
 

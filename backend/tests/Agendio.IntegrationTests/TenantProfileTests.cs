@@ -71,7 +71,7 @@ public class TenantProfileTests(IntegrationTestFixture fixture)
 
         var ownerEmail = $"owner-{Guid.NewGuid():N}@example.com";
         await client.PostAsJsonAsync(
-            "/api/auth/register", new { tenantId, email = ownerEmail, password = Password, fullName = "Dono" }, cancellationToken);
+            "/api/auth/register", new { tenantId, email = ownerEmail, password = Password, fullName = "Dono", phone = "+5511999999999", cpfCnpj = "12345678909", termsAccepted = true }, cancellationToken);
         await fixture.ConfirmEmailDirectlyAsync(tenantId, ownerEmail, cancellationToken);
         var loginResponse = await client.PostAsJsonAsync(
             "/api/auth/login", new { tenantId, email = ownerEmail, password = Password }, cancellationToken);
@@ -327,14 +327,39 @@ public class TenantProfileTests(IntegrationTestFixture fixture)
             cancellationToken);
         updateResponse.StatusCode.ShouldBe(HttpStatusCode.NoContent);
 
+        // Le pelo endpoint proprio (GET /company-info, Owner-only), NAO mais
+        // por /profile — dado cadastral separado do perfil geral desde o
+        // pedido do usuario (2026-09-05) de restringir a leitura a Owner.
+        var companyInfoResponse = await AuthorizedRequestHelpers.GetAuthorizedAsync(client, accessToken, "/api/tenants/company-info", cancellationToken);
+        var companyInfo = await companyInfoResponse.Content.ReadFromJsonAsync<JsonElement>(cancellationToken);
+        companyInfo.GetProperty("name").GetString().ShouldBe("Barbearia do Ze");
+        companyInfo.GetProperty("legalName").GetString().ShouldBe("Jose da Silva Servicos Ltda");
+        companyInfo.GetProperty("document").GetString().ShouldBe("11222333000181");
+        companyInfo.GetProperty("city").GetString().ShouldBe("Sao Paulo");
+        companyInfo.GetProperty("state").GetString().ShouldBe("SP");
+        companyInfo.GetProperty("zipCode").GetString().ShouldBe("01310-100");
+
+        // Perfil geral (liberado a qualquer papel) nunca deve carregar dado
+        // cadastral — so o nome, que continua publico/compartilhado.
         var profileResponse = await AuthorizedRequestHelpers.GetAuthorizedAsync(client, accessToken, "/api/tenants/profile", cancellationToken);
         var profile = await profileResponse.Content.ReadFromJsonAsync<JsonElement>(cancellationToken);
         profile.GetProperty("name").GetString().ShouldBe("Barbearia do Ze");
-        profile.GetProperty("legalName").GetString().ShouldBe("Jose da Silva Servicos Ltda");
-        profile.GetProperty("document").GetString().ShouldBe("11222333000181");
-        profile.GetProperty("city").GetString().ShouldBe("Sao Paulo");
-        profile.GetProperty("state").GetString().ShouldBe("SP");
-        profile.GetProperty("zipCode").GetString().ShouldBe("01310-100");
+        profile.TryGetProperty("legalName", out _).ShouldBeFalse();
+        profile.TryGetProperty("document", out _).ShouldBeFalse();
+        profile.TryGetProperty("city", out _).ShouldBeFalse();
+    }
+
+    [Fact]
+    public async Task A_Staff_Member_Should_Not_Be_Able_To_Read_Company_Info()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var client = fixture.CreateClient();
+        var (tenantId, ownerToken) = await CreateTenantWithOwnerAndLoginAsyncWithId(client, cancellationToken);
+        var staffToken = await InviteAndLoginAsStaffAsync(client, tenantId, ownerToken, cancellationToken);
+
+        var response = await AuthorizedRequestHelpers.GetAuthorizedAsync(client, staffToken, "/api/tenants/company-info", cancellationToken);
+
+        response.StatusCode.ShouldBe(HttpStatusCode.Forbidden);
     }
 
     [Fact]
@@ -755,7 +780,7 @@ public class TenantProfileTests(IntegrationTestFixture fixture)
 
         var ownerEmail = $"owner-{Guid.NewGuid():N}@example.com";
         await client.PostAsJsonAsync(
-            "/api/auth/register", new { tenantId, email = ownerEmail, password = Password, fullName = "Dono" }, cancellationToken);
+            "/api/auth/register", new { tenantId, email = ownerEmail, password = Password, fullName = "Dono", phone = "+5511999999999", cpfCnpj = "12345678909", termsAccepted = true }, cancellationToken);
         await fixture.ConfirmEmailDirectlyAsync(tenantId, ownerEmail, cancellationToken);
 
         var loginResponse = await client.PostAsJsonAsync(
@@ -781,7 +806,7 @@ public class TenantProfileTests(IntegrationTestFixture fixture)
 
         var ownerEmail = $"owner-{Guid.NewGuid():N}@example.com";
         await client.PostAsJsonAsync(
-            "/api/auth/register", new { tenantId, email = ownerEmail, password = Password, fullName = "Dono" }, cancellationToken);
+            "/api/auth/register", new { tenantId, email = ownerEmail, password = Password, fullName = "Dono", phone = "+5511999999999", cpfCnpj = "12345678909", termsAccepted = true }, cancellationToken);
         await fixture.ConfirmEmailDirectlyAsync(tenantId, ownerEmail, cancellationToken);
 
         var loginResponse = await client.PostAsJsonAsync(

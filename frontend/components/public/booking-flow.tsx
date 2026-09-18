@@ -447,7 +447,11 @@ export function BookingFlow({
       {step === "confirmed" && selectedService && selectedSlot && (
         <section aria-labelledby="step-confirmed-heading" className="text-center">
           <h2 id="step-confirmed-heading" className="mb-2 text-lg font-medium">
-            {paymentUrl ? "Falta pouco! Pague o sinal para confirmar" : "Agendamento confirmado!"}
+            {paymentUrl
+              ? "Falta pouco! Pague o sinal para confirmar"
+              : paymentRequired
+                ? "Horário reservado — pagamento do sinal pendente"
+                : "Agendamento confirmado!"}
           </h2>
           <p className="text-muted-foreground text-sm capitalize">
             {selectedService.name} em {formatDate(selectedSlot.startUtc)} as {formatTime(selectedSlot.startUtc)}
@@ -463,6 +467,16 @@ export function BookingFlow({
                 </a>
               </Button>
             </>
+          ) : paymentRequired ? (
+            // Agendamento foi criado normalmente, mas a geracao da cobranca no
+            // gateway falhou (ver TryCreateDepositAsync no backend) — sem este
+            // aviso, o cliente via "Agendamento confirmado!" sem nunca saber
+            // que ainda precisa pagar o sinal, e a reserva podia expirar sem
+            // ele entender o motivo.
+            <p className="text-muted-foreground mt-4 text-sm">
+              Seu horário está reservado, mas não conseguimos gerar o link de pagamento do sinal agora. A equipe vai
+              entrar em contato por e-mail ou telefone para combinar o pagamento antes do horário.
+            </p>
           ) : (
             <p className="text-muted-foreground mt-4 text-sm">Enviamos os detalhes para {email}.</p>
           )}

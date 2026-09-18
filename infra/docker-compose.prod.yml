@@ -1,0 +1,160 @@
+name: agendio
+
+# Producao. Segredos vem de infra/.env (nao versionado — ver infra/.env.example).
+# Nenhuma porta de infra (postgres/redis/rabbitmq) publicada no host: so o
+# Caddy expoe 80/443. A rede "agendio" e o unico caminho entre os containers.
+
+services:
+  postgres:
+    image: pgvector/pgvector:pg17
+    container_name: agendio-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${POSTGRES_SUPERUSER_PASSWORD}
+      POSTGRES_DB: postgres
+      AGENDIO_OWNER_PASSWORD: ${AGENDIO_OWNER_PASSWORD}
+      AGENDIO_APP_PASSWORD: ${AGENDIO_APP_PASSWORD}
+    volumes:
+      - agendio_postgres_data:/var/lib/postgresql/data
+      - ./postgres/init.prod:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    networks: [agendio]
+
+  redis:
+    image: redis:7-alpine
+    container_name: agendio-redis
+    restart: unless-stopped
+    volumes:
+      - agendio_redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    networks: [agendio]
+
+  rabbitmq:
+    image: rabbitmq:4-management-alpine
+    container_name: agendio-rabbitmq
+    restart: unless-stopped
+    environment:
+      RABBITMQ_DEFAULT_USER: agendio
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD}
+    volumes:
+      - agendio_rabbitmq_data:/var/lib/rabbitmq
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 10s
+      timeout: 10s
+      retries: 10
+    networks: [agendio]
+
+  backend:
+    build:
+      context: ../backend
+      dockerfile: Dockerfile
+    container_name: agendio-backend
+    restart: unless-stopped
+    depends_on:
+      postgres: { condition: service_healthy }
+      redis: { condition: service_healthy }
+      rabbitmq: { condition: service_healthy }
+    environment:
+      ASPNETCORE_ENVIRONMENT: Production
+      ConnectionStrings__Postgres: Host=postgres;Port=5432;Database=agendio;Username=agendio_app;Password=${AGENDIO_APP_PASSWORD}
+      ConnectionStrings__PostgresAdmin: Host=postgres;Port=5432;Database=agendio;Username=agendio_owner;Password=${AGENDIO_OWNER_PASSWORD}
+      ConnectionStrings__Redis: redis:6379
+      RabbitMq__HostName: rabbitmq
+      RabbitMq__Port: 5672
+      RabbitMq__UserName: agendio
+      RabbitMq__Password: ${RABBITMQ_PASSWORD}
+      Jwt__Issuer: ${PUBLIC_ORIGIN}
+      Jwt__SigningKey: ${JWT_SIGNING_KEY}
+      PlatformJwt__Issuer: ${PUBLIC_ORIGIN}/platform
+      PlatformJwt__SigningKey: ${PLATFORM_JWT_SIGNING_KEY}
+      OnboardingJwt__Issuer: ${PUBLIC_ORIGIN}/onboarding
+      OnboardingJwt__SigningKey: ${ONBOARDING_JWT_SIGNING_KEY}
+      ColumnEncryption__Key: ${COLUMN_ENCRYPTION_KEY}
+      Cors__AllowedOrigins__0: ${PUBLIC_ORIGIN}
+      Frontend__BaseUrl: ${PUBLIC_ORIGIN}
+      Asaas__BaseUrl: ${ASAAS_BASE_URL:-https://api-sandbox.asaas.com/v3}
+      Asaas__ApiKey: ${ASAAS_API_KEY:-}
+      Asaas__WebhookSecret: ${ASAAS_WEBHOOK_SECRET:-}
+      Asaas__AppointmentDepositWebhookSecret: ${ASAAS_APPOINTMENT_DEPOSIT_WEBHOOK_SECRET:-}
+      Smtp__Host: ${SMTP_HOST:-}
+      Smtp__Port: ${SMTP_PORT:-587}
+      Smtp__UserName: ${SMTP_USERNAME:-}
+      Smtp__Password: ${SMTP_PASSWORD:-}
+      Smtp__FromAddress: ${SMTP_FROM_ADDRESS:-no-reply@agendiobr.com.br}
+      Smtp__FromName: Agendio
+      Feedback__NotificationEmail: ${FEEDBACK_NOTIFICATION_EMAIL:-contato@agendiobr.com.br}
+      AiAssistant__Provider: Anthropic
+      AiAssistant__ApiKey: ${AI_ASSISTANT_API_KEY:-}
+    volumes:
+      - agendio_uploads:/app/uploads
+    networks: [agendio]
+
+  # Nao sobe com `up`: roda migrations sob demanda, uma vez, via
+  #   docker compose -f infra/docker-compose.prod.yml run --rm migrator
+  # Usa o estagio `build` da imagem backend (tem o SDK + codigo-fonte
+  # completo) contra a role agendio_owner, que os containers em runtime
+  # (agendio_app) nunca usam.
+  migrator:
+    build:
+      context: ../backend
+      dockerfile: Dockerfile
+      target: build
+    container_name: agendio-migrator
+    profiles: ["tools"]
+    depends_on:
+      postgres: { condition: service_healthy }
+    working_dir: /src
+    entrypoint: ["sh", "migrate.sh"]
+    environment:
+      ConnectionStrings__PostgresAdmin: Host=postgres;Port=5432;Database=agendio;Username=agendio_owner;Password=${AGENDIO_OWNER_PASSWORD}
+      ColumnEncryption__Key: ${COLUMN_ENCRYPTION_KEY}
+    networks: [agendio]
+
+  frontend:
+    build:
+      context: ../frontend
+      dockerfile: Dockerfile
+      args:
+        NEXT_PUBLIC_API_URL: ${PUBLIC_ORIGIN}
+        NEXT_PUBLIC_ROOT_DOMAIN: ${ROOT_DOMAIN:-agendiobr.com.br}
+    container_name: agendio-frontend
+    restart: unless-stopped
+    depends_on: [backend]
+    networks: [agendio]
+
+  caddy:
+    image: caddy:2-alpine
+    container_name: agendio-caddy
+    restart: unless-stopped
+    depends_on: [backend, frontend]
+    # So localhost: TLS publica e roteamento vem do Cloudflare Tunnel
+    # (cloudflared roda no host, fora do compose, e fala com este Caddy em
+    # http://localhost:80) -- a porta nunca fica exposta na internet.
+    ports:
+      - "127.0.0.1:80:80"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - agendio_caddy_data:/data
+      - agendio_caddy_config:/config
+    networks: [agendio]
+
+networks:
+  agendio:
+
+volumes:
+  agendio_postgres_data:
+  agendio_redis_data:
+  agendio_rabbitmq_data:
+  agendio_uploads:
+  agendio_caddy_data:
+  agendio_caddy_config:

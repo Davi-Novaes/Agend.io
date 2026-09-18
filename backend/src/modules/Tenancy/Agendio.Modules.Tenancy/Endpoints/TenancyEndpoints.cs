@@ -2,6 +2,7 @@ using Agendio.Infrastructure.Endpoints;
 using Agendio.Modules.Tenancy.Application.CreateTenant;
 using Agendio.Modules.Tenancy.Application.CreateUnit;
 using Agendio.Modules.Tenancy.Application.GetPublicTenantProfile;
+using Agendio.Modules.Tenancy.Application.GetTenantCompanyInfo;
 using Agendio.Modules.Tenancy.Application.GetTenantProfile;
 using Agendio.Modules.Tenancy.Application.GetUnitById;
 using Agendio.Modules.Tenancy.Application.ListUnits;
@@ -157,6 +158,21 @@ public sealed class TenancyEndpoints : IEndpointModule
         .WithName("UpdateTenantPageCustomization")
         .WithSummary("Atualiza a personalizacao da pagina publica: cor secundaria, fonte, estilo de botao, textos de conteudo e visibilidade de secoes.");
 
+        group.MapGet("/company-info", async (IDispatcher dispatcher, CancellationToken cancellationToken) =>
+        {
+            var result = await dispatcher.Query(new GetTenantCompanyInfoQuery(), cancellationToken);
+            return result.IsSuccess ? Results.Ok(result.Value) : result.Error.ToProblemResult();
+        })
+        // Owner-only tambem na LEITURA (nao so na escrita, ver PUT abaixo) —
+        // pedido explicito do usuario (2026-09-05): CNPJ/CPF/razao social/
+        // localizacao cadastral do estabelecimento nao sao "so mais um campo"
+        // do perfil geral (GetTenantProfile, liberado a qualquer papel) — por
+        // isso viraram um endpoint proprio em vez de campos condicionais no
+        // DTO grande.
+        .RequireAuthorization(policy => policy.RequireRole("Owner"))
+        .WithName("GetTenantCompanyInfo")
+        .WithSummary("Retorna os dados cadastrais do estabelecimento (nome, razao social, CNPJ/CPF, cidade, estado, CEP) — Owner-only.");
+
         group.MapPut("/company-info", async (UpdateCompanyInfoRequest request, IDispatcher dispatcher, CancellationToken cancellationToken) =>
         {
             var command = new UpdateTenantCompanyInfoCommand(request.Name, request.LegalName, request.Document, request.City, request.State, request.ZipCode);
@@ -286,7 +302,7 @@ public sealed class TenancyEndpoints : IEndpointModule
 
         units.MapPost("/", async (CreateUnitRequest request, IDispatcher dispatcher, CancellationToken cancellationToken) =>
         {
-            var command = new CreateUnitCommand(request.Name, request.Address);
+            var command = new CreateUnitCommand(request.Name, request.Address, request.City, request.State, request.Country);
             var result = await dispatcher.Send(command, cancellationToken);
 
             return result.IsSuccess
@@ -298,7 +314,7 @@ public sealed class TenancyEndpoints : IEndpointModule
 
         units.MapPut("/{id:guid}", async (Guid id, UpdateUnitRequest request, IDispatcher dispatcher, CancellationToken cancellationToken) =>
         {
-            var command = new UpdateUnitCommand(id, request.Name, request.Address);
+            var command = new UpdateUnitCommand(id, request.Name, request.Address, request.City, request.State, request.Country);
             var result = await dispatcher.Send(command, cancellationToken);
 
             return result.IsSuccess ? Results.NoContent() : result.Error.ToProblemResult();
@@ -315,9 +331,9 @@ public sealed class TenancyEndpoints : IEndpointModule
         .WithSummary("Ativa ou desativa uma unidade.");
     }
 
-    private sealed record CreateUnitRequest(string Name, string? Address);
+    private sealed record CreateUnitRequest(string Name, string? Address, string? City, string? State, string? Country);
 
-    private sealed record UpdateUnitRequest(string Name, string? Address);
+    private sealed record UpdateUnitRequest(string Name, string? Address, string? City, string? State, string? Country);
 
     private sealed record SetUnitStatusRequest(bool IsActive);
 

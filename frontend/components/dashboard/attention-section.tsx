@@ -3,6 +3,7 @@
 import Link from "next/link";
 import type { LucideIcon } from "lucide-react";
 import { Bell, CircleCheck, PackageX, Receipt, UserRoundX, UsersRound } from "lucide-react";
+import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
 
@@ -85,13 +86,32 @@ export function AttentionSection({
     });
   }
 
+  const alertsCount = alerts.reduce((sum, alert) => sum + alert.count, 0);
+
   return (
-    <div className="rounded-lg border p-4">
+    <Card className="border-border/70 ring-0 shadow-none">
+    <CardContent>
       <div className="mb-3 flex items-center gap-2">
-        <Bell className="text-primary size-4" aria-hidden="true" />
+        {!isLoading && alerts.length === 0 ? (
+          <CircleCheck className="text-success size-4" aria-hidden="true" />
+        ) : (
+          <Bell className="text-primary size-4" aria-hidden="true" />
+        )}
         <div>
-          <h3 className="text-sm font-semibold">Requer sua atencao</h3>
-          <p className="text-muted-foreground text-xs">Existem itens que precisam da sua acao.</p>
+          <h3 className="text-sm font-semibold">
+            {isLoading
+              ? "Verificando pendencias..."
+              : alerts.length === 0
+                ? "Tudo em ordem"
+                : `${alertsCount} ${alertsCount === 1 ? "item precisa" : "itens precisam"} da sua atencao`}
+          </h3>
+          <p className="text-muted-foreground text-xs">
+            {isLoading
+              ? "Um instante."
+              : alerts.length === 0
+                ? "Nenhuma pendencia importante no momento."
+                : "Resolva o quanto antes para nao afetar o atendimento."}
+          </p>
         </div>
       </div>
 
@@ -100,21 +120,13 @@ export function AttentionSection({
           <Skeleton className="h-20 w-full" />
           <Skeleton className="h-20 w-full" />
         </div>
-      ) : alerts.length === 0 ? (
-        <div className="flex items-center gap-3 py-6">
-          <CircleCheck className="text-success size-5 shrink-0" aria-hidden="true" />
-          <div>
-            <p className="text-sm font-medium">Esta tudo em ordem</p>
-            <p className="text-muted-foreground text-xs">Nao encontramos nenhuma pendencia importante.</p>
-          </div>
-        </div>
-      ) : (
+      ) : alerts.length === 0 ? null : (
         <div className="grid gap-3 sm:grid-cols-2">
           {alerts.map((alert) => (
             <Link
               key={alert.key}
               href={alert.href}
-              className="hover:border-primary/40 hover:bg-accent/50 flex flex-col gap-2 rounded-lg border p-3 transition-colors"
+              className="hover:border-primary/40 hover:bg-card-hover border-border/70 flex flex-col gap-2 rounded-lg border p-3 transition-colors"
             >
               <div className="flex items-center gap-2">
                 <div className={cn("flex size-7 items-center justify-center rounded-md", TONE_CLASSES[alert.tone])}>
@@ -128,6 +140,7 @@ export function AttentionSection({
           ))}
         </div>
       )}
-    </div>
+    </CardContent>
+    </Card>
   );
 }

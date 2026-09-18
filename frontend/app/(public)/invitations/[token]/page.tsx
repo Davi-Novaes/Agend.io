@@ -10,6 +10,7 @@ import { CheckCircle2 } from "lucide-react";
 
 import { acceptInvitation, ApiError } from "@/lib/api/client";
 import { Logo } from "@/components/logo";
+import { strongPasswordSchema } from "@/lib/validation/password";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -23,7 +24,7 @@ import {
 
 const acceptSchema = z.object({
   fullName: z.string().trim().min(1, "Informe seu nome."),
-  password: z.string().min(8, "A senha precisa ter ao menos 8 caracteres."),
+  password: strongPasswordSchema,
 });
 
 type AcceptFormValues = z.infer<typeof acceptSchema>;

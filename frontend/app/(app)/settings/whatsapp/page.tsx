@@ -10,10 +10,12 @@ import { toast } from "sonner";
 import {
   getTenantProfile,
   updateTenantWhatsAppSettings,
+  TENANT_PROFILE_QUERY_KEY,
   ApiError,
   type TenantProfile,
 } from "@/lib/api/client";
 import { useSession } from "@/lib/auth/session-context";
+import { decodeJwtRole } from "@/lib/auth/decode-jwt";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -77,9 +79,14 @@ function toNullable(value: string): string | null {
 export default function WhatsAppSettingsPage() {
   const { session } = useSession();
   const accessToken = session?.accessToken ?? "";
+  // Escrita (updateTenantWhatsAppSettings) e Owner-only no backend -- a
+  // leitura do perfil foi liberada pra qualquer papel, entao sem isto Staff
+  // veria o formulario normal (inclusive o campo de token) e so descobriria
+  // o bloqueio com um 403 confuso ao clicar em salvar.
+  const isOwner = session ? decodeJwtRole(session.accessToken) === "Owner" : false;
 
   const profileQuery = useQuery({
-    queryKey: ["tenant", "profile"],
+    queryKey: TENANT_PROFILE_QUERY_KEY,
     queryFn: () => getTenantProfile(accessToken),
     enabled: Boolean(session),
   });
@@ -89,10 +96,13 @@ export default function WhatsAppSettingsPage() {
   }
 
   return (
-    <div className="mx-auto flex w-full max-w-lg flex-1 flex-col gap-6">
+    <div className="flex w-full max-w-lg flex-1 flex-col gap-6">
       <p className="text-muted-foreground text-sm">
         Conecte o WhatsApp do seu estabelecimento para enviar confirmações, lembretes e outras notificações automáticas aos clientes.
       </p>
+      {!isOwner && (
+        <p className="text-muted-foreground text-sm">Somente o administrador da conta pode alterar estas configurações.</p>
+      )}
 
       {profileQuery.isLoading || !profileQuery.data ? (
         <div className="flex flex-col gap-6">
@@ -100,13 +110,21 @@ export default function WhatsAppSettingsPage() {
           <Skeleton className="h-96 w-full" />
         </div>
       ) : (
-        <WhatsAppSettingsForm profile={profileQuery.data} accessToken={accessToken} />
+        <WhatsAppSettingsForm profile={profileQuery.data} accessToken={accessToken} readOnly={!isOwner} />
       )}
     </div>
   );
 }
 
-function WhatsAppSettingsForm({ profile, accessToken }: { profile: TenantProfile; accessToken: string }) {
+function WhatsAppSettingsForm({
+  profile,
+  accessToken,
+  readOnly,
+}: {
+  profile: TenantProfile;
+  accessToken: string;
+  readOnly: boolean;
+}) {
   const queryClient = useQueryClient();
 
   const form = useForm<SettingsFormValues>({
@@ -145,7 +163,7 @@ function WhatsAppSettingsForm({ profile, accessToken }: { profile: TenantProfile
       ),
     onSuccess: () => {
       toast.success("Configurações do WhatsApp atualizadas.");
-      queryClient.invalidateQueries({ queryKey: ["tenant", "profile"] });
+      queryClient.invalidateQueries({ queryKey: TENANT_PROFILE_QUERY_KEY });
       form.setValue("accessToken", "");
     },
     onError: (error) => toast.error(error instanceof ApiError ? error.message : "Não foi possível salvar as configurações do WhatsApp."),
@@ -154,6 +172,7 @@ function WhatsAppSettingsForm({ profile, accessToken }: { profile: TenantProfile
   return (
     <Form {...form}>
       <form onSubmit={form.handleSubmit((values) => mutation.mutate(values))} className="flex flex-col gap-6">
+      <fieldset disabled={readOnly} className="contents">
         <Card>
           <CardHeader>
             <CardTitle className="text-base">Conexão</CardTitle>
@@ -254,6 +273,7 @@ function WhatsAppSettingsForm({ profile, accessToken }: { profile: TenantProfile
         <Button type="submit" disabled={mutation.isPending} className="w-fit">
           {mutation.isPending ? "Salvando..." : "Salvar configurações do WhatsApp"}
         </Button>
+      </fieldset>
       </form>
     </Form>
   );

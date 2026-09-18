@@ -7,6 +7,7 @@ using Agendio.Modules.Tenancy.Contracts;
 using Agendio.SharedKernel.Messaging;
 using Agendio.SharedKernel.Multitenancy;
 using Agendio.SharedKernel.Results;
+using Agendio.SharedKernel.Time;
 using Agendio.SharedKernel.ValueObjects;
 using Hangfire;
 using Microsoft.EntityFrameworkCore;
@@ -18,7 +19,9 @@ public sealed class RegisterUserCommandHandler(
     ITenantLookupService tenantLookupService,
     IPasswordHasher passwordHasher,
     IBackgroundJobClient jobClient,
-    IOnboardingJwtTokenService onboardingJwtTokenService) : ICommandHandler<RegisterUserCommand, RegisterUserResult>
+    IOnboardingJwtTokenService onboardingJwtTokenService,
+    SecurityAuditLogger<IdentityDbContext> securityAuditLogger,
+    IClock clock) : ICommandHandler<RegisterUserCommand, RegisterUserResult>
 {
     public async Task<Result<RegisterUserResult>> Handle(RegisterUserCommand request, CancellationToken cancellationToken)
     {
@@ -36,6 +39,18 @@ public sealed class RegisterUserCommandHandler(
             return Result.Failure<RegisterUserResult>(emailResult.Error);
         }
 
+        var phoneResult = PhoneNumber.Create(request.Phone);
+        if (phoneResult.IsFailure)
+        {
+            return Result.Failure<RegisterUserResult>(phoneResult.Error);
+        }
+
+        var cpfCnpjResult = CpfCnpj.Create(request.CpfCnpj);
+        if (cpfCnpjResult.IsFailure)
+        {
+            return Result.Failure<RegisterUserResult>(cpfCnpjResult.Error);
+        }
+
         // ExplicitTenantBehavior ja ancorou o tenant no ITenantContext antes deste
         // handler rodar — o Global Query Filter do EF ja restringe isto ao tenant certo.
         var emailTaken = await dbContext.Users.AnyAsync(u => u.Email == emailResult.Value, cancellationToken);
@@ -46,7 +61,9 @@ public sealed class RegisterUserCommandHandler(
 
         var passwordHash = passwordHasher.Hash(request.Password);
 
-        var userResult = User.Register(tenantId, emailResult.Value, request.FullName, passwordHash);
+        var userResult = User.Register(
+            tenantId, emailResult.Value, request.FullName, passwordHash,
+            phone: phoneResult.Value.Value, cpf: cpfCnpjResult.Value.Value, termsAcceptedAtUtc: clock.UtcNow);
         if (userResult.IsFailure)
         {
             return Result.Failure<RegisterUserResult>(userResult.Error);
@@ -54,6 +71,7 @@ public sealed class RegisterUserCommandHandler(
 
         dbContext.Users.Add(userResult.Value);
         await dbContext.SaveChangesAsync(cancellationToken);
+        await securityAuditLogger.LogAsync("RegistrationConfirmed", success: true, tenantId.Value, userResult.Value.Id.Value, null, cancellationToken);
 
         // Via Hangfire (nao sincrono): e o unico jeito do dono entrar na propria
         // conta (login exige e-mail confirmado, ver LoginCommandHandler), uma

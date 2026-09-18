@@ -41,6 +41,15 @@ public sealed class Customer : AggregateRoot<CustomerId>, ITenantOwned, IAuditab
     /// <summary>Saldo atual do programa de fidelidade (Fase 11) — a soma dos lancamentos em LoyaltyPointsLedgerEntry, mantida aqui como projecao para leitura rapida.</summary>
     public int LoyaltyPoints { get; private set; }
 
+    /// <summary>
+    /// Ultima vez que o estabelecimento mandou uma mensagem avulsa (SendCustomerMessage)
+    /// ou uma campanha (Marketing.SendCampaign) para este cliente — usado por
+    /// GetCustomerRecoveryCandidatesQueryHandler pra nao continuar sugerindo
+    /// "recuperar" quem ja foi contatado nesse ciclo de atraso (pedido explicito
+    /// do usuario, 2026-09-05: "precisa remover assim que enviar").
+    /// </summary>
+    public DateTimeOffset? LastContactedAtUtc { get; private set; }
+
     public DateTimeOffset CreatedAtUtc { get; set; }
 
     public string? CreatedBy { get; set; }
@@ -162,6 +171,8 @@ public sealed class Customer : AggregateRoot<CustomerId>, ITenantOwned, IAuditab
 
         return Result.Success();
     }
+
+    public void MarkContacted(DateTimeOffset nowUtc) => LastContactedAtUtc = nowUtc;
 
     public void Deactivate() => IsActive = false;
 

@@ -8,6 +8,13 @@ namespace Agendio.Modules.Assistant.Application.AskAssistant;
 // externa de IA, com custo por chamada.
 public sealed record AssistantChatMessageDto(string Role, string Text);
 
-public sealed record AskAssistantCommand(string Question, IReadOnlyList<AssistantChatMessageDto> History) : ICommand<AskAssistantResult>;
+// CallerRole ("Owner"/"Staff") vem da claim do JWT, resolvida no endpoint --
+// usada so pelo fast-path (NavigationIntentRule) pra nao sugerir uma tela que
+// o usuario nem consegue abrir. O caminho LLM ja recusa educadamente pedidos
+// fora do escopo, entao nao precisa da role hoje. CallerUserId vem da mesma
+// claim (NameIdentifier) -- so pro log de auditoria (Fase 3), nunca usado
+// pra logica de negocio.
+public sealed record AskAssistantCommand(string Question, IReadOnlyList<AssistantChatMessageDto> History, string CallerRole, Guid CallerUserId) : ICommand<AskAssistantResult>;
 
-public sealed record AskAssistantResult(string Answer);
+/// <summary>SuggestedRoute preenchido so quando a resposta veio (ou se refere a) uma tela especifica -- o frontend usa pra mostrar um botao "Ir para X".</summary>
+public sealed record AskAssistantResult(string Answer, string? SuggestedRoute = null);

@@ -1,0 +1,567 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+@import "shadcn/tailwind.css";
+
+@custom-variant dark (&:is(.dark *));
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: var(--font-plus-jakarta-sans);
+  --font-mono: var(--font-geist-mono);
+  --font-heading: var(--font-sans);
+  --color-sidebar-ring: var(--sidebar-ring);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar: var(--sidebar);
+  --color-chart-5: var(--chart-5);
+  --color-chart-4: var(--chart-4);
+  --color-chart-3: var(--chart-3);
+  --color-chart-2: var(--chart-2);
+  --color-chart-1: var(--chart-1);
+  --color-ring: var(--ring);
+  --color-input: var(--input);
+  --color-border: var(--border);
+  --color-destructive: var(--destructive);
+  --color-success: var(--success);
+  --color-warning: var(--warning);
+  --color-info: var(--info);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-accent: var(--accent);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-muted: var(--muted);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-secondary: var(--secondary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-primary: var(--primary);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-popover: var(--popover);
+  --color-card-foreground: var(--card-foreground);
+  --color-card: var(--card);
+  --color-card-hover: var(--card-hover);
+  --color-surface-inset: var(--surface-inset);
+  --radius-sm: calc(var(--radius) * 0.6);
+  --radius-md: calc(var(--radius) * 0.8);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) * 1.4);
+  --radius-2xl: calc(var(--radius) * 1.8);
+  --radius-3xl: calc(var(--radius) * 2.2);
+  --radius-4xl: calc(var(--radius) * 2.6);
+  --shadow-xs: var(--shadow-xs);
+  --shadow-sm: var(--shadow-sm);
+  --shadow-md: var(--shadow-md);
+  --shadow-lg: var(--shadow-lg);
+  --shadow-xl: var(--shadow-xl);
+}
+
+:root {
+  /* Tema claro "amarelado" (pedido explicito do usuario, 2026-09-04): branco
+     puro em tudo (--background E --card no mesmo oklch(1 0 0)) deixava os
+     cards impossiveis de distinguir do fundo, "estourado" demais pra
+     leitura confortavel. Mesmo raciocinio de hierarquia ja aplicado no dark
+     mode (sidebar mais escura/recuada, --card a superficie mais clara/
+     "elevada"): aqui --background e um creme quente (hue ~85 = amarelo,
+     chroma baixo -- so uma pitada, nao fica literalmente amarelo) mais
+     escuro que --card, que fica branco puro pra "flutuar" acima do fundo.
+     --foreground continua acromatico (nunca tingido) -- contraste de texto
+     so AUMENTA com o fundo mais escuro, nunca fica abaixo do que passava
+     antes em AA. */
+  --background: oklch(0.965 0.01 85);
+  --foreground: oklch(0.145 0 0);
+  --card: oklch(1 0 0);
+  --card-foreground: oklch(0.145 0 0);
+  --popover: oklch(1 0 0);
+  --popover-foreground: oklch(0.145 0 0);
+  --primary: oklch(0.475 0.165 275);
+  --primary-foreground: oklch(0.99 0 0);
+  --secondary: oklch(0.95 0.012 85);
+  --secondary-foreground: oklch(0.205 0 0);
+  --muted: oklch(0.95 0.012 85);
+  --muted-foreground: oklch(0.556 0 0);
+  --accent: color-mix(in oklch, var(--primary), transparent 90%);
+  --accent-foreground: oklch(0.34 0.11 276);
+  --destructive: oklch(0.577 0.245 27.325);
+  --success: oklch(0.58 0.14 145);
+  --warning: oklch(0.58 0.15 55);
+  --info: oklch(0.55 0.14 235);
+  --border: oklch(0.9 0.012 85);
+  --input: oklch(0.9 0.012 85);
+  --ring: oklch(0.475 0.165 275);
+  --card-hover: oklch(0.945 0.012 85);
+  --surface-inset: oklch(0.95 0.01 85);
+  /* Paleta categorica validada pela skill dataviz (node scripts/validate_palette.js)
+     — os valores anteriores (oklch escolhidos a olho) falhavam separacao CVD entre
+     chart-3/chart-4 (protanopia). Hex fixos em vez de oklch: sao a saida direta do
+     validador, reconverter pra oklch so arriscaria reintroduzir o mesmo erro. */
+  --chart-1: #2a78d6;
+  --chart-2: #eb6834;
+  --chart-3: #1baf7a;
+  --chart-4: #eda100;
+  --chart-5: #e87ba4;
+  /* Recebido/Pago (financeiro) -- verde/vermelho especificos, NAO os tokens
+     genericos --success/--destructive: validados a parte pela skill dataviz
+     pro contraste especifico dessa dupla (ver components/financeiro/cash-flow-chart.tsx). */
+  --chart-received: #008300;
+  --chart-paid: #e34948;
+  --radius: 0.625rem;
+  /* Fase 3: raio dos botoes da pagina publica — TenantThemeProvider sobrescreve
+     quando o dono escolhe um estilo diferente de "Arredondado". */
+  --tenant-button-radius: var(--radius-lg);
+  --shadow-xs: 0 1px 2px 0 oklch(0.145 0.02 275 / 0.04);
+  --shadow-sm: 0 1px 3px 0 oklch(0.145 0.02 275 / 0.06), 0 1px 2px -1px oklch(0.145 0.02 275 / 0.06);
+  --shadow-md: 0 4px 6px -1px oklch(0.145 0.02 275 / 0.07), 0 2px 4px -2px oklch(0.145 0.02 275 / 0.06);
+  --shadow-lg: 0 10px 15px -3px oklch(0.145 0.02 275 / 0.08), 0 4px 6px -4px oklch(0.145 0.02 275 / 0.06);
+  --shadow-xl: 0 20px 25px -5px oklch(0.145 0.02 275 / 0.09), 0 8px 10px -6px oklch(0.145 0.02 275 / 0.06);
+  /* Mesmo hue quente de --background (85) em vez do frio original (275) --
+     acompanha o tom "amarelado" pedido pro site inteiro. Mais escura que
+     --background/--card de proposito (mesma hierarquia do dark mode: a
+     sidebar e area estrutural recuada, o card e quem "flutua" por cima). */
+  --sidebar: oklch(0.93 0.014 85);
+  --sidebar-foreground: oklch(0.145 0 0);
+  --sidebar-primary: oklch(0.475 0.165 275);
+  --sidebar-primary-foreground: oklch(0.99 0 0);
+  --sidebar-accent: oklch(0.895 0.016 85);
+  --sidebar-accent-foreground: oklch(0.205 0 0);
+  --sidebar-border: oklch(0.87 0.014 85);
+  --sidebar-ring: oklch(0.708 0 0);
+}
+
+.dark {
+  /* Segunda rodada de refinamento (pedido explicito do usuario, 2026-09-03):
+     a rodada anterior deixou tudo cinza-quase-preto sem separacao entre
+     sidebar/background/card. Aqui cada superficie tem seu proprio hex fixo
+     (nao mais so luminance de oklch(_,0,0)), formando uma hierarquia visivel:
+     sidebar (#111118) < background (#08080C, o mais escuro) < card (#12121A)
+     < card-hover (#181820); --surface-inset (#0D0D13) e uma superficie a
+     parte, mais escura que o card, pro miolo de graficos "afundar" dentro
+     do card em vez de flutuar solto. Hex direto (nao oklch): sao os valores
+     exatos passados pelo usuario, converter perderia a fidelidade. */
+  --background: #08080c;
+  --foreground: #f5f5f7;
+  --card: #12121a;
+  --card-foreground: #f5f5f7;
+  --card-hover: #181820;
+  --surface-inset: #0d0d13;
+  --popover: #12121a;
+  --popover-foreground: #f5f5f7;
+  --primary: #6257f5;
+  --primary-foreground: #f5f5f7;
+  --secondary: #181820;
+  --secondary-foreground: #f5f5f7;
+  --muted: #181820;
+  --muted-foreground: #92929f;
+  /* Wash translucido do proprio --primary (nao um cinza neutro) -- usado em
+     hover/active de itens clicaveis (menu, filtros), papel diferente do
+     --card-hover neutro (esse e so elevacao de superficie, sem cor). */
+  --accent: color-mix(in oklch, var(--primary), transparent 78%);
+  --accent-foreground: #e4e1fb;
+  --destructive: oklch(0.704 0.191 22.216);
+  --success: oklch(0.72 0.16 145);
+  --warning: oklch(0.78 0.16 60);
+  --info: oklch(0.72 0.13 235);
+  --border: #242431;
+  --input: #242431;
+  --ring: #6257f5;
+  --chart-1: #3987e5;
+  --chart-2: #d95926;
+  --chart-3: #199e70;
+  --chart-4: #c98500;
+  --chart-5: #d55181;
+  --chart-received: #008300;
+  --chart-paid: #e66767;
+  --shadow-xs: 0 1px 2px 0 oklch(0 0 0 / 0.3);
+  --shadow-sm: 0 1px 3px 0 oklch(0 0 0 / 0.35), 0 1px 2px -1px oklch(0 0 0 / 0.3);
+  --shadow-md: 0 4px 6px -1px oklch(0 0 0 / 0.4), 0 2px 4px -2px oklch(0 0 0 / 0.3);
+  --shadow-lg: 0 10px 15px -3px oklch(0 0 0 / 0.45), 0 4px 6px -4px oklch(0 0 0 / 0.3);
+  --shadow-xl: 0 20px 25px -5px oklch(0 0 0 / 0.5), 0 8px 10px -6px oklch(0 0 0 / 0.35);
+  /* Grafite escuro levemente azulado/arroxeado -- mais claro que o
+     background (#08080C) de proposito: a sidebar precisa ler como area
+     ESTRUTURAL propria, nao como um recuo escondido atras do painel. */
+  --sidebar: #111118;
+  --sidebar-foreground: #f5f5f7;
+  --sidebar-primary: #6257f5;
+  --sidebar-primary-foreground: #f5f5f7;
+  --sidebar-accent: #181820;
+  --sidebar-accent-foreground: #f5f5f7;
+  /* Divisoria extremamente sutil (nao a #242431 cheia): 40% de opacidade
+     em cima do proprio --sidebar, quase imperceptivel mas ainda separa a
+     sidebar do painel ao lado. */
+  --sidebar-border: color-mix(in oklch, #242431, transparent 40%);
+  --sidebar-ring: #6257f5;
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  body {
+    @apply bg-background text-foreground;
+  }
+  html {
+    @apply font-sans;
+  }
+}
+
+/* WCAG 2.2 AA (2.3.3) -- quem pede menos movimento no SO nao deve receber
+   scroll-reveal, contadores animados nem o parallax do mockup da home. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+@layer components {
+  /* Atmosfera de luz do hero -- 3 camadas grandes e muito difusas (nao um
+     "spot" pequeno atras do titulo), cada uma cobrindo boa parte da secao e
+     se movendo devagar em direcoes diferentes pra dar profundidade. Em modo
+     claro fica bem sutil (fundo e branco); em modo escuro a intensidade sobe
+     pra criar a sensacao de ambiente iluminado pedida no redesign. Desativado
+     junto com o resto em prefers-reduced-motion. */
+  .hero-glow {
+    position: absolute;
+    left: 50%;
+    border-radius: 9999px;
+    will-change: transform;
+  }
+
+  .hero-glow-1 {
+    top: -20%;
+    width: min(1400px, 95vw);
+    height: min(900px, 78vh);
+    transform: translateX(-50%);
+    background: radial-gradient(
+      closest-side,
+      color-mix(in oklch, var(--primary), transparent 82%) 0%,
+      color-mix(in oklch, var(--primary), transparent 90%) 40%,
+      transparent 75%
+    );
+    animation: hero-glow-drift-1 18s ease-in-out infinite;
+  }
+  .dark .hero-glow-1 {
+    background: radial-gradient(
+      closest-side,
+      color-mix(in oklch, var(--primary), transparent 42%) 0%,
+      color-mix(in oklch, var(--primary), transparent 68%) 40%,
+      color-mix(in oklch, var(--primary), transparent 88%) 65%,
+      transparent 85%
+    );
+  }
+
+  .hero-glow-2 {
+    top: -5%;
+    width: min(1200px, 88vw);
+    height: min(820px, 68vh);
+    transform: translateX(-80%);
+    background: radial-gradient(
+      closest-side,
+      color-mix(in oklch, var(--info), transparent 86%) 0%,
+      color-mix(in oklch, var(--info), transparent 93%) 45%,
+      transparent 78%
+    );
+    animation: hero-glow-drift-2 24s ease-in-out infinite;
+  }
+  .dark .hero-glow-2 {
+    background: radial-gradient(
+      closest-side,
+      color-mix(in oklch, var(--info), transparent 55%) 0%,
+      color-mix(in oklch, var(--info), transparent 78%) 45%,
+      transparent 80%
+    );
+  }
+
+  .hero-glow-3 {
+    top: 10%;
+    width: min(1600px, 100vw);
+    height: min(750px, 62vh);
+    transform: translateX(-25%);
+    background: radial-gradient(
+      closest-side,
+      color-mix(in oklch, var(--primary), transparent 92%) 0%,
+      transparent 75%
+    );
+    animation: hero-glow-drift-3 30s ease-in-out infinite;
+  }
+  .dark .hero-glow-3 {
+    background: radial-gradient(
+      closest-side,
+      color-mix(in oklch, var(--primary), transparent 82%) 0%,
+      transparent 75%
+    );
+  }
+
+  /* Luz que segue o cursor (tela de cadastro) -- posicao vem de --spotlight-x/y,
+     atualizadas via JS a cada mousemove (ver onboarding/page.tsx). So um
+     efeito de hover direto (a pessoa move o proprio mouse), nao uma animacao
+     automatica -- por isso nao entra na lista de coisas desligadas em
+     prefers-reduced-motion, e some sozinha em telas sem mouse de verdade
+     (o componente ja guarda com matchMedia("(hover: hover)")). */
+  .cursor-spotlight {
+    position: absolute;
+    inset: 0;
+    opacity: 0;
+    transition: opacity 300ms ease-out;
+    /* --spotlight-size: default 480px (hero/onboarding) -- AppBackground passa
+       um valor bem menor via style inline pro efeito discreto do painel. */
+    background: radial-gradient(
+      var(--spotlight-size, 480px) circle at var(--spotlight-x, 50%) var(--spotlight-y, 50%),
+      color-mix(in oklch, var(--primary), transparent 85%),
+      transparent 70%
+    );
+  }
+  .cursor-spotlight.is-active {
+    opacity: 1;
+  }
+
+  @keyframes hero-glow-drift-1 {
+    0%, 100% { transform: translate(-50%, 0) scale(1); }
+    33% { transform: translate(calc(-50% + 6vw), -5vh) scale(1.08); }
+    66% { transform: translate(calc(-50% - 4vw), 4vh) scale(0.96); }
+  }
+  @keyframes hero-glow-drift-2 {
+    0%, 100% { transform: translate(-80%, 0) scale(1); }
+    33% { transform: translate(calc(-80% - 7vw), 5vh) scale(1.06); }
+    66% { transform: translate(calc(-80% + 5vw), -6vh) scale(0.94); }
+  }
+  @keyframes hero-glow-drift-3 {
+    0%, 100% { transform: translate(-25%, 0) scale(1); }
+    33% { transform: translate(calc(-25% + 8vw), 4vh) scale(1.1); }
+    66% { transform: translate(calc(-25% - 6vw), -5vh) scale(0.93); }
+  }
+
+  /* Fundo ambiente do painel interno (AppBackground, atras do conteudo de
+     SidebarInset — nunca atras da sidebar, que fica solida de proposito pra
+     marcar a separacao).
+
+     Redesenhado do zero (pedido explicito do usuario, 2026-09-03): a versao
+     anterior usava "blobs" de glow com raio pequeno e borda relativamente
+     definida (radial-gradient closest-side) que liam como pontos de luz
+     artificiais, soltos da interface. Aqui a luz nao tem contorno -- cada
+     camada e um radial-gradient ENORME (background-size 100-115vw/vh) com
+     origem fora ou rente a um canto da tela (background-position negativo ou
+     >100%), varios stops bem gradual e blur real (filter) por cima, entao so
+     a cauda mais difusa do degrade alcanca a area visivel. Nunca fecha um
+     circulo perceptivel.
+
+     Tres niveis, de fora pra dentro:
+       .app-ambient       -- wrapper que reage ao cursor (transform + transition
+                              longa, ver app-background.tsx). So desloca a
+                              cena inteira alguns px, nunca um holofote.
+       .app-ambient-a/-b   -- os 2 campos de luz (roxo canto sup-esq, azul
+                              canto inf-dir), cada um com deriva propria via
+                              @keyframes animando background-position (nao
+                              transform -- essa propriedade ja e ocupada pelo
+                              wrapper acima, evita as duas animacoes brigarem
+                              pelo mesmo transform no mesmo elemento).
+       background-attachment: fixed (em cada camada) -- mesma tecnica ja
+                              usada aqui antes: o degrade fica ancorado ao
+                              VIEWPORT, nao ao conteudo (que pode ser bem mais
+                              alto que a tela); sem isto a luz "some" ao rolar
+                              paginas longas (bug ja corrigido nesta mesma
+                              classe numa rodada anterior). */
+  .app-ambient {
+    position: absolute;
+    inset: 0;
+    transition: transform 2.4s cubic-bezier(0.16, 1, 0.3, 1);
+    will-change: transform;
+  }
+
+  .app-ambient-a,
+  .app-ambient-b {
+    position: absolute;
+    inset: 0;
+    background-repeat: no-repeat;
+    background-attachment: fixed;
+    filter: blur(40px);
+  }
+
+  /* background-position em vw/vh (NAO %) de proposito: com o box do
+     background (background-size) bem maior que o viewport, % resolve contra
+     a DIFERENCA entre os dois tamanhos -- formula pouco intuitiva que, pros
+     numeros deste efeito, colocava o centro do degrade perto do meio da
+     tela em vez de perto do canto (bug real, corrigido depois de medir com
+     getComputedStyle no navegador). Como comprimento fixo, o valor abaixo e
+     literalmente "desloca a origem da imagem X vw/vh" -- sem formula, direto:
+     centro do degrade = background-position + metade do background-size. */
+  .app-ambient-a {
+    background-size: 90vw 90vh;
+    background-position: -50vw -51vh;
+    background-image: radial-gradient(
+      closest-side,
+      color-mix(in oklch, var(--primary), transparent 88%) 0%,
+      color-mix(in oklch, var(--primary), transparent 94%) 45%,
+      color-mix(in oklch, var(--primary), transparent 98%) 68%,
+      transparent 85%
+    );
+    animation: app-ambient-drift-a 34s ease-in-out infinite;
+  }
+  .dark .app-ambient-a {
+    background-image: radial-gradient(
+      closest-side,
+      color-mix(in oklch, var(--primary), transparent 82%) 0%,
+      color-mix(in oklch, var(--primary), transparent 90%) 45%,
+      color-mix(in oklch, var(--primary), transparent 96%) 68%,
+      transparent 85%
+    );
+  }
+
+  .app-ambient-b {
+    background-size: 85vw 85vh;
+    background-position: 62.5vw 63.5vh;
+    background-image: radial-gradient(
+      closest-side,
+      color-mix(in oklch, var(--info), transparent 90%) 0%,
+      color-mix(in oklch, var(--info), transparent 95%) 45%,
+      transparent 80%
+    );
+    animation: app-ambient-drift-b 27s ease-in-out infinite;
+    animation-delay: -9s;
+  }
+  .dark .app-ambient-b {
+    background-image: radial-gradient(
+      closest-side,
+      color-mix(in oklch, var(--info), transparent 85%) 0%,
+      color-mix(in oklch, var(--info), transparent 92%) 45%,
+      transparent 80%
+    );
+  }
+
+  /* Amplitude pequena (poucos vw/vh) de proposito -- "movimento quase
+     imperceptivel", nunca um salto visivel. 0%/100% fecham no mesmo valor
+     pra nao ter descontinuidade no loop; durações longas e primas entre si
+     (34s/27s) pra as duas camadas nunca se repetirem em sincronia. */
+  @keyframes app-ambient-drift-a {
+    0%, 100% { background-position: -50vw -51vh; }
+    50% { background-position: -44vw -45vh; }
+  }
+  @keyframes app-ambient-drift-b {
+    0%, 100% { background-position: 62.5vw 63.5vh; }
+    50% { background-position: 57vw 58vh; }
+  }
+
+  /* Linhas diagonais: mesma identidade geometrica do Agendio, agora com uma
+     mascara radial pra desvanecer perto das bordas em vez de cobrir o
+     viewport inteiro com a MESMA intensidade uniforme -- "reduzir a
+     uniformidade... parte da identidade visual, nao um padrao repetido". */
+  .app-bg-lines {
+    position: absolute;
+    inset: -15%;
+    background-image: repeating-linear-gradient(
+      115deg,
+      color-mix(in oklch, var(--primary), transparent 96%) 0px,
+      color-mix(in oklch, var(--primary), transparent 96%) 1.5px,
+      transparent 1.5px,
+      transparent 72px
+    );
+    -webkit-mask-image: radial-gradient(120% 90% at 28% 18%, black 30%, transparent 85%);
+    mask-image: radial-gradient(120% 90% at 28% 18%, black 30%, transparent 85%);
+    animation: app-bg-lines-drift 20s linear infinite;
+  }
+  .dark .app-bg-lines {
+    background-image: repeating-linear-gradient(
+      115deg,
+      color-mix(in oklch, var(--primary), transparent 95%) 0px,
+      color-mix(in oklch, var(--primary), transparent 95%) 1.5px,
+      transparent 1.5px,
+      transparent 72px
+    );
+  }
+  @keyframes app-bg-lines-drift {
+    from { transform: translate(0, 0); }
+    to { transform: translate(72px, 72px); }
+  }
+
+  /* Barra de progresso da troca automatica de aba em ProductShowcase (home) —
+     enche da esquerda pra direita ate a proxima aba entrar sozinha. Duracao
+     vem inline (style) pra bater exatamente com o intervalo em JS; a key={tab}
+     no elemento reinicia a animacao a cada troca. */
+  @keyframes tab-progress-fill {
+    from { width: 0%; }
+    to { width: 100%; }
+  }
+  .animate-tab-progress {
+    animation-name: tab-progress-fill;
+    animation-timing-function: linear;
+    animation-fill-mode: forwards;
+  }
+
+  /* Paines visual do lado esquerdo do login (LoginShowcase) -- flutuacao
+     lenta dos cards e do mockup, brilho que varre a tela do mockup de vez em
+     quando, e o pulsar bem discreto das particulas de fundo. Tudo desligado
+     em prefers-reduced-motion pelo componente (nao so aqui), que tambem pula
+     o entrance/parallax nesse caso. */
+  @keyframes gentle-float {
+    0%, 100% {
+      transform: translateY(0);
+    }
+    50% {
+      transform: translateY(-8px);
+    }
+  }
+  .animate-gentle-float {
+    animation: gentle-float 6s ease-in-out infinite;
+  }
+
+  @keyframes shimmer-sweep {
+    0%,
+    35% {
+      transform: translateX(-120%) rotate(8deg);
+    }
+    55%,
+    100% {
+      transform: translateX(220%) rotate(8deg);
+    }
+  }
+  .animate-shimmer-sweep {
+    animation: shimmer-sweep 7s ease-in-out infinite;
+  }
+
+  @keyframes particle-pulse {
+    0%,
+    100% {
+      opacity: 0.15;
+      transform: scale(0.85);
+    }
+    50% {
+      opacity: 0.6;
+      transform: scale(1);
+    }
+  }
+  .animate-particle-pulse {
+    animation: particle-pulse 4s ease-in-out infinite;
+  }
+
+
+  /* Sombra nas bordas indicando conteudo fora da tela em overflow-x-auto —
+     some sozinha quando o scroll chega no fim daquele lado. So CSS (sem JS/
+     scroll listener): as duas primeiras camadas (attachment local) cobrem a
+     sombra quando o conteudo real ja esta ali; as duas ultimas (attachment
+     scroll) sao a sombra em si, fixas relativas ao viewport do proprio
+     container. Usado em Table (BL-18) e na grade da Agenda (BL-17) —
+     docs/BACKLOG.md.
+     --scroll-shadow-color (default --background, do proprio elemento pra
+     fora): Table fica SEMPRE dentro de um Card, entao pinta o proprio fundo
+     com --background (cor da PAGINA) por baixo do --card do Card ao redor —
+     um retangulo visivelmente mais escuro por dentro do card. table.tsx
+     sobrescreve essa variavel pra --card especificamente. */
+  .scroll-shadow-x {
+    background:
+      linear-gradient(to right, var(--scroll-shadow-color, var(--background)) 30%, transparent),
+      linear-gradient(to left, var(--scroll-shadow-color, var(--background)) 30%, transparent) 100% 0,
+      linear-gradient(to right, color-mix(in oklch, var(--foreground) 20%, transparent), transparent),
+      linear-gradient(to left, color-mix(in oklch, var(--foreground) 20%, transparent), transparent) 100% 0;
+    background-repeat: no-repeat;
+    background-color: var(--scroll-shadow-color, var(--background));
+    background-size: 24px 100%, 24px 100%, 8px 100%, 8px 100%;
+    background-position: 0 0, 100% 0, 0 0, 100% 0;
+    background-attachment: local, local, scroll, scroll;
+  }
+}

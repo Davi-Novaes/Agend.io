@@ -9,9 +9,9 @@ import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 
 // TenantThemeProvider NAO entra aqui — envolveria toda a arvore (painel do
-// dono, login, admin) com a paleta padrao de tenant em vez do design system
-// global. Ele fica local em app/(public)/[slug]/page.tsx, o unico lugar que
-// realmente precisa de branding por tenant.
+// dono, admin) com uma paleta fixa em vez do design system global. Cada
+// pagina que precisa de uma cor de destaque propria (app/(public)/[slug],
+// app/(auth)/login) aplica localmente, sem afetar o resto do app.
 export function Providers({ children }: { children: React.ReactNode }) {
   const [queryClient] = React.useState(() => new QueryClient());
 

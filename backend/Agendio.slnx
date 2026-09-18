@@ -22,9 +22,14 @@
   </Folder>
   <Folder Name="/src/modules/Marketing/">
     <Project Path="src/modules/Marketing/Agendio.Modules.Marketing/Agendio.Modules.Marketing.csproj" />
+    <Project Path="src/modules/Marketing/Agendio.Modules.Marketing.Contracts/Agendio.Modules.Marketing.Contracts.csproj" />
   </Folder>
   <Folder Name="/src/modules/Assistant/">
     <Project Path="src/modules/Assistant/Agendio.Modules.Assistant/Agendio.Modules.Assistant.csproj" />
+  </Folder>
+  <Folder Name="/src/modules/Feedback/">
+    <Project Path="src/modules/Feedback/Agendio.Modules.Feedback/Agendio.Modules.Feedback.csproj" />
+    <Project Path="src/modules/Feedback/Agendio.Modules.Feedback.Contracts/Agendio.Modules.Feedback.Contracts.csproj" />
   </Folder>
   <Folder Name="/src/modules/Customers/">
     <Project Path="src/modules/Customers/Agendio.Modules.Customers/Agendio.Modules.Customers.csproj" />

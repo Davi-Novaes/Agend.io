@@ -4,6 +4,7 @@ import * as React from "react";
 import { Sparkles } from "lucide-react";
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
 import type { ServiceRevenuePoint } from "@/lib/api/client";
 
@@ -27,13 +28,14 @@ export function ServiceRevenueChart({ data }: { data: ServiceRevenuePoint[] }) {
   }
 
   return (
-    <div className="rounded-lg border p-4">
+    <Card className="border-border/70 ring-0 shadow-none">
+    <CardContent>
       <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
         <div>
           <h3 className="text-sm font-semibold">Servicos mais vendidos</h3>
           <p className="text-muted-foreground text-xs">Desempenho por servico no periodo selecionado</p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <div role="group" aria-label="Metrica" className="flex gap-1">
             <Button
               type="button"
@@ -99,14 +101,14 @@ export function ServiceRevenueChart({ data }: { data: ServiceRevenuePoint[] }) {
           </TableBody>
         </Table>
       ) : (
-        <ul className="flex flex-col gap-2.5" aria-label="Servicos mais vendidos">
+        <ul className="bg-surface-inset flex flex-col gap-2.5 rounded-lg p-3" aria-label="Servicos mais vendidos">
           {sorted.map((point) => (
             <li key={point.serviceName} className="flex items-center gap-3">
               <span className="w-28 shrink-0 truncate text-xs">{point.serviceName}</span>
               <div className="bg-muted h-4 flex-1 overflow-hidden rounded-sm">
                 <div
-                  className="h-full rounded-sm bg-[#2a78d6] dark:bg-[#3987e5]"
-                  style={{ width: `${Math.max(3, (point[metric] / max) * 100)}%` }}
+                  className="h-full rounded-sm"
+                  style={{ width: `${Math.max(3, (point[metric] / max) * 100)}%`, backgroundColor: "var(--chart-1)" }}
                 />
               </div>
               <span className="w-24 shrink-0 text-right text-xs tabular-nums">{formatMetric(point)}</span>
@@ -114,6 +116,7 @@ export function ServiceRevenueChart({ data }: { data: ServiceRevenuePoint[] }) {
           ))}
         </ul>
       )}
-    </div>
+    </CardContent>
+    </Card>
   );
 }

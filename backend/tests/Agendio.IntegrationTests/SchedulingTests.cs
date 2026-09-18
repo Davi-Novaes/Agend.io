@@ -147,6 +147,118 @@ public class SchedulingTests(IntegrationTestFixture fixture)
     }
 
     [Fact]
+    public async Task Owner_Can_Resize_Appointment_Duration_Via_Reschedule_Preserving_Price()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var client = fixture.CreateClient();
+        var accessToken = await CreateTenantWithOwnerAndLoginAsync(client, cancellationToken);
+        var (customerId, resourceId, serviceId) = await CreateBookingPrerequisitesAsync(client, accessToken, cancellationToken);
+
+        var startAtUtc = DateTimeOffset.UtcNow.AddDays(1);
+        var appointmentId = await ScheduleAppointmentAsync(client, accessToken, customerId, resourceId, serviceId, startAtUtc, cancellationToken);
+
+        var resizeResponse = await AuthorizedRequestHelpers.PutAuthorizedAsync(
+            client, accessToken, $"/api/appointments/{appointmentId}/reschedule",
+            new { newStartAtUtc = startAtUtc, reason = (string?)null, newDurationMinutes = 45 }, cancellationToken);
+        resizeResponse.StatusCode.ShouldBe(HttpStatusCode.NoContent);
+
+        var afterResize = await AuthorizedRequestHelpers.GetAuthorizedAsync(client, accessToken, $"/api/appointments/{appointmentId}", cancellationToken);
+        var afterResizeBody = await afterResize.Content.ReadFromJsonAsync<JsonElement>(cancellationToken);
+        var newStart = afterResizeBody.GetProperty("startUtc").GetDateTimeOffset();
+        var newEnd = afterResizeBody.GetProperty("endUtc").GetDateTimeOffset();
+        (newEnd - newStart).ShouldBe(TimeSpan.FromMinutes(45));
+        // Redimensionar nao recalcula preco por tempo — continua o preco do servico (BL do redesign da Agenda).
+        afterResizeBody.GetProperty("price").GetDecimal().ShouldBe(45.90m);
+    }
+
+    [Fact]
+    public async Task Resizing_Below_The_Minimum_Duration_Should_Be_Rejected()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var client = fixture.CreateClient();
+        var accessToken = await CreateTenantWithOwnerAndLoginAsync(client, cancellationToken);
+        var (customerId, resourceId, serviceId) = await CreateBookingPrerequisitesAsync(client, accessToken, cancellationToken);
+
+        var startAtUtc = DateTimeOffset.UtcNow.AddDays(1);
+        var appointmentId = await ScheduleAppointmentAsync(client, accessToken, customerId, resourceId, serviceId, startAtUtc, cancellationToken);
+
+        var resizeResponse = await AuthorizedRequestHelpers.PutAuthorizedAsync(
+            client, accessToken, $"/api/appointments/{appointmentId}/reschedule",
+            new { newStartAtUtc = startAtUtc, reason = (string?)null, newDurationMinutes = 10 }, cancellationToken);
+        resizeResponse.StatusCode.ShouldBe(HttpStatusCode.BadRequest);
+    }
+
+    [Fact]
+    public async Task Owner_Can_Reassign_An_Appointment_To_A_Different_Resource_Via_Reschedule()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var client = fixture.CreateClient();
+        var accessToken = await CreateTenantWithOwnerAndLoginAsync(client, cancellationToken);
+        var (customerId, firstResourceId, serviceId) = await CreateBookingPrerequisitesAsync(client, accessToken, cancellationToken);
+        var secondResourceId = await CreateResourceAsync(client, accessToken, "Cadeira 2", cancellationToken);
+
+        var startAtUtc = DateTimeOffset.UtcNow.AddDays(1);
+        var appointmentId = await ScheduleAppointmentAsync(client, accessToken, customerId, firstResourceId, serviceId, startAtUtc, cancellationToken);
+
+        var reassignResponse = await AuthorizedRequestHelpers.PutAuthorizedAsync(
+            client, accessToken, $"/api/appointments/{appointmentId}/reschedule",
+            new { newStartAtUtc = startAtUtc, reason = (string?)null, newResourceId = secondResourceId }, cancellationToken);
+        reassignResponse.StatusCode.ShouldBe(HttpStatusCode.NoContent);
+
+        var afterReassign = await AuthorizedRequestHelpers.GetAuthorizedAsync(client, accessToken, $"/api/appointments/{appointmentId}", cancellationToken);
+        var afterReassignBody = await afterReassign.Content.ReadFromJsonAsync<JsonElement>(cancellationToken);
+        afterReassignBody.GetProperty("resourceId").GetGuid().ShouldBe(secondResourceId);
+
+        var historyResponse = await AuthorizedRequestHelpers.GetAuthorizedAsync(
+            client, accessToken, $"/api/appointments/history?appointmentId={appointmentId}", cancellationToken);
+        var historyBody = await historyResponse.Content.ReadFromJsonAsync<JsonElement>(cancellationToken);
+        var rescheduleEntry = historyBody.GetProperty("items").EnumerateArray().Single(e => e.GetProperty("changeType").GetString() == "Rescheduled");
+        rescheduleEntry.GetProperty("previousResourceId").GetGuid().ShouldBe(firstResourceId);
+        rescheduleEntry.GetProperty("resourceId").GetGuid().ShouldBe(secondResourceId);
+    }
+
+    [Fact]
+    public async Task Reassigning_To_A_Resource_On_Time_Off_Should_Be_Rejected_With_Conflict()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var client = fixture.CreateClient();
+        var accessToken = await CreateTenantWithOwnerAndLoginAsync(client, cancellationToken);
+        var (customerId, firstResourceId, serviceId) = await CreateBookingPrerequisitesAsync(client, accessToken, cancellationToken);
+        var secondResourceId = await CreateResourceAsync(client, accessToken, "Cadeira 2", cancellationToken);
+
+        var startAtUtc = DateTimeOffset.UtcNow.AddDays(1);
+        var localDate = DateOnly.FromDateTime(startAtUtc.UtcDateTime);
+        var timeOffResponse = await AuthorizedRequestHelpers.PostAuthorizedAsync(
+            client, accessToken, $"/api/resources/{secondResourceId}/time-off",
+            new { startDate = localDate.AddDays(-1), endDate = localDate.AddDays(1), reason = (string?)null }, cancellationToken);
+        timeOffResponse.StatusCode.ShouldBe(HttpStatusCode.Created);
+
+        var appointmentId = await ScheduleAppointmentAsync(client, accessToken, customerId, firstResourceId, serviceId, startAtUtc, cancellationToken);
+
+        var reassignResponse = await AuthorizedRequestHelpers.PutAuthorizedAsync(
+            client, accessToken, $"/api/appointments/{appointmentId}/reschedule",
+            new { newStartAtUtc = startAtUtc, reason = (string?)null, newResourceId = secondResourceId }, cancellationToken);
+        reassignResponse.StatusCode.ShouldBe(HttpStatusCode.Conflict);
+    }
+
+    [Fact]
+    public async Task Reassigning_To_An_Unknown_Resource_Should_Be_Rejected_With_NotFound()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var client = fixture.CreateClient();
+        var accessToken = await CreateTenantWithOwnerAndLoginAsync(client, cancellationToken);
+        var (customerId, resourceId, serviceId) = await CreateBookingPrerequisitesAsync(client, accessToken, cancellationToken);
+
+        var startAtUtc = DateTimeOffset.UtcNow.AddDays(1);
+        var appointmentId = await ScheduleAppointmentAsync(client, accessToken, customerId, resourceId, serviceId, startAtUtc, cancellationToken);
+
+        var reassignResponse = await AuthorizedRequestHelpers.PutAuthorizedAsync(
+            client, accessToken, $"/api/appointments/{appointmentId}/reschedule",
+            new { newStartAtUtc = startAtUtc, reason = (string?)null, newResourceId = Guid.NewGuid() }, cancellationToken);
+        reassignResponse.StatusCode.ShouldBe(HttpStatusCode.NotFound);
+    }
+
+    [Fact]
     public async Task Scheduling_On_A_Slot_Already_Taken_Should_Be_Rejected_With_Conflict()
     {
         var cancellationToken = TestContext.Current.CancellationToken;
@@ -684,7 +796,7 @@ public class SchedulingTests(IntegrationTestFixture fixture)
 
         var ownerEmail = $"owner-{Guid.NewGuid():N}@example.com";
         await client.PostAsJsonAsync(
-            "/api/auth/register", new { tenantId, email = ownerEmail, password = Password, fullName = "Dono" }, cancellationToken);
+            "/api/auth/register", new { tenantId, email = ownerEmail, password = Password, fullName = "Dono", phone = "+5511999999999", cpfCnpj = "12345678909", termsAccepted = true }, cancellationToken);
         await fixture.ConfirmEmailDirectlyAsync(tenantId, ownerEmail, cancellationToken);
 
         var loginResponse = await client.PostAsJsonAsync(

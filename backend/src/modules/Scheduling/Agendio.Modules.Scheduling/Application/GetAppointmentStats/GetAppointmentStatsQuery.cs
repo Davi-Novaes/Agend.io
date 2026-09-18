@@ -8,6 +8,8 @@ public sealed record ServiceRevenuePoint(string ServiceName, decimal Total, int 
 
 public sealed record ProfessionalRevenuePoint(Guid ResourceId, string ResourceName, decimal Total);
 
+public sealed record ProfessionalCountPoint(Guid ResourceId, string ResourceName, int Count);
+
 // ScheduledCount/ConfirmedCount fecham o total junto com Completed/NoShow/Cancelled —
 // InProgress soma dentro de ConfirmedCount por ser um estado transiente e raro de
 // aparecer num agendamento consultado fora do horario exato do atendimento.
@@ -15,4 +17,5 @@ public sealed record AppointmentStats(
     int TotalCount, int CompletedCount, int NoShowCount, int CancelledCount, int RescheduledCount,
     int ScheduledCount, int ConfirmedCount,
     decimal NoShowRate, decimal CancellationRate, decimal RescheduleRate,
-    IReadOnlyList<ServiceRevenuePoint> RevenueByService, IReadOnlyList<ProfessionalRevenuePoint> RevenueByProfessional);
+    IReadOnlyList<ServiceRevenuePoint> RevenueByService, IReadOnlyList<ProfessionalRevenuePoint> RevenueByProfessional,
+    IReadOnlyList<ProfessionalCountPoint> CountByProfessional);

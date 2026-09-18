@@ -11,6 +11,9 @@ const NAV_ITEMS = [
   { href: "/admin", label: "Dashboard" },
   { href: "/admin/tenants", label: "Estabelecimentos" },
   { href: "/admin/subscriptions", label: "Assinaturas" },
+  { href: "/admin/security", label: "Segurança" },
+  { href: "/admin/activity", label: "Atividade" },
+  { href: "/admin/feedback", label: "Feedback" },
 ];
 
 export function AdminNav() {

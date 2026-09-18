@@ -16,6 +16,11 @@ public sealed class CreateTenantCommandHandler(TenancyDbContext dbContext) : ICo
             return Result.Failure<Guid>(slugResult.Error);
         }
 
+        if (Domain.ReservedSlugs.IsReserved(slugResult.Value.Value))
+        {
+            return Result.Failure<Guid>(Error.Validation("Tenant.SlugReserved", "Este identificador e reservado pela plataforma."));
+        }
+
         // Compara o Value Object inteiro (nao ".Slug.Value") de proposito: o EF
         // so consegue traduzir esta consulta para SQL aplicando a mesma
         // ValueConverter configurada em TentantConfiguration ao objeto inteiro.

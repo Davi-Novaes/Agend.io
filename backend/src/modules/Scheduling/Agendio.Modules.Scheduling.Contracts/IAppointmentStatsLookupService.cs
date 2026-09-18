@@ -14,7 +14,10 @@ public sealed record ServiceRevenueLookupPoint(string ServiceName, decimal Total
 
 public sealed record ProfessionalRevenueLookupPoint(Guid ResourceId, string ResourceName, decimal Total);
 
+public sealed record ProfessionalCountLookupPoint(Guid ResourceId, string ResourceName, int Count);
+
 public sealed record AppointmentStatsLookupResult(
     int TotalCount, int CompletedCount, int NoShowCount, int CancelledCount, int RescheduledCount,
     decimal NoShowRate, decimal CancellationRate, decimal RescheduleRate,
-    IReadOnlyList<ServiceRevenueLookupPoint> RevenueByService, IReadOnlyList<ProfessionalRevenueLookupPoint> RevenueByProfessional);
+    IReadOnlyList<ServiceRevenueLookupPoint> RevenueByService, IReadOnlyList<ProfessionalRevenueLookupPoint> RevenueByProfessional,
+    IReadOnlyList<ProfessionalCountLookupPoint> CountByProfessional);

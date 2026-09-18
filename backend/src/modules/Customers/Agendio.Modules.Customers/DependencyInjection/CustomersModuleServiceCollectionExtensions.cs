@@ -25,8 +25,10 @@ public static class CustomersModuleServiceCollectionExtensions
         services.AddSingleton<IEndpointModule, CustomerEndpoints>();
         services.AddSingleton<IEndpointModule, PublicCustomerEndpoints>();
         services.AddScoped<ICustomerLookupService, Infrastructure.CustomerLookupService>();
+        services.AddScoped<ICustomerDirectoryLookupService, Infrastructure.CustomerLookupService>();
         services.AddScoped<ICustomerRegistrationService, Infrastructure.CustomerRegistrationService>();
         services.AddHostedService<Infrastructure.Messaging.LoyaltyIntegrationEventConsumer>();
+        services.AddHostedService<Infrastructure.Messaging.MarketingIntegrationEventConsumer>();
 
         return services;
     }

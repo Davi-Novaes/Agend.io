@@ -18,6 +18,12 @@ public sealed class Unit : AggregateRoot<UnitId>, ITenantOwned, IAuditable, ISof
 
     public string? Address { get; private set; }
 
+    public string? City { get; private set; }
+
+    public string? State { get; private set; }
+
+    public string? Country { get; private set; }
+
     public bool IsActive { get; private set; }
 
     public DateTimeOffset CreatedAtUtc { get; set; }
@@ -36,26 +42,29 @@ public sealed class Unit : AggregateRoot<UnitId>, ITenantOwned, IAuditable, ISof
     {
     }
 
-    private Unit(TenantId tenantId, string name, string? address)
+    private Unit(TenantId tenantId, string name, string? address, string? city, string? state, string? country)
         : base(UnitId.New())
     {
         TenantId = tenantId;
         Name = name;
         Address = address;
+        City = city;
+        State = state;
+        Country = country;
         IsActive = true;
     }
 
-    public static Result<Unit> Create(TenantId tenantId, string? name, string? address)
+    public static Result<Unit> Create(TenantId tenantId, string? name, string? address, string? city, string? state, string? country)
     {
         if (string.IsNullOrWhiteSpace(name))
         {
             return Result.Failure<Unit>(Error.Validation("Unit.NameEmpty", "O nome da unidade nao pode ser vazio."));
         }
 
-        return Result.Success(new Unit(tenantId, name.Trim(), address?.Trim()));
+        return Result.Success(new Unit(tenantId, name.Trim(), address?.Trim(), city?.Trim(), state?.Trim(), country?.Trim()));
     }
 
-    public Result Update(string? name, string? address)
+    public Result Update(string? name, string? address, string? city, string? state, string? country)
     {
         if (string.IsNullOrWhiteSpace(name))
         {
@@ -64,6 +73,9 @@ public sealed class Unit : AggregateRoot<UnitId>, ITenantOwned, IAuditable, ISof
 
         Name = name.Trim();
         Address = address?.Trim();
+        City = city?.Trim();
+        State = state?.Trim();
+        Country = country?.Trim();
 
         return Result.Success();
     }

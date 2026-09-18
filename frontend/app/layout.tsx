@@ -13,8 +13,14 @@ const geistMono = Geist_Mono({
   subsets: ["latin"],
 });
 
+// Fallback so serve pra dev local sem NEXT_PUBLIC_API_URL configurado -- em
+// producao aponta pro mesmo dominio publico (Caddy serve frontend e /api/*
+// do mesmo host, ver PUBLIC_ORIGIN em infra/docker-compose.prod.yml).
+export const SITE_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3000";
+
 export const metadata: Metadata = {
-  title: "Agendio",
+  metadataBase: new URL(SITE_URL),
+  title: "AgendioBR",
   description: "Plataforma de gestao para negocios baseados em agendamento.",
 };
 

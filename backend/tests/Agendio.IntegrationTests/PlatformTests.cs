@@ -221,6 +221,51 @@ public class PlatformTests(IntegrationTestFixture fixture)
     }
 
     [Fact]
+    public async Task Feedback_Without_A_Platform_Token_Should_Be_Unauthorized()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var client = fixture.CreateClient();
+
+        var anonymousResponse = await client.GetAsync("/api/platform/feedback", cancellationToken);
+        anonymousResponse.StatusCode.ShouldBe(HttpStatusCode.Unauthorized);
+
+        var tenantToken = await CreateTenantWithOwnerAndLoginAsync(client, cancellationToken);
+        var tenantTokenResponse = await AuthorizedRequestHelpers.GetAuthorizedAsync(client, tenantToken, "/api/platform/feedback", cancellationToken);
+        tenantTokenResponse.StatusCode.ShouldBe(HttpStatusCode.Unauthorized);
+    }
+
+    [Fact]
+    public async Task Platform_Admin_Can_Read_Feedback_Submitted_By_Any_Tenant()
+    {
+        // Regressao direta do bug que motivou remover RLS de FeedbackEntry:
+        // sem isso, agendio_app (NOBYPASSRLS) nunca enxergaria feedback de
+        // nenhum tenant pelo endpoint do Super Admin.
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var client = fixture.CreateClient();
+
+        var tenantAToken = await CreateTenantWithOwnerAndLoginAsync(client, cancellationToken);
+        var subjectA = $"Assunto A {Guid.NewGuid():N}";
+        var submitA = await AuthorizedRequestHelpers.PostAuthorizedAsync(
+            client, tenantAToken, "/api/feedback", new { subject = subjectA, body = "Mensagem do tenant A" }, cancellationToken);
+        submitA.StatusCode.ShouldBe(HttpStatusCode.NoContent);
+
+        var tenantBToken = await CreateTenantWithOwnerAndLoginAsync(client, cancellationToken);
+        var subjectB = $"Assunto B {Guid.NewGuid():N}";
+        var submitB = await AuthorizedRequestHelpers.PostAuthorizedAsync(
+            client, tenantBToken, "/api/feedback", new { subject = subjectB, body = "Mensagem do tenant B" }, cancellationToken);
+        submitB.StatusCode.ShouldBe(HttpStatusCode.NoContent);
+
+        var platformToken = await LoginAsPlatformAdminAsync(client, cancellationToken);
+        var response = await AuthorizedRequestHelpers.GetAuthorizedAsync(client, platformToken, "/api/platform/feedback", cancellationToken);
+        response.StatusCode.ShouldBe(HttpStatusCode.OK);
+
+        var body = await response.Content.ReadFromJsonAsync<JsonElement>(cancellationToken);
+        var entries = body.EnumerateArray().ToList();
+        entries.ShouldContain(e => e.GetProperty("subject").GetString() == subjectA);
+        entries.ShouldContain(e => e.GetProperty("subject").GetString() == subjectB);
+    }
+
+    [Fact]
     public async Task Cancelling_A_Subscription_For_An_Unknown_Tenant_Should_Be_NotFound()
     {
         var cancellationToken = TestContext.Current.CancellationToken;
@@ -311,7 +356,7 @@ public class PlatformTests(IntegrationTestFixture fixture)
 
         var ownerEmail = $"owner-{Guid.NewGuid():N}@example.com";
         await client.PostAsJsonAsync(
-            "/api/auth/register", new { tenantId, email = ownerEmail, password = "SenhaForte123!", fullName = "Dono" }, cancellationToken);
+            "/api/auth/register", new { tenantId, email = ownerEmail, password = "SenhaForte123!", fullName = "Dono", phone = "+5511999999999", cpfCnpj = "12345678909", termsAccepted = true }, cancellationToken);
         await fixture.ConfirmEmailDirectlyAsync(tenantId, ownerEmail, cancellationToken);
 
         return (tenantId, ownerEmail);

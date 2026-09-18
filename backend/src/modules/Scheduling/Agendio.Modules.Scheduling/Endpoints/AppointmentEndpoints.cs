@@ -159,11 +159,13 @@ public sealed class AppointmentEndpoints : IEndpointModule
 
         group.MapPut("/{id:guid}/reschedule", async (Guid id, RescheduleAppointmentRequest request, IDispatcher dispatcher, CancellationToken cancellationToken) =>
         {
-            var result = await dispatcher.Send(new RescheduleAppointmentCommand(id, request.NewStartAtUtc, request.Reason), cancellationToken);
+            var result = await dispatcher.Send(
+                new RescheduleAppointmentCommand(id, request.NewStartAtUtc, request.Reason, request.NewDurationMinutes, request.NewResourceId),
+                cancellationToken);
             return result.IsSuccess ? Results.NoContent() : result.Error.ToProblemResult();
         })
         .WithName("RescheduleAppointment")
-        .WithSummary("Remarca um agendamento, preservando a duracao original, com motivo opcional (Fase 14). Rejeita com 409 se o novo horario ja estiver ocupado.");
+        .WithSummary("Remarca um agendamento, com motivo opcional (Fase 14). NewDurationMinutes/NewResourceId opcionais permitem redimensionar a duracao e/ou reatribuir o profissional no mesmo comando — omitidos, preserva duracao/recurso originais. Rejeita com 409 se o novo horario ja estiver ocupado.");
 
         var waitlistGroup = endpoints.MapGroup("/api/waitlist").WithTags("Scheduling").RequireAuthorization();
 
@@ -199,7 +201,7 @@ public sealed class AppointmentEndpoints : IEndpointModule
 
     private sealed record CancelAppointmentRequest(bool ByStaff, string? Reason);
 
-    private sealed record RescheduleAppointmentRequest(DateTimeOffset NewStartAtUtc, string? Reason);
+    private sealed record RescheduleAppointmentRequest(DateTimeOffset NewStartAtUtc, string? Reason, int? NewDurationMinutes = null, Guid? NewResourceId = null);
 
     private sealed record ConvertWaitlistEntryRequest(Guid ResourceId, DateTimeOffset StartAtUtc);
 }

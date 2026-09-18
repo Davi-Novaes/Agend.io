@@ -9,6 +9,7 @@ import { UserRoundX } from "lucide-react";
 import {
   getCustomerRecoveryCandidates,
   sendCustomerMessage,
+  CUSTOMER_RECOVERY_QUERY_KEY,
   ApiError,
   type CustomerRecoveryCandidate,
 } from "@/lib/api/client";
@@ -36,7 +37,7 @@ export function CustomerRecoveryCard() {
   const [body, setBody] = React.useState("");
 
   const recoveryQuery = useQuery({
-    queryKey: ["customers", "recovery"],
+    queryKey: CUSTOMER_RECOVERY_QUERY_KEY,
     queryFn: () => getCustomerRecoveryCandidates(accessToken),
     enabled: Boolean(session),
   });
@@ -50,7 +51,7 @@ export function CustomerRecoveryCard() {
     },
     onSuccess: () => {
       toast.success("Mensagem enviada.");
-      queryClient.invalidateQueries({ queryKey: ["customers", "recovery"] });
+      queryClient.invalidateQueries({ queryKey: CUSTOMER_RECOVERY_QUERY_KEY });
       setMessagingCandidate(null);
     },
     onError: (error) => toast.error(error instanceof ApiError ? error.message : "Nao foi possivel enviar a mensagem."),

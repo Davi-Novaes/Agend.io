@@ -8,7 +8,10 @@ function Table({ className, ...props }: React.ComponentProps<"table">) {
   return (
     <div
       data-slot="table-container"
-      className="scroll-shadow-x relative w-full overflow-x-auto"
+      // Table sempre vive dentro de um Card (--card) -- sem isto, a sombra
+      // de scroll pinta o proprio fundo com --background (cor da pagina),
+      // criando um retangulo perceptivelmente mais escuro dentro do card.
+      className="scroll-shadow-x relative w-full overflow-x-auto [--scroll-shadow-color:var(--card)]"
     >
       <table
         data-slot="table"

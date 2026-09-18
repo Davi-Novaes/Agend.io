@@ -1,8 +1,11 @@
 using System.Reflection;
 using Agendio.Infrastructure.DependencyInjection;
 using Agendio.Infrastructure.Endpoints;
+using Agendio.Infrastructure.Security;
 using Agendio.Modules.Identity.Application;
+using Agendio.Modules.Identity.Contracts;
 using Agendio.Modules.Identity.Endpoints;
+using Agendio.Modules.Identity.Infrastructure;
 using Agendio.Modules.Identity.Infrastructure.Mfa;
 using Agendio.Modules.Identity.Infrastructure.Notifications;
 using Agendio.Modules.Identity.Infrastructure.Persistence;
@@ -35,6 +38,18 @@ public static class IdentityModuleServiceCollectionExtensions
         services.AddSingleton<IMfaChallengeStore, RedisMfaChallengeStore>();
         services.AddScoped<IMfaCodeVerifier, MfaCodeVerifier>();
         services.AddScoped<EmailConfirmationJobs>();
+        services.AddScoped<PasswordResetJobs>();
+
+        // Tipo fechado direto (nao uma interface ISecurityAuditLogger
+        // compartilhada) — ver comentario de SecurityAuditLogger<TContext>
+        // sobre por que isso importa: duas modulos registrando a mesma
+        // interface fariam o ultimo "vencer" para qualquer injecao no processo.
+        services.AddScoped<SecurityAuditLogger<IdentityDbContext>>();
+
+        // Unico ponto de leitura sincrona que o Platform (painel do Super
+        // Admin) tem sobre a trilha de seguranca de Identity — ver
+        // ISecurityAuditReader.
+        services.AddScoped<ISecurityAuditReader, SecurityAuditReader>();
 
         return services;
     }

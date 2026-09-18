@@ -8,7 +8,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Agendio.Modules.Identity.Application.DisableMfa;
 
-public sealed class DisableMfaCommandHandler(IdentityDbContext dbContext, IPasswordHasher passwordHasher, IMfaCodeVerifier mfaCodeVerifier)
+public sealed class DisableMfaCommandHandler(IdentityDbContext dbContext, IPasswordHasher passwordHasher, IMfaCodeVerifier mfaCodeVerifier, SecurityAuditLogger<IdentityDbContext> securityAuditLogger)
     : ICommandHandler<DisableMfaCommand>
 {
     public async Task<Result> Handle(DisableMfaCommand request, CancellationToken cancellationToken)
@@ -40,6 +40,7 @@ public sealed class DisableMfaCommandHandler(IdentityDbContext dbContext, IPassw
         dbContext.MfaRecoveryCodes.RemoveRange(recoveryCodes);
 
         await dbContext.SaveChangesAsync(cancellationToken);
+        await securityAuditLogger.LogAsync("MfaDisabled", success: true, user.TenantId.Value, user.Id.Value, null, cancellationToken);
 
         return Result.Success();
     }

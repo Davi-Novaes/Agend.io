@@ -13,8 +13,11 @@ import { Badge } from "@/components/ui/badge";
 // <head>, mesmo vindo de um componente filho).
 const FONT_FAMILY_BY_VALUE: Record<PublicPageFont, string> = {
   Default: "ui-sans-serif, system-ui, sans-serif",
+  Inter: "'Inter', sans-serif",
   Poppins: "'Poppins', sans-serif",
+  Montserrat: "'Montserrat', sans-serif",
   PlayfairDisplay: "'Playfair Display', serif",
+  Lora: "'Lora', serif",
   Merriweather: "'Merriweather', serif",
 };
 
@@ -31,7 +34,7 @@ export function LivePreviewFonts() {
     // eslint-disable-next-line @next/next/no-page-custom-font -- regra pensada pro Pages Router (pages/_document.js nao existe aqui); App Router hoisteia <link rel="stylesheet"> normalmente pro <head>. So previa, a pagina publica de verdade usa next/font/google.
     <link
       rel="stylesheet"
-      href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700&family=Playfair+Display:wght@400;700&family=Merriweather:wght@400;700&display=swap"
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&family=Poppins:wght@400;600;700&family=Montserrat:wght@400;600;700&family=Playfair+Display:wght@400;700&family=Lora:wght@400;700&family=Merriweather:wght@400;700&display=swap"
     />
   );
 }
@@ -58,18 +61,22 @@ export function LivePreviewPanel({ compact = false }: { compact?: boolean }) {
       </div>
 
       <div className="overflow-hidden rounded-xl border shadow-sm">
-        {/* Hero */}
+        {/* Hero — mesmo tratamento da pagina publica de verdade
+            (app/(public)/[slug]/page.tsx): banner em opacidade cheia com um
+            degrade escuro por cima so pra legibilidade do texto, nunca a cor
+            de marca lavando o banner (antes usava opacity-30 na imagem, que
+            deixava a cor dominando e o banner quase invisivel). Sem banner,
+            a cor de marca continua sendo o fundo. */}
         <div
           className="relative flex flex-col items-center gap-3 px-6 py-10 text-center"
           style={{ backgroundColor: primary, color: "#FFFFFF" }}
         >
           {draft.bannerPreviewUrl && (
-            // eslint-disable-next-line @next/next/no-img-element -- previa local/blob, nao asset estatico do build.
-            <img
-              src={draft.bannerPreviewUrl}
-              alt=""
-              className="absolute inset-0 size-full object-cover opacity-30"
-            />
+            <>
+              {/* eslint-disable-next-line @next/next/no-img-element -- previa local/blob, nao asset estatico do build. */}
+              <img src={draft.bannerPreviewUrl} alt="" className="absolute inset-0 size-full object-cover" />
+              <div aria-hidden className="absolute inset-0 bg-gradient-to-t from-black/75 via-black/35 to-black/10" />
+            </>
           )}
           <div className="relative flex flex-col items-center gap-3">
             <div className="flex size-14 items-center justify-center overflow-hidden rounded-xl bg-white shadow">

@@ -6,6 +6,7 @@ using Agendio.SharedKernel.Messaging;
 using Agendio.SharedKernel.Multitenancy;
 using Agendio.SharedKernel.Results;
 using Agendio.SharedKernel.Time;
+using Agendio.SharedKernel.ValueObjects;
 using Microsoft.EntityFrameworkCore;
 
 namespace Agendio.Modules.Billing.Application.SubscribeToPlan;
@@ -31,10 +32,15 @@ public sealed class SubscribeToPlanCommandHandler(
                 Error.Conflict("Subscription.AlreadyActive", "Este estabelecimento ja tem uma assinatura ativa."));
         }
 
+        // O validator ja garantiu formato valido (digito verificador) — aqui so
+        // normaliza pra digitos puros antes de mandar pra Asaas, mesmo que o
+        // usuario tenha digitado com pontuacao.
+        var normalizedCpfCnpj = CpfCnpj.Create(request.CpfCnpj).Value.Value;
+
         // Se ja existe cliente na Asaas (ex.: reassinando depois de cancelar),
         // reaproveita — nunca cria um segundo cliente pro mesmo tenant.
         var asaasCustomerId = subscription.AsaasCustomerId
-            ?? await asaasClient.CreateCustomerAsync(request.FullName, request.CpfCnpj, request.Email, cancellationToken);
+            ?? await asaasClient.CreateCustomerAsync(request.FullName, normalizedCpfCnpj, request.Email, cancellationToken);
 
         // Cobra a partir do fim do trial (nao imediatamente) se o dono assinar
         // durante o periodo gratis — ninguem perde os dias de trial restantes.
@@ -42,7 +48,14 @@ public sealed class SubscribeToPlanCommandHandler(
         var trialEndDate = DateOnly.FromDateTime(subscription.TrialEndsAtUtc.UtcDateTime);
         var nextDueDate = trialEndDate > todayUtc ? trialEndDate : todayUtc;
 
-        var asaasSubscription = await asaasClient.CreateSubscriptionAsync(asaasCustomerId, plan.PriceAmount, nextDueDate, cancellationToken);
+        // Reenviar o formulario antes de pagar (F5, duplo clique, voltar do
+        // checkout) nao pode criar uma segunda assinatura recorrente na Asaas
+        // — bug real encontrado em sandbox: o mesmo cliente acumulou 2
+        // assinaturas ACTIVE simultaneas de R$99/mes. Se ja existe uma
+        // assinatura Asaas vinculada, so recupera a fatura mais recente dela.
+        var asaasSubscription = subscription.AsaasSubscriptionId is { } existingAsaasSubscriptionId
+            ? await asaasClient.GetLatestSubscriptionPaymentAsync(existingAsaasSubscriptionId, cancellationToken)
+            : await asaasClient.CreateSubscriptionAsync(asaasCustomerId, plan.PriceAmount, nextDueDate, cancellationToken);
 
         var attachResult = subscription.AttachAsaasCheckout(asaasCustomerId, asaasSubscription.AsaasSubscriptionId);
         if (attachResult.IsFailure)
@@ -50,9 +63,17 @@ public sealed class SubscribeToPlanCommandHandler(
             return Result.Failure<SubscribeToPlanResult>(attachResult.Error);
         }
 
-        dbContext.Payments.Add(new Payment(
-            tenantContext.TenantId, subscription.Id, asaasSubscription.AsaasPaymentId,
-            plan.PriceAmount, asaasSubscription.DueDate, asaasSubscription.InvoiceUrl, asaasSubscription.BillingType));
+        // Mesmo motivo: sem essa checagem, reenviar o formulario tentaria
+        // inserir outra linha com o mesmo AsaasPaymentId (indice unico),
+        // derrubando a requisicao com erro 500 em vez de so devolver o link.
+        var paymentAlreadyRecorded = await dbContext.Payments
+            .AnyAsync(p => p.AsaasPaymentId == asaasSubscription.AsaasPaymentId, cancellationToken);
+        if (!paymentAlreadyRecorded)
+        {
+            dbContext.Payments.Add(new Payment(
+                tenantContext.TenantId, subscription.Id, asaasSubscription.AsaasPaymentId,
+                plan.PriceAmount, asaasSubscription.DueDate, asaasSubscription.InvoiceUrl, asaasSubscription.BillingType));
+        }
 
         await dbContext.SaveChangesAsync(cancellationToken);
 

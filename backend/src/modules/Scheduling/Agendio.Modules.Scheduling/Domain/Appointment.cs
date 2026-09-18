@@ -143,7 +143,11 @@ public sealed class Appointment : AggregateRoot<AppointmentId>, ITenantOwned, IA
         return Result.Success();
     }
 
-    public Result Reschedule(TimeSlot newSlot)
+    // newResourceId/newUnitId sao opcionais e tratados juntos: so mexem em
+    // ResourceId/UnitId quando o agendamento esta sendo reatribuido pra outro
+    // recurso (drag entre colunas na Agenda) — reagendar so o horario ou so a
+    // duracao (redimensionar) nunca toca nesses dois campos.
+    public Result Reschedule(TimeSlot newSlot, Guid? newResourceId = null, Guid? newUnitId = null)
     {
         if (Status is not (AppointmentStatus.Scheduled or AppointmentStatus.Confirmed))
         {
@@ -151,6 +155,12 @@ public sealed class Appointment : AggregateRoot<AppointmentId>, ITenantOwned, IA
         }
 
         Slot = newSlot;
+        if (newResourceId is { } resourceId)
+        {
+            ResourceId = resourceId;
+            UnitId = newUnitId;
+        }
+
         return Result.Success();
     }
 }

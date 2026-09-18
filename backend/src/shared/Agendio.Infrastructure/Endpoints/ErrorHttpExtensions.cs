@@ -21,6 +21,10 @@ public static class ErrorHttpExtensions
             _ => StatusCodes.Status500InternalServerError,
         };
 
-        return Results.Problem(title: error.Code, detail: error.Message, statusCode: statusCode);
+        return Results.Problem(
+            title: error.Code,
+            detail: error.Message,
+            statusCode: statusCode,
+            extensions: error.Extensions?.ToDictionary(kv => kv.Key, kv => kv.Value));
     }
 }

@@ -37,7 +37,7 @@ public sealed class SendCampaignCommandHandler(
 
         var campaignResult = Domain.Campaign.Create(
             tenantContext.TenantId, request.Subject, request.Body, request.Channel, request.TargetSegment?.ToString(),
-            recipients.Count, clock.UtcNow);
+            recipients.Select(r => r.CustomerId).ToList(), clock.UtcNow);
         if (campaignResult.IsFailure)
         {
             return Result.Failure<SendCampaignResult>(campaignResult.Error);

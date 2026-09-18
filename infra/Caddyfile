@@ -1,0 +1,16 @@
+# TLS publica e trabalho do Cloudflare Tunnel agora (cloudflared no host fala
+# com este Caddy em HTTP simples via localhost:80) -- Caddy nao expoe porta
+# nenhuma pra internet diretamente, entao nao faz sentido ele proprio tentar
+# emitir certificado Let's Encrypt aqui.
+:80
+
+encode zstd gzip
+
+@backend path /api/* /uploads/* /health/*
+handle @backend {
+	reverse_proxy backend:8080
+}
+
+handle {
+	reverse_proxy frontend:3000
+}

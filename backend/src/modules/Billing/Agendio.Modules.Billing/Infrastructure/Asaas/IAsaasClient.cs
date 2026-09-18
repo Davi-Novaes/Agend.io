@@ -7,6 +7,15 @@ public interface IAsaasClient
 
     Task<AsaasNewSubscriptionResult> CreateSubscriptionAsync(string asaasCustomerId, decimal value, DateOnly nextDueDate, CancellationToken cancellationToken);
 
+    /// <summary>
+    /// Recupera o pagamento mais recente de uma assinatura Asaas ja existente,
+    /// sem criar outra. Usado quando o dono reenvia o formulario de "Assinar"
+    /// antes de pagar (F5, duplo clique, volta do checkout) — sem isso, cada
+    /// reenvio criava uma NOVA assinatura recorrente na Asaas, deixando a
+    /// anterior orfa (cliente cobrado em duplicidade todo mes).
+    /// </summary>
+    Task<AsaasNewSubscriptionResult> GetLatestSubscriptionPaymentAsync(string asaasSubscriptionId, CancellationToken cancellationToken);
+
     Task CancelSubscriptionAsync(string asaasSubscriptionId, CancellationToken cancellationToken);
 
     /// <summary>

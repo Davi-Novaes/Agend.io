@@ -32,6 +32,12 @@ public sealed class AppointmentChangeLogEntry : AggregateRoot<AppointmentChangeL
 
     public DateTimeOffset? NewStartUtc { get; private set; }
 
+    /// <summary>Preenchido so quando a remarcacao tambem reatribuiu o profissional (drag entre colunas na Agenda) — nulo pra remarcacao normal.</summary>
+    public Guid? PreviousResourceId { get; private set; }
+
+    /// <summary>Preenchido so quando a remarcacao tambem redimensionou a duracao (arrastar a borda do card na Agenda) — nulo pra remarcacao normal.</summary>
+    public DateTimeOffset? NewEndUtc { get; private set; }
+
     public bool ByStaff { get; private set; }
 
     public DateTimeOffset OccurredAtUtc { get; private set; }
@@ -50,7 +56,8 @@ public sealed class AppointmentChangeLogEntry : AggregateRoot<AppointmentChangeL
 
     private AppointmentChangeLogEntry(
         TenantId tenantId, AppointmentId appointmentId, Guid customerId, Guid resourceId, string serviceName, AppointmentChangeType changeType,
-        string? reason, DateTimeOffset previousStartUtc, DateTimeOffset? newStartUtc, bool byStaff, DateTimeOffset occurredAtUtc)
+        string? reason, DateTimeOffset previousStartUtc, DateTimeOffset? newStartUtc, bool byStaff, DateTimeOffset occurredAtUtc,
+        Guid? previousResourceId = null, DateTimeOffset? newEndUtc = null)
         : base(AppointmentChangeLogEntryId.New())
     {
         TenantId = tenantId;
@@ -62,6 +69,8 @@ public sealed class AppointmentChangeLogEntry : AggregateRoot<AppointmentChangeL
         Reason = reason;
         PreviousStartUtc = previousStartUtc;
         NewStartUtc = newStartUtc;
+        PreviousResourceId = previousResourceId;
+        NewEndUtc = newEndUtc;
         ByStaff = byStaff;
         OccurredAtUtc = occurredAtUtc;
     }
@@ -83,7 +92,8 @@ public sealed class AppointmentChangeLogEntry : AggregateRoot<AppointmentChangeL
 
     public static Result<AppointmentChangeLogEntry> RecordReschedule(
         TenantId tenantId, AppointmentId appointmentId, Guid customerId, Guid resourceId, string serviceName,
-        DateTimeOffset previousStartUtc, DateTimeOffset newStartUtc, string? reason, DateTimeOffset occurredAtUtc)
+        DateTimeOffset previousStartUtc, DateTimeOffset newStartUtc, string? reason, DateTimeOffset occurredAtUtc,
+        Guid? previousResourceId = null, DateTimeOffset? newEndUtc = null)
     {
         var trimmedReasonResult = TrimReason(reason);
         if (trimmedReasonResult.IsFailure)
@@ -93,7 +103,8 @@ public sealed class AppointmentChangeLogEntry : AggregateRoot<AppointmentChangeL
 
         return Result.Success(new AppointmentChangeLogEntry(
             tenantId, appointmentId, customerId, resourceId, serviceName, AppointmentChangeType.Rescheduled,
-            trimmedReasonResult.Value, previousStartUtc, newStartUtc, byStaff: true, occurredAtUtc));
+            trimmedReasonResult.Value, previousStartUtc, newStartUtc, byStaff: true, occurredAtUtc,
+            previousResourceId, newEndUtc));
     }
 
     private static Result<string?> TrimReason(string? reason)

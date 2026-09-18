@@ -222,6 +222,22 @@ namespace Agendio.Modules.Billing.Infrastructure.Persistence.Migrations
                         .HasColumnType("boolean")
                         .HasColumnName("is_active");
 
+                    b.Property<bool>("IsFeatured")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_featured");
+
+                    b.Property<int?>("MaxCustomers")
+                        .HasColumnType("integer")
+                        .HasColumnName("max_customers");
+
+                    b.Property<int?>("MaxProfessionals")
+                        .HasColumnType("integer")
+                        .HasColumnName("max_professionals");
+
+                    b.Property<int?>("MaxUnits")
+                        .HasColumnType("integer")
+                        .HasColumnName("max_units");
+
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasMaxLength(100)
@@ -243,7 +259,8 @@ namespace Agendio.Modules.Billing.Infrastructure.Persistence.Migrations
                             Id = new Guid("11111111-1111-1111-1111-111111111111"),
                             BillingCycle = "Monthly",
                             Currency = "BRL",
-                            IsActive = true,
+                            IsActive = false,
+                            IsFeatured = false,
                             Name = "Padrão",
                             PriceAmount = 99.00m
                         },
@@ -252,9 +269,48 @@ namespace Agendio.Modules.Billing.Infrastructure.Persistence.Migrations
                             Id = new Guid("22222222-2222-2222-2222-222222222222"),
                             BillingCycle = "Monthly",
                             Currency = "BRL",
-                            IsActive = true,
+                            IsActive = false,
+                            IsFeatured = false,
                             Name = "Grátis",
                             PriceAmount = 0.00m
+                        },
+                        new
+                        {
+                            Id = new Guid("33333333-3333-3333-3333-333333333333"),
+                            BillingCycle = "Monthly",
+                            Currency = "BRL",
+                            IsActive = true,
+                            IsFeatured = false,
+                            MaxCustomers = 300,
+                            MaxProfessionals = 3,
+                            MaxUnits = 1,
+                            Name = "Essencial",
+                            PriceAmount = 49.99m
+                        },
+                        new
+                        {
+                            Id = new Guid("44444444-4444-4444-4444-444444444444"),
+                            BillingCycle = "Monthly",
+                            Currency = "BRL",
+                            IsActive = true,
+                            IsFeatured = true,
+                            MaxCustomers = 1500,
+                            MaxProfessionals = 10,
+                            MaxUnits = 3,
+                            Name = "Profissional",
+                            PriceAmount = 69.99m
+                        },
+                        new
+                        {
+                            Id = new Guid("55555555-5555-5555-5555-555555555555"),
+                            BillingCycle = "Monthly",
+                            Currency = "BRL",
+                            IsActive = true,
+                            IsFeatured = false,
+                            MaxProfessionals = 30,
+                            MaxUnits = 10,
+                            Name = "Premium",
+                            PriceAmount = 99.99m
                         });
                 });
 

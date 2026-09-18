@@ -27,6 +27,9 @@
     <ProjectReference Include="..\..\Scheduling\Agendio.Modules.Scheduling.Contracts\Agendio.Modules.Scheduling.Contracts.csproj" />
     <!-- Fase 11: programa de fidelidade le a configuracao (ligado/desligado, limiar) via Tenancy.Contracts. -->
     <ProjectReference Include="..\..\Tenancy\Agendio.Modules.Tenancy.Contracts\Agendio.Modules.Tenancy.Contracts.csproj" />
+    <ProjectReference Include="..\..\Billing\Agendio.Modules.Billing.Contracts\Agendio.Modules.Billing.Contracts.csproj" />
+    <!-- Consome CampaignSentDomainEvent (MarketingIntegrationEventConsumer) pra marcar clientes contatados. -->
+    <ProjectReference Include="..\..\Marketing\Agendio.Modules.Marketing.Contracts\Agendio.Modules.Marketing.Contracts.csproj" />
   </ItemGroup>
 
 </Project>

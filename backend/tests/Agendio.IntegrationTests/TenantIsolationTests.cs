@@ -52,9 +52,9 @@ public class TenantIsolationTests(IntegrationTestFixture fixture)
         var email = $"compartilhado-{Guid.NewGuid():N}@example.com";
 
         var registerA = await client.PostAsJsonAsync(
-            "/api/auth/register", new { tenantId = tenantAId, email, password = Password, fullName = "Pessoa A" }, cancellationToken);
+            "/api/auth/register", new { tenantId = tenantAId, email, password = Password, fullName = "Pessoa A", phone = "+5511999999999", cpfCnpj = "12345678909", termsAccepted = true }, cancellationToken);
         var registerB = await client.PostAsJsonAsync(
-            "/api/auth/register", new { tenantId = tenantBId, email, password = "OutraSenhaForte456!", fullName = "Pessoa B" }, cancellationToken);
+            "/api/auth/register", new { tenantId = tenantBId, email, password = "OutraSenhaForte456!", fullName = "Pessoa B", phone = "+5511999999998", cpfCnpj = "98765432100", termsAccepted = true }, cancellationToken);
 
         registerA.StatusCode.ShouldBe(HttpStatusCode.Created);
         registerB.StatusCode.ShouldBe(HttpStatusCode.Created);
@@ -69,9 +69,9 @@ public class TenantIsolationTests(IntegrationTestFixture fixture)
         var email = $"duplicado-{Guid.NewGuid():N}@example.com";
 
         var first = await client.PostAsJsonAsync(
-            "/api/auth/register", new { tenantId, email, password = Password, fullName = "Primeira Conta" }, cancellationToken);
+            "/api/auth/register", new { tenantId, email, password = Password, fullName = "Primeira Conta", phone = "+5511999999999", cpfCnpj = "12345678909", termsAccepted = true }, cancellationToken);
         var second = await client.PostAsJsonAsync(
-            "/api/auth/register", new { tenantId, email, password = Password, fullName = "Segunda Conta" }, cancellationToken);
+            "/api/auth/register", new { tenantId, email, password = Password, fullName = "Segunda Conta", phone = "+5511999999998", cpfCnpj = "98765432100", termsAccepted = true }, cancellationToken);
 
         first.StatusCode.ShouldBe(HttpStatusCode.Created);
         second.StatusCode.ShouldBe(HttpStatusCode.Conflict);
@@ -96,7 +96,7 @@ public class TenantIsolationTests(IntegrationTestFixture fixture)
         HttpClient client, Guid tenantId, string email, string password, string fullName, CancellationToken cancellationToken)
     {
         var response = await client.PostAsJsonAsync(
-            "/api/auth/register", new { tenantId, email, password, fullName }, cancellationToken);
+            "/api/auth/register", new { tenantId, email, password, fullName, phone = "+5511999999999", cpfCnpj = "12345678909", termsAccepted = true }, cancellationToken);
         response.StatusCode.ShouldBe(HttpStatusCode.Created);
     }
 }

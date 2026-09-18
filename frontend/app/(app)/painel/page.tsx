@@ -13,10 +13,13 @@ import {
   listAccountsPayable,
   listAppointments,
   listCustomers,
+  listResources,
+  listServices,
+  CUSTOMER_RECOVERY_QUERY_KEY,
 } from "@/lib/api/client";
 import { useSession } from "@/lib/auth/session-context";
+import { decodeJwtFullName } from "@/lib/auth/decode-jwt";
 import { PeriodFilter } from "@/components/shared/period-filter";
-import { CategoryBreakdownChart } from "@/components/financeiro/cash-flow-chart";
 import { MetricCard } from "@/components/dashboard/metric-card";
 import { RevenueChart } from "@/components/dashboard/revenue-chart";
 import { AppointmentStatusChart } from "@/components/dashboard/appointment-status-chart";
@@ -25,8 +28,9 @@ import { TodayAgendaCard, type TodayAppointmentItem } from "@/components/dashboa
 import { AttentionSection } from "@/components/dashboard/attention-section";
 import { CustomerStatsCard } from "@/components/dashboard/customer-stats-card";
 import { InsightsSection } from "@/components/dashboard/insights-section";
+import { OnboardingChecklistCard } from "@/components/dashboard/onboarding-checklist-card";
 import { Button } from "@/components/ui/button";
-import { previousPeriod, startOfMonth, toDateOnly } from "@/lib/date-utils";
+import { previousPeriod, startOfYear, toDateOnly } from "@/lib/date-utils";
 
 function formatCurrency(value: number): string {
   return value.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
@@ -37,6 +41,10 @@ function greeting(): string {
   if (hour < 12) return "Bom dia";
   if (hour < 18) return "Boa tarde";
   return "Boa noite";
+}
+
+function firstNameOf(fullName: string | null): string | null {
+  return fullName?.trim().split(/\s+/)[0] ?? null;
 }
 
 /** null quando o periodo anterior nao tem base pra comparar (ex.: tenant novo, sem historico). */
@@ -59,7 +67,10 @@ function startOfDay(date: Date): Date {
 
 export default function DashboardPage() {
   const { session } = useSession();
-  const [from, setFrom] = React.useState(() => toDateOnly(startOfMonth(new Date())));
+  // Ano todo por padrao (nao so o mes atual) -- com poucos meses de historico
+  // acumulado, "este mes" sozinho deixava o grafico de faturamento parecendo
+  // vazio (um unico ponto). O seletor continua permitindo qualquer periodo.
+  const [from, setFrom] = React.useState(() => toDateOnly(startOfYear(new Date())));
   const [to, setTo] = React.useState(() => toDateOnly(new Date()));
   const previous = previousPeriod(from, to);
 
@@ -86,7 +97,7 @@ export default function DashboardPage() {
     enabled,
   });
   const recoveryQuery = useQuery({
-    queryKey: ["painel", "recuperacao"],
+    queryKey: CUSTOMER_RECOVERY_QUERY_KEY,
     queryFn: () => getCustomerRecoveryCandidates(accessToken),
     enabled,
   });
@@ -127,6 +138,16 @@ export default function DashboardPage() {
     queryFn: () => listCustomers({ page: 1, pageSize: 1, segment: "Inativo" }, accessToken),
     enabled,
   });
+  const servicesCountQuery = useQuery({
+    queryKey: ["painel", "servicos-count"],
+    queryFn: () => listServices({ page: 1, pageSize: 1 }, accessToken),
+    enabled,
+  });
+  const resourcesCountQuery = useQuery({
+    queryKey: ["painel", "recursos-count"],
+    queryFn: () => listResources({ page: 1, pageSize: 1 }, accessToken),
+    enabled,
+  });
 
   if (!session) {
     return null;
@@ -155,51 +176,70 @@ export default function DashboardPage() {
   const todayPendingCount = todayAppointmentsQuery.data?.filter((a) => a.status === "Scheduled").length ?? 0;
 
   const overduePayablesCount = overduePayablesQuery.data?.items.filter((item) => item.dueDate < todayIso).length;
+  const displayName = firstNameOf(session ? decodeJwtFullName(session.accessToken) : null);
 
   return (
-    <div className="mx-auto flex w-full max-w-5xl flex-1 flex-col gap-8">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h2 className="text-lg font-semibold tracking-tight">{greeting()}</h2>
-          <p className="text-muted-foreground text-sm">Veja como esta o desempenho do seu negocio.</p>
+    <div className="flex w-full flex-1 flex-col gap-6">
+      {/* Cabecalho compacto: saudacao + acoes rapidas numa linha, filtro de
+          periodo integrado logo abaixo (nao mais numa secao propria) */}
+      <div className="flex flex-col gap-3">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <h2 className="text-lg font-semibold tracking-tight">
+              {greeting()}
+              {displayName ? `, ${displayName}` : ""} <span aria-hidden="true">👋</span>
+            </h2>
+            <p className="text-muted-foreground text-sm">Aqui esta o resumo do seu negocio.</p>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <Button
+              asChild
+              variant="ghost"
+              size="sm"
+              className="border border-primary/50 bg-transparent text-primary hover:bg-primary/10 hover:text-primary dark:border-primary/50 dark:bg-transparent dark:hover:bg-primary/10 dark:hover:text-primary"
+            >
+              <Link href="/clientes?novo=1">
+                <Plus className="size-4" />
+                Novo cliente
+              </Link>
+            </Button>
+            <Button asChild size="sm">
+              <Link href="/agenda?novo=1">
+                <Plus className="size-4" />
+                Novo agendamento
+              </Link>
+            </Button>
+          </div>
         </div>
-        <div className="flex gap-2">
-          <Button
-            asChild
-            variant="ghost"
-            size="sm"
-            className="border border-primary/50 bg-transparent text-primary hover:bg-primary/10 hover:text-primary dark:border-primary/50 dark:bg-transparent dark:hover:bg-primary/10 dark:hover:text-primary"
-          >
-            <Link href="/clientes?novo=1">
-              <Plus className="size-4" />
-              Novo cliente
-            </Link>
-          </Button>
-          <Button asChild size="sm">
-            <Link href="/agenda?novo=1">
-              <Plus className="size-4" />
-              Novo agendamento
-            </Link>
-          </Button>
-        </div>
+        <PeriodFilter from={from} to={to} onFromChange={setFrom} onToChange={setTo} />
       </div>
 
-      <PeriodFilter from={from} to={to} onFromChange={setFrom} onToChange={setTo} />
+      {servicesCountQuery.data && resourcesCountQuery.data && (
+        <OnboardingChecklistCard
+          servicesCount={servicesCountQuery.data.totalCount}
+          resourcesCount={resourcesCountQuery.data.totalCount}
+          hasAppointments={(stats?.totalCount ?? 0) > 0}
+        />
+      )}
 
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      {/* 1. Indicadores principais */}
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <MetricCard
           icon={Wallet}
           title="Faturamento"
           value={cashFlow ? formatCurrency(cashFlow.totalReceived) : "—"}
           delta={cashFlow && previousCashFlow ? percentDelta(cashFlow.totalReceived, previousCashFlow.totalReceived) : undefined}
+          emptyLabel={cashFlow?.totalReceived === 0 ? "Aguardando primeiros lancamentos" : undefined}
           isLoading={kpiLoading}
           tone="primary"
+          featured
         />
         <MetricCard
           icon={ArrowDownCircle}
           title="Despesas"
           value={cashFlow ? formatCurrency(cashFlow.totalPaid) : "—"}
           delta={cashFlow && previousCashFlow ? percentDelta(cashFlow.totalPaid, previousCashFlow.totalPaid) : undefined}
+          emptyLabel={cashFlow?.totalPaid === 0 ? "Nenhuma despesa lancada ainda" : undefined}
           isLoading={kpiLoading}
           tone="destructive"
         />
@@ -215,19 +255,30 @@ export default function DashboardPage() {
         <MetricCard
           icon={CalendarCheck}
           title="Agendamentos"
-          value={todayAppointmentsQuery.data ? `${todayAppointmentsQuery.data.length} hoje` : "—"}
-          description={todayAppointmentsQuery.data ? `${todayCompletedCount} concluidos` : undefined}
+          value={todayAppointmentsQuery.data ? `${todayAppointmentsQuery.data.length}` : "—"}
+          description={
+            todayAppointmentsQuery.data && todayAppointmentsQuery.data.length > 0
+              ? `${todayCompletedCount} concluidos hoje`
+              : undefined
+          }
+          emptyLabel={todayAppointmentsQuery.data?.length === 0 ? "Nenhum agendamento hoje" : undefined}
           isLoading={todayAppointmentsQuery.isLoading}
           tone="info"
         />
       </div>
 
-      <div className="grid gap-4 lg:grid-cols-2">
-        {cashFlow ? <RevenueChart data={cashFlow.seriesByMonth} /> : <div className="h-64 animate-pulse rounded-lg border bg-muted/40" />}
-        <TodayAgendaCard appointments={todayAppointments} isLoading={todayAppointmentsQuery.isLoading} />
-      </div>
+      {/* 2. Agenda de hoje -- protagonismo proprio, largura total */}
+      <TodayAgendaCard appointments={todayAppointments} isLoading={todayAppointmentsQuery.isLoading} />
 
-      <div className="grid gap-4 lg:grid-cols-2">
+      {/* 3. Faturamento / indicadores financeiros */}
+      {cashFlow ? (
+        <RevenueChart data={cashFlow.seriesByMonth} />
+      ) : (
+        <div className="h-64 animate-pulse rounded-lg bg-muted/40" />
+      )}
+
+      {/* 4. Alertas e pendencias + 5. Insights do periodo */}
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
         <AttentionSection
           overduePayablesCount={overduePayablesCount}
           pendingAppointmentsCount={todayPendingCount}
@@ -243,13 +294,13 @@ export default function DashboardPage() {
         />
       </div>
 
-      {/* 2 colunas, nao 4: ServiceRevenueChart/AppointmentStatusChart tem controles
-          internos (toggles, legenda) que dependem de largura de viewport (sm:/lg:),
-          nao da largura da coluna do grid -- numa 4a coluna eles ficam espremidos
-          mesmo em telas largas, porque o breakpoint interno nao sabe que ganhou
-          menos espaco por causa do grid pai. */}
-      <div className="grid gap-4 sm:grid-cols-2">
-        {stats ? <ServiceRevenueChart data={stats.revenueByService} /> : <div className="h-72 animate-pulse rounded-lg border bg-muted/40" />}
+      {/* xl, nao lg: ServiceRevenueChart/AppointmentStatusChart tem controles
+          internos (toggles, legenda) que dependem de largura de viewport, nao
+          da largura da coluna do grid -- em 3 colunas antes de xl eles ficam
+          espremidos mesmo em telas largas, porque o breakpoint interno nao
+          sabe que ganhou menos espaco por causa do grid pai. */}
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
+        {stats ? <ServiceRevenueChart data={stats.revenueByService} /> : <div className="h-72 animate-pulse rounded-lg bg-muted/40" />}
         <CustomerStatsCard
           newCount={newCustomersQuery.data?.totalCount}
           recurringCount={recurringCustomersQuery.data?.totalCount}
@@ -259,19 +310,7 @@ export default function DashboardPage() {
         {stats ? (
           <AppointmentStatusChart stats={stats} />
         ) : (
-          <div className="h-72 animate-pulse rounded-lg border bg-muted/40" />
-        )}
-        {stats ? (
-          <CategoryBreakdownChart
-            id="painel-revenue-by-service"
-            title="Faturamento por servico"
-            subtitle="Agendamentos concluidos no periodo"
-            emptyMessage="Nenhum agendamento concluido no periodo."
-            categoryLabel="Servico"
-            data={stats.revenueByService.map((point) => ({ category: point.serviceName, total: point.total }))}
-          />
-        ) : (
-          <div className="h-72 animate-pulse rounded-lg border bg-muted/40" />
+          <div className="h-72 animate-pulse rounded-lg bg-muted/40" />
         )}
       </div>
     </div>
