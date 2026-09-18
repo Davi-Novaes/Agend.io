@@ -24,6 +24,9 @@
     <ProjectReference Include="..\..\Estoque\Agendio.Modules.Estoque.Contracts\Agendio.Modules.Estoque.Contracts.csproj" />
     <ProjectReference Include="..\..\Scheduling\Agendio.Modules.Scheduling.Contracts\Agendio.Modules.Scheduling.Contracts.csproj" />
     <ProjectReference Include="..\..\Tenancy\Agendio.Modules.Tenancy.Contracts\Agendio.Modules.Tenancy.Contracts.csproj" />
+    <!-- Fase 2 (Agendio Assist): so contagem/lista agregada de clientes.
+         O prompt continua recusando dado de um cliente especifico. -->
+    <ProjectReference Include="..\..\Customers\Agendio.Modules.Customers.Contracts\Agendio.Modules.Customers.Contracts.csproj" />
   </ItemGroup>
 
 </Project>

@@ -12,6 +12,7 @@ import {
   listResources,
   getResourceById,
   getTenantProfile,
+  TENANT_PROFILE_QUERY_KEY,
   createResource,
   updateResource,
   setResourceActiveStatus,
@@ -173,7 +174,7 @@ export default function ResourcesPage() {
   // genericamente "Recursos" mesmo quando o resto do produto ja fala a
   // lingua do segmento (BL-14, docs/BACKLOG.md).
   const profileQuery = useQuery({
-    queryKey: ["tenant-profile"],
+    queryKey: TENANT_PROFILE_QUERY_KEY,
     queryFn: () => getTenantProfile(accessToken),
     enabled: Boolean(session),
   });
@@ -286,6 +287,13 @@ export default function ResourcesPage() {
       );
     },
     onSuccess: () => {
+      // Sem isto, a grade da Agenda (["resource-details", id], consumida so
+      // la) continuava mostrando o horario antigo ate um refetch acontecer
+      // por outro motivo (reload, foco de janela) -- horario salvo aqui,
+      // grade desatualizada la.
+      if (hoursResource) {
+        queryClient.invalidateQueries({ queryKey: ["resource-details", hoursResource.id] });
+      }
       toast.success("Horarios atualizados.");
       setHoursDialogOpen(false);
     },
@@ -459,7 +467,7 @@ export default function ResourcesPage() {
   }
 
   return (
-    <div className="mx-auto flex w-full max-w-4xl flex-1 flex-col">
+    <div className="flex w-full flex-1 flex-col">
       <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
         <p className="text-muted-foreground text-sm">Pessoas, salas e equipamentos que a agenda reserva.</p>
         <Button onClick={openCreateDialog}>

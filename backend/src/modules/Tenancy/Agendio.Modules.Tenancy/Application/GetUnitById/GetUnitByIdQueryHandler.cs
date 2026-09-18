@@ -18,6 +18,6 @@ public sealed class GetUnitByIdQueryHandler(TenancyDbContext dbContext) : IQuery
             return Result.Failure<UnitDetails>(Error.NotFound("Unit.NotFound", "Unidade nao encontrada."));
         }
 
-        return Result.Success(new UnitDetails(unit.Id.Value, unit.Name, unit.Address, unit.IsActive));
+        return Result.Success(new UnitDetails(unit.Id.Value, unit.Name, unit.Address, unit.City, unit.State, unit.Country, unit.IsActive));
     }
 }

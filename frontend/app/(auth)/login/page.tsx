@@ -7,13 +7,15 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { toast } from "sonner";
-import { MailCheck } from "lucide-react";
+import { Eye, EyeOff, Loader2, Lock, Mail, MailCheck, ShieldCheck, Store } from "lucide-react";
 
 import { getTenantBySlug, resendConfirmationEmail, ApiError } from "@/lib/api/client";
 import { useSession, MfaRequiredError } from "@/lib/auth/session-context";
 import { Logo } from "@/components/logo";
+import { LoginShowcase } from "@/components/auth/login-showcase";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { cn } from "@/lib/utils";
 import {
   Form,
   FormControl,
@@ -22,6 +24,14 @@ import {
   FormLabel,
   FormMessage,
 } from "@/components/ui/form";
+
+// Estilo dos inputs so desta tela (nao mexe no Input global, usado em toda
+// a base de codigo) -- entrada mais "premium": mais alta, superficie --card
+// (contrasta com o --background do painel em vez de ficar transparente e
+// "apagada"), e um anel de foco maior/mais suave que o padrao do design
+// system pra reforcar a cor de marca sem ficar agressivo.
+const LOGIN_INPUT_BASE_CLASS =
+  "h-11 rounded-xl border-border bg-card text-[15px] shadow-xs transition-all duration-200 hover:border-foreground/25 focus-visible:ring-4 focus-visible:ring-primary/15";
 
 const loginSchema = z.object({
   tenantSlug: z
@@ -40,6 +50,12 @@ const mfaSchema = z.object({
 
 type MfaFormValues = z.infer<typeof mfaSchema>;
 
+function formatCountdown(totalSeconds: number): string {
+  const minutes = Math.floor(totalSeconds / 60);
+  const seconds = totalSeconds % 60;
+  return `${minutes}:${seconds.toString().padStart(2, "0")}`;
+}
+
 export default function LoginPage() {
   const router = useRouter();
   const { login, verifyMfa, isAuthenticating } = useSession();
@@ -53,6 +69,24 @@ export default function LoginPage() {
     null
   );
   const [isResending, setIsResending] = React.useState(false);
+  // Presente quando o login falhou por bloqueio de tentativas (5 senhas
+  // erradas) -- troca de tela mostrando a contagem regressiva ate poder
+  // tentar de novo, em vez de deixar a pessoa martelando o formulario.
+  const [lockedUntil, setLockedUntil] = React.useState<Date | null>(null);
+  const [remainingSeconds, setRemainingSeconds] = React.useState(0);
+  const [showPassword, setShowPassword] = React.useState(false);
+
+  React.useEffect(() => {
+    if (!lockedUntil) return;
+
+    function tick() {
+      setRemainingSeconds(Math.max(0, Math.ceil((lockedUntil!.getTime() - Date.now()) / 1000)));
+    }
+
+    tick();
+    const interval = setInterval(tick, 1000);
+    return () => clearInterval(interval);
+  }, [lockedUntil]);
 
   const form = useForm<LoginFormValues>({
     resolver: zodResolver(loginSchema),
@@ -103,6 +137,11 @@ export default function LoginPage() {
         return;
       }
 
+      if (error instanceof ApiError && error.code === "Auth.AccountLocked" && error.lockedUntilUtc) {
+        setLockedUntil(new Date(error.lockedUntilUtc));
+        return;
+      }
+
       const message =
         error instanceof ApiError ? error.message : "Nao foi possivel entrar. Tente novamente.";
       toast.error(message);
@@ -140,30 +179,62 @@ export default function LoginPage() {
   }
 
   return (
-    <main className="grid min-h-full flex-1 lg:grid-cols-2">
-      <section className="relative hidden flex-col justify-between overflow-hidden bg-primary p-10 text-primary-foreground lg:flex">
+    <main className="theme-fixed-light bg-background text-foreground grid min-h-full flex-1 lg:grid-cols-[minmax(0,7fr)_minmax(0,6fr)]">
+      <LoginShowcase />
+
+      <section className="relative flex flex-1 items-center justify-center p-6 sm:p-10 lg:p-16">
+        {/* Suaviza a divisao entre os dois paineis -- em vez de uma linha
+            reta 50/50, um leve degrade da cor de marca "vaza" pra dentro do
+            painel claro na emenda. */}
         <div
           aria-hidden
-          className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_15%_20%,color-mix(in_oklch,var(--primary-foreground),transparent_82%),transparent_55%),radial-gradient(circle_at_85%_80%,color-mix(in_oklch,var(--primary-foreground),transparent_88%),transparent_60%)]"
+          className="pointer-events-none absolute inset-y-0 left-0 hidden w-20 bg-gradient-to-r from-[color-mix(in_oklch,var(--primary),transparent_88%)] to-transparent lg:block"
         />
-        <Logo inverted className="relative text-primary-foreground" />
-        <blockquote className="relative space-y-3">
-          <p className="text-2xl leading-snug font-medium text-balance">
-            Agenda, clientes e equipe em um só lugar — sem complicar a rotina do seu negócio.
-          </p>
-          <footer className="text-sm text-primary-foreground/70">
-            Barbearias, clínicas, pet shops, estúdios e muito mais.
-          </footer>
-        </blockquote>
-      </section>
 
-      <section className="flex flex-1 items-center justify-center p-6 sm:p-10">
-        <div className="w-full max-w-sm">
-          <div className="mb-8 flex flex-col gap-2 lg:hidden">
+        <div className="animate-in fade-in-0 slide-in-from-bottom-3 fill-mode-both relative w-full max-w-[420px] duration-700 ease-out">
+          <div className="mb-8 flex flex-col gap-2 text-lg lg:hidden">
             <Logo />
           </div>
 
-          {unconfirmedEmail ? (
+          {lockedUntil ? (
+            <>
+              <div className="mb-6 flex flex-col items-center gap-3 text-center">
+                <span className="bg-destructive/10 text-destructive flex size-12 items-center justify-center rounded-full">
+                  <Lock className="size-6" aria-hidden />
+                </span>
+                <div className="space-y-1.5">
+                  <h1 className="text-xl font-semibold tracking-tight">Conta temporariamente bloqueada</h1>
+                  <p className="text-muted-foreground text-sm">
+                    Muitas tentativas incorretas. Por segurança, aguarde antes de tentar de novo.
+                  </p>
+                </div>
+              </div>
+
+              <div className="border-border bg-muted/40 flex flex-col items-center gap-1 rounded-lg border py-4">
+                <span className="text-muted-foreground text-xs">Tente novamente em</span>
+                <span className="text-2xl font-semibold tabular-nums" aria-live="polite">
+                  {formatCountdown(remainingSeconds)}
+                </span>
+              </div>
+
+              {remainingSeconds <= 0 && (
+                <Button
+                  type="button"
+                  onClick={() => setLockedUntil(null)}
+                  className="mt-4 h-11 w-full text-[15px] font-semibold shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:shadow-lg hover:shadow-primary/25"
+                >
+                  Tentar novamente
+                </Button>
+              )}
+
+              <p className="text-muted-foreground mt-6 text-center text-sm">
+                Não quer esperar?{" "}
+                <Link href="/forgot-password" className="text-primary underline-offset-4 hover:underline">
+                  Redefina sua senha
+                </Link>
+              </p>
+            </>
+          ) : unconfirmedEmail ? (
             <>
               <div className="mb-6 flex flex-col items-center gap-3 text-center">
                 <span className="bg-accent text-accent-foreground flex size-12 items-center justify-center rounded-full">
@@ -182,8 +253,9 @@ export default function LoginPage() {
                 type="button"
                 onClick={onResendConfirmation}
                 disabled={isResending}
-                className="h-10 w-full"
+                className="h-11 w-full text-[15px] font-semibold shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:shadow-lg hover:shadow-primary/25"
               >
+                {isResending && <Loader2 className="size-4 animate-spin" aria-hidden />}
                 {isResending ? "Reenviando..." : "Reenviar e-mail"}
               </Button>
 
@@ -213,19 +285,31 @@ export default function LoginPage() {
                       <FormItem>
                         <FormLabel>Código</FormLabel>
                         <FormControl>
-                          <Input
-                            inputMode="numeric"
-                            autoComplete="one-time-code"
-                            autoFocus
-                            placeholder="000000"
-                            {...field}
-                          />
+                          <div className="relative">
+                            <ShieldCheck
+                              className="text-muted-foreground pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2"
+                              aria-hidden
+                            />
+                            <Input
+                              inputMode="numeric"
+                              autoComplete="one-time-code"
+                              autoFocus
+                              placeholder="000000"
+                              className={cn(LOGIN_INPUT_BASE_CLASS, "pl-10 tracking-[0.3em] tabular-nums")}
+                              {...field}
+                            />
+                          </div>
                         </FormControl>
                         <FormMessage />
                       </FormItem>
                     )}
                   />
-                  <Button type="submit" disabled={isAuthenticating} className="mt-2 h-10">
+                  <Button
+                    type="submit"
+                    disabled={isAuthenticating}
+                    className="mt-2 h-11 text-[15px] font-semibold shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:shadow-lg hover:shadow-primary/25"
+                  >
+                    {isAuthenticating && <Loader2 className="size-4 animate-spin" aria-hidden />}
                     {isAuthenticating ? "Verificando..." : "Confirmar"}
                   </Button>
                 </form>
@@ -241,15 +325,15 @@ export default function LoginPage() {
             </>
           ) : (
             <>
-              <div className="mb-6 space-y-1.5">
-                <h1 className="text-xl font-semibold tracking-tight">Entrar</h1>
+              <div className="mb-7 space-y-1.5">
+                <h1 className="text-[1.75rem] font-bold tracking-tight">Entrar</h1>
                 <p className="text-muted-foreground text-sm">
                   Acesse o painel do seu estabelecimento.
                 </p>
               </div>
 
               <Form {...form}>
-                <form onSubmit={form.handleSubmit(onSubmit)} className="grid gap-4">
+                <form onSubmit={form.handleSubmit(onSubmit)} className="grid gap-5">
                   <FormField
                     control={form.control}
                     name="tenantSlug"
@@ -257,7 +341,18 @@ export default function LoginPage() {
                       <FormItem>
                         <FormLabel>Identificador do estabelecimento</FormLabel>
                         <FormControl>
-                          <Input placeholder="barbearia-do-ze" autoComplete="organization" {...field} />
+                          <div className="relative">
+                            <Store
+                              className="text-muted-foreground pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2"
+                              aria-hidden
+                            />
+                            <Input
+                              placeholder="barbearia-do-ze"
+                              autoComplete="organization"
+                              className={cn(LOGIN_INPUT_BASE_CLASS, "pl-10")}
+                              {...field}
+                            />
+                          </div>
                         </FormControl>
                         <FormMessage />
                       </FormItem>
@@ -270,7 +365,18 @@ export default function LoginPage() {
                       <FormItem>
                         <FormLabel>E-mail</FormLabel>
                         <FormControl>
-                          <Input type="email" autoComplete="email" {...field} />
+                          <div className="relative">
+                            <Mail
+                              className="text-muted-foreground pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2"
+                              aria-hidden
+                            />
+                            <Input
+                              type="email"
+                              autoComplete="email"
+                              className={cn(LOGIN_INPUT_BASE_CLASS, "pl-10")}
+                              {...field}
+                            />
+                          </div>
                         </FormControl>
                         <FormMessage />
                       </FormItem>
@@ -281,15 +387,47 @@ export default function LoginPage() {
                     name="password"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Senha</FormLabel>
+                        <div className="flex items-center justify-between">
+                          <FormLabel>Senha</FormLabel>
+                          <Link
+                            href="/forgot-password"
+                            className="text-muted-foreground text-xs underline-offset-4 hover:underline"
+                          >
+                            Esqueceu a senha?
+                          </Link>
+                        </div>
                         <FormControl>
-                          <Input type="password" autoComplete="current-password" {...field} />
+                          <div className="relative">
+                            <Lock
+                              className="text-muted-foreground pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2"
+                              aria-hidden
+                            />
+                            <Input
+                              type={showPassword ? "text" : "password"}
+                              autoComplete="current-password"
+                              className={cn(LOGIN_INPUT_BASE_CLASS, "pl-10 pr-9")}
+                              {...field}
+                            />
+                            <button
+                              type="button"
+                              onClick={() => setShowPassword((value) => !value)}
+                              aria-label={showPassword ? "Ocultar senha" : "Mostrar senha"}
+                              className="text-muted-foreground hover:text-foreground absolute inset-y-0 right-0 flex w-10 items-center justify-center"
+                            >
+                              {showPassword ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
+                            </button>
+                          </div>
                         </FormControl>
                         <FormMessage />
                       </FormItem>
                     )}
                   />
-                  <Button type="submit" disabled={isAuthenticating} className="mt-2 h-10">
+                  <Button
+                    type="submit"
+                    disabled={isAuthenticating}
+                    className="mt-2 h-11 text-[15px] font-semibold shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:shadow-lg hover:shadow-primary/25"
+                  >
+                    {isAuthenticating && <Loader2 className="size-4 animate-spin" aria-hidden />}
                     {isAuthenticating ? "Entrando..." : "Entrar"}
                   </Button>
                 </form>

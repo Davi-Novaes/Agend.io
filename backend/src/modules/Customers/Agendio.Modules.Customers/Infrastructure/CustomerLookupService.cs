@@ -9,7 +9,7 @@ using Microsoft.EntityFrameworkCore;
 namespace Agendio.Modules.Customers.Infrastructure;
 
 internal sealed class CustomerLookupService(CustomersDbContext dbContext, ICustomerVisitStatsLookupService visitStatsLookup, IClock clock)
-    : ICustomerLookupService
+    : ICustomerLookupService, ICustomerDirectoryLookupService
 {
     public async Task<CustomerLookupResult?> FindByIdAsync(Guid customerId, CancellationToken cancellationToken = default)
     {
@@ -18,7 +18,8 @@ internal sealed class CustomerLookupService(CustomersDbContext dbContext, ICusto
 
         return customer is null
             ? null
-            : new CustomerLookupResult(customer.Id.Value, customer.FullName, customer.Email?.Value, customer.Phone?.Value, customer.IsActive);
+            : new CustomerLookupResult(
+                customer.Id.Value, customer.FullName, customer.Email?.Value, customer.Phone?.Value, customer.IsActive, customer.LastContactedAtUtc);
     }
 
     public async Task<IReadOnlyList<CustomerLookupResult>> FindByIdsAsync(
@@ -35,7 +36,7 @@ internal sealed class CustomerLookupService(CustomersDbContext dbContext, ICusto
             .ToListAsync(cancellationToken);
 
         return customers
-            .Select(c => new CustomerLookupResult(c.Id.Value, c.FullName, c.Email?.Value, c.Phone?.Value, c.IsActive))
+            .Select(c => new CustomerLookupResult(c.Id.Value, c.FullName, c.Email?.Value, c.Phone?.Value, c.IsActive, c.LastContactedAtUtc))
             .ToList();
     }
 
@@ -47,7 +48,7 @@ internal sealed class CustomerLookupService(CustomersDbContext dbContext, ICusto
             .ToListAsync(cancellationToken);
 
         return customers
-            .Select(c => new CustomerLookupResult(c.Id.Value, c.FullName, c.Email!.Value, c.Phone?.Value, c.IsActive))
+            .Select(c => new CustomerLookupResult(c.Id.Value, c.FullName, c.Email!.Value, c.Phone?.Value, c.IsActive, c.LastContactedAtUtc))
             .ToList();
     }
 
@@ -62,7 +63,7 @@ internal sealed class CustomerLookupService(CustomersDbContext dbContext, ICusto
         if (segment is null)
         {
             return customers
-                .Select(c => new CustomerLookupResult(c.Id.Value, c.FullName, c.Email?.Value, c.Phone?.Value, c.IsActive))
+                .Select(c => new CustomerLookupResult(c.Id.Value, c.FullName, c.Email?.Value, c.Phone?.Value, c.IsActive, c.LastContactedAtUtc))
                 .ToList();
         }
 
@@ -75,7 +76,29 @@ internal sealed class CustomerLookupService(CustomersDbContext dbContext, ICusto
 
         return customers
             .Where(c => CustomerSegmentCalculator.Calculate(statsByCustomerId.GetValueOrDefault(c.Id.Value), nowUtc, vipSpendThreshold) == segment)
-            .Select(c => new CustomerLookupResult(c.Id.Value, c.FullName, c.Email?.Value, c.Phone?.Value, c.IsActive))
+            .Select(c => new CustomerLookupResult(c.Id.Value, c.FullName, c.Email?.Value, c.Phone?.Value, c.IsActive, c.LastContactedAtUtc))
             .ToList();
+    }
+
+    public async Task<IReadOnlyList<CustomerLookupResult>> ListInactiveSinceAsync(
+        int daysSinceLastContact, CancellationToken cancellationToken = default)
+    {
+        var cutoff = clock.UtcNow.AddDays(-daysSinceLastContact);
+
+        var customers = await dbContext.Customers.AsNoTracking()
+            .Where(c => c.IsActive && (c.LastContactedAtUtc == null || c.LastContactedAtUtc < cutoff))
+            .OrderBy(c => c.LastContactedAtUtc)
+            .ToListAsync(cancellationToken);
+
+        return customers
+            .Select(c => new CustomerLookupResult(c.Id.Value, c.FullName, c.Email?.Value, c.Phone?.Value, c.IsActive, c.LastContactedAtUtc))
+            .ToList();
+    }
+
+    public async Task<CustomerDirectorySummaryLookupResult> GetSummaryAsync(CancellationToken cancellationToken = default)
+    {
+        var totalActive = await dbContext.Customers.AsNoTracking().CountAsync(c => c.IsActive, cancellationToken);
+        var totalInactive = await dbContext.Customers.AsNoTracking().CountAsync(c => !c.IsActive, cancellationToken);
+        return new CustomerDirectorySummaryLookupResult(totalActive, totalInactive);
     }
 }

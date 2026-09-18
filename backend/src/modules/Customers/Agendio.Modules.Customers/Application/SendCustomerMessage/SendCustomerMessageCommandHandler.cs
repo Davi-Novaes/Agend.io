@@ -4,13 +4,14 @@ using Agendio.Modules.Customers.Infrastructure.Persistence;
 using Agendio.SharedKernel.Messaging;
 using Agendio.SharedKernel.Multitenancy;
 using Agendio.SharedKernel.Results;
+using Agendio.SharedKernel.Time;
 using Hangfire;
 using Microsoft.EntityFrameworkCore;
 
 namespace Agendio.Modules.Customers.Application.SendCustomerMessage;
 
 public sealed class SendCustomerMessageCommandHandler(
-    CustomersDbContext dbContext, ITenantContext tenantContext, IBackgroundJobClient jobClient)
+    CustomersDbContext dbContext, ITenantContext tenantContext, IBackgroundJobClient jobClient, IClock clock)
     : ICommandHandler<SendCustomerMessageCommand>
 {
     public async Task<Result> Handle(SendCustomerMessageCommand request, CancellationToken cancellationToken)
@@ -30,6 +31,12 @@ public sealed class SendCustomerMessageCommandHandler(
 
         jobClient.Enqueue<CustomerMessageEmailJob>(job => job.SendAsync(
             tenantContext.TenantId.Value, customer.Email.Value, customer.FullName, request.Subject, request.Body, CancellationToken.None));
+
+        // Pedido explicito do usuario (2026-09-05): quem ja recebeu uma
+        // mensagem nao deve continuar aparecendo no card "Clientes para
+        // recuperar" (ver GetCustomerRecoveryCandidatesQueryHandler).
+        customer.MarkContacted(clock.UtcNow);
+        await dbContext.SaveChangesAsync(cancellationToken);
 
         return Result.Success();
     }

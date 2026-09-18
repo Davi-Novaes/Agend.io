@@ -59,5 +59,37 @@ public sealed class BillingReconciliationJob(
                 "Tenant {TenantId} desativado pelo job de conciliacao (trial/assinatura vencidos sem pagamento).",
                 subscription.TenantId.Value);
         }
+
+        // Cancelamento com carencia (Subscription.Cancel, pedido explicito do
+        // usuario 2026-09-05): quem cancelou um plano pago continua Active/
+        // PastDue ate o periodo ja pago vencer -- aqui e onde o corte de
+        // verdade acontece, batendo CurrentPeriodEndsAtUtc contra agora.
+        var pendingCancellations = await dbContext.Subscriptions
+            .Where(s =>
+                s.CanceledAtUtc != null &&
+                s.Status != SubscriptionStatus.Canceled &&
+                s.CurrentPeriodEndsAtUtc != null &&
+                s.CurrentPeriodEndsAtUtc < now)
+            .ToListAsync(cancellationToken);
+
+        foreach (var subscription in pendingCancellations)
+        {
+            // Sem SetActiveStatusAsync aqui de proposito: o cancelamento
+            // IMEDIATO (CancelSubscriptionCommandHandler, Trialing ou sem
+            // periodo pago) tambem nunca desativa o tenant -- so troca
+            // Status pra Canceled e deixa o gate de billing (AppLayout,
+            // "status !== Active") bloquear o painel. Mesmo comportamento
+            // aqui, so que adiado ate o periodo pago vencer.
+            subscription.FinalizeCancellation();
+
+            logger.LogInformation(
+                "Assinatura do tenant {TenantId} finalizada pelo job de conciliacao (cancelamento com carencia venceu).",
+                subscription.TenantId.Value);
+        }
+
+        if (pendingCancellations.Count > 0)
+        {
+            await dbContext.SaveChangesAsync(cancellationToken);
+        }
     }
 }

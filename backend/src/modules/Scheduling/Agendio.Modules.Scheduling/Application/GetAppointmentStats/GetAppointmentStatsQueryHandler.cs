@@ -54,22 +54,30 @@ public sealed class GetAppointmentStatsQueryHandler(SchedulingDbContext dbContex
             .OrderByDescending(point => point.Total)
             .ToList();
 
-        var revenueByResourceId = completed
+        // Um unico agrupamento por profissional (nao dois separados) -- revenue e
+        // count vem do MESMO conjunto de agendamentos concluidos, entao o
+        // ranking por valor e por volume sempre bate um com o outro (ex.: um
+        // profissional que suma da lista de receita tambem some da de volume).
+        var byResourceId = completed
             .GroupBy(a => a.ResourceId)
-            .Select(group => new { ResourceId = group.Key, Total = group.Sum(a => a.Amount) })
+            .Select(group => new { ResourceId = group.Key, Total = group.Sum(a => a.Amount), Count = group.Count() })
             .OrderByDescending(group => group.Total)
             .ToList();
 
         var revenueByProfessional = new List<ProfessionalRevenuePoint>();
-        foreach (var group in revenueByResourceId)
+        var countByProfessional = new List<ProfessionalCountPoint>();
+        foreach (var group in byResourceId)
         {
             var resource = await resourceLookupService.FindByIdAsync(group.ResourceId, cancellationToken);
-            revenueByProfessional.Add(new ProfessionalRevenuePoint(group.ResourceId, resource?.Name ?? "Profissional removido", group.Total));
+            var resourceName = resource?.Name ?? "Profissional removido";
+            revenueByProfessional.Add(new ProfessionalRevenuePoint(group.ResourceId, resourceName, group.Total));
+            countByProfessional.Add(new ProfessionalCountPoint(group.ResourceId, resourceName, group.Count));
         }
+        countByProfessional = [.. countByProfessional.OrderByDescending(p => p.Count)];
 
         return Result.Success(new AppointmentStats(
             totalCount, completedCount, noShowCount, cancelledCount, rescheduledCount, scheduledCount, confirmedCount,
             noShowRate, cancellationRate, rescheduleRate,
-            revenueByService, revenueByProfessional));
+            revenueByService, revenueByProfessional, countByProfessional));
     }
 }

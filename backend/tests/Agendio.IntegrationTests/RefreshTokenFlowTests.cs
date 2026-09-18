@@ -147,7 +147,7 @@ public class RefreshTokenFlowTests(IntegrationTestFixture fixture)
 
         var email = $"user-{Guid.NewGuid():N}@example.com";
         var registerResponse = await client.PostAsJsonAsync(
-            "/api/auth/register", new { tenantId, email, password = Password, fullName = "Usuario de Teste" }, cancellationToken);
+            "/api/auth/register", new { tenantId, email, password = Password, fullName = "Usuario de Teste", phone = "+5511999999999", cpfCnpj = "12345678909", termsAccepted = true }, cancellationToken);
         registerResponse.StatusCode.ShouldBe(HttpStatusCode.Created);
         await fixture.ConfirmEmailDirectlyAsync(tenantId, email, cancellationToken);
 

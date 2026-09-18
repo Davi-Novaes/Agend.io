@@ -93,6 +93,10 @@ function toNullable(value: string): string | null {
   return value.trim() === "" ? null : value.trim();
 }
 
+// Hierarquia label/valor: rotulo pequeno/discreto/uppercase, valor grande/forte.
+const FIELD_LABEL_CLASS = "text-[13px] font-medium tracking-wide text-muted-foreground uppercase";
+const FIELD_VALUE_CLASS = "text-[15px] font-semibold text-foreground";
+
 export default function BrandingInfoPage() {
   const { session } = useSession();
   const accessToken = session?.accessToken ?? "";
@@ -218,8 +222,8 @@ function InfoForms({
           <CardTitle className="text-base">Contato e redes sociais</CardTitle>
           <CardDescription>
             Aparece no portal público do seu estabelecimento. Dados cadastrais (CNPJ/CPF, razão social) ficam em{" "}
-            <Link href="/settings/company" className="underline underline-offset-2">
-              Empresa → Dados da empresa
+            <Link href="/settings/account/company" className="underline underline-offset-2">
+              Minha conta → Empresa
             </Link>
             .
           </CardDescription>
@@ -237,10 +241,10 @@ function InfoForms({
                 control={profileForm.control}
                 name="description"
                 render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Descrição</FormLabel>
+                  <FormItem className="gap-1.5">
+                    <FormLabel className={FIELD_LABEL_CLASS}>Descrição</FormLabel>
                     <FormControl>
-                      <Textarea rows={3} placeholder="Conte um pouco sobre o seu negócio." {...field} />
+                      <Textarea rows={3} placeholder="Conte um pouco sobre o seu negócio." className={FIELD_VALUE_CLASS} {...field} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -251,10 +255,10 @@ function InfoForms({
                   control={profileForm.control}
                   name="phone"
                   render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Telefone</FormLabel>
+                    <FormItem className="gap-1.5">
+                      <FormLabel className={FIELD_LABEL_CLASS}>Telefone</FormLabel>
                       <FormControl>
-                        <Input placeholder="(11) 99999-8888" {...field} />
+                        <Input placeholder="(11) 99999-8888" className={FIELD_VALUE_CLASS} {...field} />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -264,10 +268,10 @@ function InfoForms({
                   control={profileForm.control}
                   name="whatsApp"
                   render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>WhatsApp</FormLabel>
+                    <FormItem className="gap-1.5">
+                      <FormLabel className={FIELD_LABEL_CLASS}>WhatsApp</FormLabel>
                       <FormControl>
-                        <Input placeholder="(11) 99999-8888" {...field} />
+                        <Input placeholder="(11) 99999-8888" className={FIELD_VALUE_CLASS} {...field} />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -278,10 +282,10 @@ function InfoForms({
                 control={profileForm.control}
                 name="email"
                 render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>E-mail de contato</FormLabel>
+                  <FormItem className="gap-1.5">
+                    <FormLabel className={FIELD_LABEL_CLASS}>E-mail de contato</FormLabel>
                     <FormControl>
-                      <Input type="email" placeholder="contato@seunegocio.com" {...field} />
+                      <Input type="email" placeholder="contato@seunegocio.com" className={FIELD_VALUE_CLASS} {...field} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -291,10 +295,10 @@ function InfoForms({
                 control={profileForm.control}
                 name="address"
                 render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Endereço</FormLabel>
+                  <FormItem className="gap-1.5">
+                    <FormLabel className={FIELD_LABEL_CLASS}>Endereço</FormLabel>
                     <FormControl>
-                      <Input placeholder="Rua das Flores, 100 - Centro" {...field} />
+                      <Input placeholder="Rua das Flores, 100 - Centro" className={FIELD_VALUE_CLASS} {...field} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -305,10 +309,10 @@ function InfoForms({
                   control={profileForm.control}
                   name="instagramUrl"
                   render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Instagram</FormLabel>
+                    <FormItem className="gap-1.5">
+                      <FormLabel className={FIELD_LABEL_CLASS}>Instagram</FormLabel>
                       <FormControl>
-                        <Input placeholder="https://instagram.com/seunegocio" {...field} />
+                        <Input placeholder="https://instagram.com/seunegocio" className={FIELD_VALUE_CLASS} {...field} />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -318,10 +322,10 @@ function InfoForms({
                   control={profileForm.control}
                   name="facebookUrl"
                   render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Facebook</FormLabel>
+                    <FormItem className="gap-1.5">
+                      <FormLabel className={FIELD_LABEL_CLASS}>Facebook</FormLabel>
                       <FormControl>
-                        <Input placeholder="https://facebook.com/seunegocio" {...field} />
+                        <Input placeholder="https://facebook.com/seunegocio" className={FIELD_VALUE_CLASS} {...field} />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -351,11 +355,11 @@ function InfoForms({
                     control={hoursForm.control}
                     name={`entries.${index}.dayOfWeek`}
                     render={({ field: dayField }) => (
-                      <FormItem className="flex-1">
-                        <FormLabel className={index === 0 ? undefined : "sr-only"}>Dia</FormLabel>
+                      <FormItem className="flex-1 gap-1.5">
+                        <FormLabel className={index === 0 ? FIELD_LABEL_CLASS : "sr-only"}>Dia</FormLabel>
                         <Select value={dayField.value} onValueChange={dayField.onChange}>
                           <FormControl>
-                            <SelectTrigger className="w-full">
+                            <SelectTrigger className={`w-full ${FIELD_VALUE_CLASS}`}>
                               <SelectValue />
                             </SelectTrigger>
                           </FormControl>
@@ -374,10 +378,10 @@ function InfoForms({
                     control={hoursForm.control}
                     name={`entries.${index}.startTime`}
                     render={({ field: startField }) => (
-                      <FormItem>
-                        <FormLabel className={index === 0 ? undefined : "sr-only"}>Início</FormLabel>
+                      <FormItem className="gap-1.5">
+                        <FormLabel className={index === 0 ? FIELD_LABEL_CLASS : "sr-only"}>Início</FormLabel>
                         <FormControl>
-                          <Input type="time" {...startField} />
+                          <Input type="time" className={FIELD_VALUE_CLASS} {...startField} />
                         </FormControl>
                       </FormItem>
                     )}
@@ -386,10 +390,10 @@ function InfoForms({
                     control={hoursForm.control}
                     name={`entries.${index}.endTime`}
                     render={({ field: endField }) => (
-                      <FormItem>
-                        <FormLabel className={index === 0 ? undefined : "sr-only"}>Fim</FormLabel>
+                      <FormItem className="gap-1.5">
+                        <FormLabel className={index === 0 ? FIELD_LABEL_CLASS : "sr-only"}>Fim</FormLabel>
                         <FormControl>
-                          <Input type="time" {...endField} />
+                          <Input type="time" className={FIELD_VALUE_CLASS} {...endField} />
                         </FormControl>
                       </FormItem>
                     )}
@@ -431,7 +435,7 @@ function InfoForms({
           <Form {...schedulingSettingsForm}>
             <form onSubmit={schedulingSettingsForm.handleSubmit((values) => schedulingSettingsMutation.mutate(values))} className="flex flex-col gap-6">
               <div className="flex flex-col gap-3">
-                <Label>Datas fechadas (feriados e eventos)</Label>
+                <Label className={FIELD_LABEL_CLASS}>Datas fechadas (feriados e eventos)</Label>
                 {closedDatesFieldArray.fields.length === 0 && <p className="text-muted-foreground text-sm">Nenhuma data fechada cadastrada ainda.</p>}
                 {closedDatesFieldArray.fields.map((field, index) => (
                   <div key={field.id} className="flex flex-col gap-2 sm:flex-row sm:items-end">
@@ -439,10 +443,10 @@ function InfoForms({
                       control={schedulingSettingsForm.control}
                       name={`closedDates.${index}.date`}
                       render={({ field: dateField }) => (
-                        <FormItem className="sm:w-40">
-                          <FormLabel className={index === 0 ? undefined : "sr-only"}>Data</FormLabel>
+                        <FormItem className="gap-1.5 sm:w-40">
+                          <FormLabel className={index === 0 ? FIELD_LABEL_CLASS : "sr-only"}>Data</FormLabel>
                           <FormControl>
-                            <Input type="date" className="w-full" {...dateField} />
+                            <Input type="date" className={`w-full ${FIELD_VALUE_CLASS}`} {...dateField} />
                           </FormControl>
                           <FormMessage />
                         </FormItem>
@@ -453,10 +457,10 @@ function InfoForms({
                         control={schedulingSettingsForm.control}
                         name={`closedDates.${index}.reason`}
                         render={({ field: reasonField }) => (
-                          <FormItem className="flex-1">
-                            <FormLabel className={index === 0 ? undefined : "sr-only"}>Motivo (opcional)</FormLabel>
+                          <FormItem className="flex-1 gap-1.5">
+                            <FormLabel className={index === 0 ? FIELD_LABEL_CLASS : "sr-only"}>Motivo (opcional)</FormLabel>
                             <FormControl>
-                              <Input placeholder="Ex.: Natal, reforma" {...reasonField} />
+                              <Input placeholder="Ex.: Natal, reforma" className={FIELD_VALUE_CLASS} {...reasonField} />
                             </FormControl>
                           </FormItem>
                         )}
@@ -483,10 +487,10 @@ function InfoForms({
                 control={schedulingSettingsForm.control}
                 name="appointmentBufferMinutes"
                 render={({ field: bufferField }) => (
-                  <FormItem className="max-w-xs">
-                    <FormLabel>Intervalo mínimo entre agendamentos (minutos)</FormLabel>
+                  <FormItem className="max-w-xs gap-1.5">
+                    <FormLabel className={FIELD_LABEL_CLASS}>Intervalo mínimo entre agendamentos (minutos)</FormLabel>
                     <FormControl>
-                      <Input type="number" min={0} max={240} {...bufferField} value={bufferField.value as number} />
+                      <Input type="number" min={0} max={240} className={FIELD_VALUE_CLASS} {...bufferField} value={bufferField.value as number} />
                     </FormControl>
                     <FormDescription>
                       Tempo de folga exigido antes e depois de um agendamento existente. Só tem efeito perto de horários já ocupados.

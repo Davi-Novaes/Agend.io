@@ -2,17 +2,25 @@ using System.Security.Claims;
 using Agendio.Infrastructure.Endpoints;
 using Agendio.Modules.Identity.Application;
 using Agendio.Modules.Identity.Application.AcceptInvitation;
+using Agendio.Modules.Identity.Application.ChangePassword;
 using Agendio.Modules.Identity.Application.ConfirmEmail;
 using Agendio.Modules.Identity.Application.DisableMfa;
 using Agendio.Modules.Identity.Application.EnableMfa;
+using Agendio.Modules.Identity.Application.ForgotPassword;
 using Agendio.Modules.Identity.Application.GetMfaStatus;
+using Agendio.Modules.Identity.Application.GetMySecurityActivity;
+using Agendio.Modules.Identity.Application.GetMyProfile;
 using Agendio.Modules.Identity.Application.InviteTeamMember;
 using Agendio.Modules.Identity.Application.Login;
 using Agendio.Modules.Identity.Application.Logout;
+using Agendio.Modules.Identity.Application.LogoutAllSessions;
 using Agendio.Modules.Identity.Application.RefreshAccessToken;
 using Agendio.Modules.Identity.Application.RegisterUser;
 using Agendio.Modules.Identity.Application.ResendConfirmationEmail;
+using Agendio.Modules.Identity.Application.ResetPassword;
 using Agendio.Modules.Identity.Application.SetupMfa;
+using Agendio.Modules.Identity.Application.UpdateMyProfile;
+using Agendio.Modules.Identity.Application.UploadUserAvatar;
 using Agendio.Modules.Identity.Application.VerifyMfa;
 using Agendio.Modules.Identity.Domain;
 using Agendio.Modules.Identity.Infrastructure.Persistence;
@@ -36,7 +44,8 @@ public sealed class IdentityEndpoints : IEndpointModule
 
         group.MapPost("/register", async (RegisterRequest request, IDispatcher dispatcher, CancellationToken cancellationToken) =>
         {
-            var command = new RegisterUserCommand(request.TenantId, request.Email, request.Password, request.FullName);
+            var command = new RegisterUserCommand(
+                request.TenantId, request.Email, request.Password, request.FullName, request.Phone, request.CpfCnpj, request.TermsAccepted);
             var result = await dispatcher.Send(command, cancellationToken);
 
             return result.IsSuccess
@@ -113,6 +122,41 @@ public sealed class IdentityEndpoints : IEndpointModule
         .WithName("VerifyMfa")
         .WithSummary("Segunda etapa do login quando MFA esta habilitado: confirma o codigo TOTP (ou de recuperacao) e emite os tokens.");
 
+        group.MapGet("/me", async (HttpContext httpContext, IDispatcher dispatcher, CancellationToken cancellationToken) =>
+        {
+            var result = await dispatcher.Query(new GetMyProfileQuery(GetUserId(httpContext)), cancellationToken);
+            return result.IsSuccess ? Results.Ok(result.Value) : result.Error.ToProblemResult();
+        })
+        .RequireAuthorization()
+        .WithName("GetMyProfile")
+        .WithSummary("Perfil basico do usuario autenticado (nome, e-mail, foto, telefone) — usado pelo avatar do AppHeader e pela tela Minha conta.");
+
+        group.MapPut("/me", async (UpdateMyProfileRequest request, HttpContext httpContext, IDispatcher dispatcher, CancellationToken cancellationToken) =>
+        {
+            var command = new UpdateMyProfileCommand(GetUserId(httpContext), request.FullName, request.Phone);
+            var result = await dispatcher.Send(command, cancellationToken);
+
+            return result.IsSuccess ? Results.NoContent() : result.Error.ToProblemResult();
+        })
+        .RequireAuthorization()
+        .WithName("UpdateMyProfile")
+        .WithSummary("Atualiza nome e telefone do usuario autenticado. E-mail fica de fora — mudar exigiria um fluxo de confirmacao que ainda nao existe.");
+
+        group.MapPost("/me/avatar", async (IFormFile file, HttpContext httpContext, IDispatcher dispatcher, CancellationToken cancellationToken) =>
+        {
+            await using var contentStream = new MemoryStream();
+            await file.CopyToAsync(contentStream, cancellationToken);
+
+            var command = new UploadUserAvatarCommand(GetUserId(httpContext), contentStream.ToArray(), file.ContentType);
+            var result = await dispatcher.Send(command, cancellationToken);
+
+            return result.IsSuccess ? Results.Ok(new { avatarUrl = result.Value }) : result.Error.ToProblemResult();
+        })
+        .RequireAuthorization()
+        .DisableAntiforgery()
+        .WithName("UploadUserAvatar")
+        .WithSummary("Faz upload da foto de perfil do usuario autenticado (PNG/JPEG/WEBP).");
+
         group.MapGet("/mfa/status", async (HttpContext httpContext, IDispatcher dispatcher, CancellationToken cancellationToken) =>
         {
             var result = await dispatcher.Query(new GetMfaStatusQuery(GetUserId(httpContext)), cancellationToken);
@@ -121,6 +165,15 @@ public sealed class IdentityEndpoints : IEndpointModule
         .RequireAuthorization()
         .WithName("GetMfaStatus")
         .WithSummary("Diz se o usuario autenticado tem MFA habilitado — usado pela tela de Configuracoes/Seguranca.");
+
+        group.MapGet("/security/activity", async (HttpContext httpContext, IDispatcher dispatcher, CancellationToken cancellationToken) =>
+        {
+            var result = await dispatcher.Query(new GetMySecurityActivityQuery(GetUserId(httpContext)), cancellationToken);
+            return result.IsSuccess ? Results.Ok(result.Value) : result.Error.ToProblemResult();
+        })
+        .RequireAuthorization()
+        .WithName("GetMySecurityActivity")
+        .WithSummary("Ultimos eventos de seguranca (login, MFA, etc) da PROPRIA conta do usuario autenticado — usado pela tela de Configuracoes/Seguranca.");
 
         group.MapPost("/mfa/setup", async (HttpContext httpContext, IDispatcher dispatcher, CancellationToken cancellationToken) =>
         {
@@ -152,6 +205,41 @@ public sealed class IdentityEndpoints : IEndpointModule
         .RequireAuthorization()
         .WithName("DisableMfa")
         .WithSummary("Desliga MFA — exige senha e um codigo (TOTP ou recuperacao) validos.");
+
+        group.MapPost("/forgot-password", async (ForgotPasswordRequest request, IDispatcher dispatcher, CancellationToken cancellationToken) =>
+        {
+            var command = new ForgotPasswordCommand(request.TenantId, request.Email);
+            await dispatcher.Send(command, cancellationToken);
+
+            // Sempre 204, exista ou nao o e-mail — mesmo raciocinio de resend-confirmation.
+            return Results.NoContent();
+        })
+        .AllowAnonymous()
+        .RequireRateLimiting("auth")
+        .WithName("ForgotPassword")
+        .WithSummary("Pede o e-mail de recuperacao de senha. Sempre responde 204, exista ou nao a conta.");
+
+        group.MapPost("/reset-password", async (ResetPasswordRequest request, IDispatcher dispatcher, CancellationToken cancellationToken) =>
+        {
+            var command = new ResetPasswordCommand(request.Token, request.NewPassword);
+            var result = await dispatcher.Send(command, cancellationToken);
+            return result.IsSuccess ? Results.NoContent() : result.Error.ToProblemResult();
+        })
+        .AllowAnonymous()
+        .RequireRateLimiting("auth")
+        .WithName("ResetPassword")
+        .WithSummary("Define uma nova senha a partir do token recebido por e-mail e revoga todas as sessoes ativas.");
+
+        group.MapPost("/change-password", async (ChangePasswordRequest request, HttpContext httpContext, IDispatcher dispatcher, CancellationToken cancellationToken) =>
+        {
+            var command = new ChangePasswordCommand(GetUserId(httpContext), request.CurrentPassword, request.NewPassword);
+            var result = await dispatcher.Send(command, cancellationToken);
+            return result.IsSuccess ? Results.NoContent() : result.Error.ToProblemResult();
+        })
+        .RequireAuthorization()
+        .RequireRateLimiting("auth")
+        .WithName("ChangePassword")
+        .WithSummary("Troca a senha do usuario autenticado (exige a senha atual) e revoga todas as sessoes ativas.");
 
         group.MapPost("/refresh", async (HttpContext httpContext, IDispatcher dispatcher, CancellationToken cancellationToken) =>
         {
@@ -194,6 +282,18 @@ public sealed class IdentityEndpoints : IEndpointModule
         .AllowAnonymous()
         .WithName("Logout")
         .WithSummary("Revoga o refresh token da sessao atual e limpa o cookie.");
+
+        group.MapPost("/logout-all", async (HttpContext httpContext, IDispatcher dispatcher, CancellationToken cancellationToken) =>
+        {
+            var result = await dispatcher.Send(new LogoutAllSessionsCommand(GetUserId(httpContext)), cancellationToken);
+
+            DeleteRefreshTokenCookie(httpContext);
+            return result.IsSuccess ? Results.NoContent() : result.Error.ToProblemResult();
+        })
+        .RequireAuthorization()
+        .RequireRateLimiting("auth")
+        .WithName("LogoutAllSessions")
+        .WithSummary("Revoga TODOS os refresh tokens do usuario (todos os dispositivos/abas), nao so a sessao atual.");
 
         var team = endpoints.MapGroup("/api/team").WithTags("Team");
 
@@ -296,11 +396,19 @@ public sealed class IdentityEndpoints : IEndpointModule
     private static Guid GetUserId(HttpContext httpContext) =>
         Guid.Parse(httpContext.User.FindFirst(ClaimTypes.NameIdentifier)!.Value);
 
-    private sealed record RegisterRequest(Guid TenantId, string Email, string Password, string FullName);
+    private sealed record UpdateMyProfileRequest(string FullName, string? Phone);
+
+    private sealed record RegisterRequest(Guid TenantId, string Email, string Password, string FullName, string Phone, string CpfCnpj, bool TermsAccepted);
 
     private sealed record ConfirmEmailRequest(string Token);
 
     private sealed record ResendConfirmationRequest(Guid TenantId, string Email);
+
+    private sealed record ForgotPasswordRequest(Guid TenantId, string Email);
+
+    private sealed record ResetPasswordRequest(string Token, string NewPassword);
+
+    private sealed record ChangePasswordRequest(string CurrentPassword, string NewPassword);
 
     private sealed record LoginRequest(Guid TenantId, string Email, string Password);
 

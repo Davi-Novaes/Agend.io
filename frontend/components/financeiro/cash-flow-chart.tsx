@@ -1,8 +1,21 @@
 "use client";
 
 import * as React from "react";
+import { LineChart as LineChartIcon } from "lucide-react";
+import {
+  Bar,
+  BarChart,
+  CartesianGrid,
+  Cell,
+  ResponsiveContainer,
+  Tooltip,
+  XAxis,
+  YAxis,
+} from "recharts";
+import type { ValueType, NameType } from "recharts/types/component/DefaultTooltipContent";
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
+import { EmptyState } from "@/components/ui/empty-state";
 import type { CashFlowCategoryPoint, CashFlowMonthPoint } from "@/lib/api/client";
 
 export const CATEGORY_LABELS: Record<string, string> = {
@@ -53,16 +66,51 @@ function ViewToggle({ view, onChange, id }: { view: ViewMode; onChange: (view: V
   );
 }
 
-/** Evolucao mensal: recebido x pago, barras agrupadas. Cores validadas (verde/vermelho) — ver skill dataviz. */
-function MonthlyEvolutionChart({ data }: { data: CashFlowMonthPoint[] }) {
-  const [view, setView] = React.useState<ViewMode>("chart");
-  const [activePoint, setActivePoint] = React.useState<{ month: string; series: "Recebido" | "Pago"; value: number } | null>(null);
-
-  const max = Math.max(1, ...data.flatMap((point) => [point.received, point.paid]));
+function MonthlyEvolutionTooltip({
+  active,
+  payload,
+  label,
+}: {
+  active?: boolean;
+  payload?: readonly { dataKey?: string; value?: ValueType }[];
+  label?: NameType;
+}) {
+  if (!active || !payload?.length) return null;
+  const received = Number(payload.find((p) => p.dataKey === "received")?.value ?? 0);
+  const paid = Number(payload.find((p) => p.dataKey === "paid")?.value ?? 0);
 
   return (
-    <div className="rounded-lg border p-4">
-      <div className="mb-3 flex items-center justify-between gap-2">
+    <div className="bg-popover text-popover-foreground min-w-40 rounded-lg border px-3.5 py-3 text-xs shadow-lg">
+      <p className="font-semibold">{formatMonthLabel(String(label))}</p>
+      <p className="mt-1.5 flex items-center justify-between gap-4">
+        <span className="flex items-center gap-1.5 text-[color:var(--chart-received)]">
+          <span aria-hidden="true" className="inline-block size-2 rounded-full bg-current" />
+          Recebido
+        </span>
+        <span className="font-medium tabular-nums">{formatCurrency(received)}</span>
+      </p>
+      <p className="mt-1 flex items-center justify-between gap-4">
+        <span className="flex items-center gap-1.5 text-[color:var(--chart-paid)]">
+          <span aria-hidden="true" className="inline-block size-2 rounded-full bg-current" />
+          Pago
+        </span>
+        <span className="font-medium tabular-nums">{formatCurrency(paid)}</span>
+      </p>
+      <p className="text-muted-foreground mt-1.5 flex items-center justify-between gap-4 border-t pt-1.5">
+        <span>Saldo</span>
+        <span className="font-medium tabular-nums">{formatCurrency(received - paid)}</span>
+      </p>
+    </div>
+  );
+}
+
+/** Evolucao mensal: recebido x pago, barras agrupadas (Recharts). Cores validadas (verde/vermelho) — ver skill dataviz. */
+function MonthlyEvolutionChart({ data }: { data: CashFlowMonthPoint[] }) {
+  const [view, setView] = React.useState<ViewMode>("chart");
+
+  return (
+    <div className="rounded-xl border p-4 shadow-sm sm:p-5">
+      <div className="mb-1 flex items-center justify-between gap-2">
         <div>
           <h3 className="text-sm font-semibold">Evolucao mensal</h3>
           <p className="text-muted-foreground text-xs">Entradas e saidas realizadas, por mes</p>
@@ -70,19 +118,19 @@ function MonthlyEvolutionChart({ data }: { data: CashFlowMonthPoint[] }) {
         <ViewToggle view={view} onChange={setView} id="monthly-evolution" />
       </div>
 
-      <div className="mb-3 flex items-center gap-4 text-xs">
+      <div className="mt-3 mb-1 flex items-center gap-4 text-xs">
         <span className="flex items-center gap-1.5">
-          <span aria-hidden="true" className="inline-block size-2.5 rounded-full bg-[#008300]" />
+          <span aria-hidden="true" className="inline-block size-2.5 rounded-full bg-[color:var(--chart-received)]" />
           Recebido
         </span>
         <span className="flex items-center gap-1.5">
-          <span aria-hidden="true" className="inline-block size-2.5 rounded-full bg-[#e34948] dark:bg-[#e66767]" />
+          <span aria-hidden="true" className="inline-block size-2.5 rounded-full bg-[color:var(--chart-paid)]" />
           Pago
         </span>
       </div>
 
       {data.length === 0 ? (
-        <p className="text-muted-foreground py-8 text-center text-sm">Nenhuma movimentacao no periodo.</p>
+        <EmptyState icon={LineChartIcon} title="Nenhuma movimentacao no periodo" />
       ) : view === "table" ? (
         <Table>
           <TableHeader>
@@ -103,52 +151,63 @@ function MonthlyEvolutionChart({ data }: { data: CashFlowMonthPoint[] }) {
           </TableBody>
         </Table>
       ) : (
-        <div className="relative">
-          <div
-            role="img"
-            aria-label={`Grafico de barras com a evolucao mensal de recebido e pago em ${data.length} meses.`}
-            className="flex h-48 items-end gap-4 border-b border-[#c3c2b7] pl-1 dark:border-[#383835]"
-          >
-            {data.map((point) => (
-              <div key={point.month} className="flex flex-1 flex-col items-center gap-1">
-                <div className="flex h-40 w-full items-end justify-center gap-[2px]">
-                  <button
-                    type="button"
-                    className="w-full max-w-6 rounded-t-[4px] bg-[#008300] transition-opacity hover:opacity-80 focus-visible:opacity-80 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2"
-                    style={{ height: `${Math.max(2, (point.received / max) * 100)}%` }}
-                    onMouseEnter={() => setActivePoint({ month: point.month, series: "Recebido", value: point.received })}
-                    onFocus={() => setActivePoint({ month: point.month, series: "Recebido", value: point.received })}
-                    onMouseLeave={() => setActivePoint(null)}
-                    onBlur={() => setActivePoint(null)}
-                    aria-label={`${formatMonthLabel(point.month)}, recebido: ${formatCurrency(point.received)}`}
-                  />
-                  <button
-                    type="button"
-                    className="w-full max-w-6 rounded-t-[4px] bg-[#e34948] transition-opacity hover:opacity-80 focus-visible:opacity-80 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 dark:bg-[#e66767]"
-                    style={{ height: `${Math.max(2, (point.paid / max) * 100)}%` }}
-                    onMouseEnter={() => setActivePoint({ month: point.month, series: "Pago", value: point.paid })}
-                    onFocus={() => setActivePoint({ month: point.month, series: "Pago", value: point.paid })}
-                    onMouseLeave={() => setActivePoint(null)}
-                    onBlur={() => setActivePoint(null)}
-                    aria-label={`${formatMonthLabel(point.month)}, pago: ${formatCurrency(point.paid)}`}
-                  />
-                </div>
-                <span className="text-muted-foreground text-[11px]">{formatMonthLabel(point.month)}</span>
-              </div>
-            ))}
-          </div>
-          <div aria-live="polite" className="text-muted-foreground mt-2 h-4 text-xs">
-            {activePoint
-              ? `${formatMonthLabel(activePoint.month)} — ${activePoint.series}: ${formatCurrency(activePoint.value)}`
-              : ""}
-          </div>
+        <div
+          role="img"
+          aria-label={`Grafico de barras com a evolucao mensal de recebido e pago em ${data.length} meses.`}
+          className="h-64 w-full"
+        >
+          <ResponsiveContainer width="100%" height="100%">
+            <BarChart data={data} margin={{ top: 8, right: 8, left: 0, bottom: 0 }} barGap={4}>
+              <CartesianGrid vertical={false} stroke="var(--border)" strokeOpacity={0.6} strokeDasharray="3 6" />
+              <XAxis
+                dataKey="month"
+                tickFormatter={(value: string) => formatMonthLabel(value)}
+                tick={{ fontSize: 11, fill: "var(--muted-foreground)" }}
+                axisLine={{ stroke: "var(--border)" }}
+                tickLine={false}
+              />
+              <YAxis
+                tickFormatter={(value: number) => formatCurrency(value)}
+                tick={{ fontSize: 11, fill: "var(--muted-foreground)" }}
+                axisLine={false}
+                tickLine={false}
+                width={80}
+              />
+              <Tooltip content={<MonthlyEvolutionTooltip />} cursor={{ fill: "var(--muted)", opacity: 0.4 }} />
+              <Bar dataKey="received" name="Recebido" fill="var(--chart-received)" radius={[4, 4, 0, 0]} maxBarSize={28} />
+              <Bar dataKey="paid" name="Pago" fill="var(--chart-paid)" radius={[4, 4, 0, 0]} maxBarSize={28} />
+            </BarChart>
+          </ResponsiveContainer>
         </div>
       )}
     </div>
   );
 }
 
-/** Lista generica de categoria/total: barras horizontais, hue sequencial unico (ver skill dataviz). */
+function CategoryTooltip({
+  active,
+  payload,
+  categoryLabel,
+  valueFormatter,
+}: {
+  active?: boolean;
+  payload?: readonly { payload: CashFlowCategoryPoint }[];
+  categoryLabel: string;
+  valueFormatter: (value: number) => string;
+}) {
+  if (!active || !payload?.[0]) return null;
+  const point = payload[0].payload;
+  return (
+    <div className="bg-popover text-popover-foreground rounded-lg border px-3 py-2 text-xs shadow-lg">
+      <p className="font-semibold">{CATEGORY_LABELS[point.category] ?? point.category}</p>
+      <p className="text-muted-foreground mt-0.5">
+        {categoryLabel}: {valueFormatter(point.total)}
+      </p>
+    </div>
+  );
+}
+
+/** Lista generica de categoria/total: barras horizontais (Recharts), hue sequencial unico (ver skill dataviz). */
 export function CategoryBreakdownChart({
   data,
   id = "category-breakdown",
@@ -168,10 +227,17 @@ export function CategoryBreakdownChart({
   valueFormatter?: (value: number) => string;
 }) {
   const [view, setView] = React.useState<ViewMode>("chart");
-  const max = Math.max(1, ...data.map((point) => point.total));
+
+  // Recharts layout="vertical" desenha de baixo pra cima -- inverte aqui pra
+  // a categoria de maior valor aparecer no topo (leitura natural, mesma
+  // ordem que a lista/tabela ja usava).
+  const chartData = [...data].reverse();
+  // Altura minima por linha, senao poucas categorias ficam com barras enormes
+  // e muitas ficam espremidas -- ResponsiveContainer respeita essa altura fixa.
+  const chartHeight = Math.max(120, chartData.length * 40);
 
   return (
-    <div className="rounded-lg border p-4">
+    <div className="rounded-xl border p-4 shadow-sm sm:p-5">
       <div className="mb-3 flex items-center justify-between gap-2">
         <div>
           <h3 className="text-sm font-semibold">{title}</h3>
@@ -181,7 +247,7 @@ export function CategoryBreakdownChart({
       </div>
 
       {data.length === 0 ? (
-        <p className="text-muted-foreground py-8 text-center text-sm">{emptyMessage}</p>
+        <EmptyState icon={LineChartIcon} title={emptyMessage} />
       ) : view === "table" ? (
         <Table>
           <TableHeader>
@@ -200,20 +266,42 @@ export function CategoryBreakdownChart({
           </TableBody>
         </Table>
       ) : (
-        <ul className="flex flex-col gap-2.5" aria-label="Despesas por categoria">
-          {data.map((point) => (
-            <li key={point.category} className="flex items-center gap-3">
-              <span className="w-24 shrink-0 truncate text-xs">{CATEGORY_LABELS[point.category] ?? point.category}</span>
-              <div className="bg-muted h-4 flex-1 overflow-hidden rounded-sm">
-                <div
-                  className="h-full rounded-sm bg-[#2a78d6] dark:bg-[#3987e5]"
-                  style={{ width: `${Math.max(3, (point.total / max) * 100)}%` }}
-                />
-              </div>
-              <span className="w-24 shrink-0 text-right text-xs tabular-nums">{valueFormatter(point.total)}</span>
-            </li>
-          ))}
-        </ul>
+        <div role="img" aria-label={`Grafico de barras com ${categoryLabel.toLowerCase()} por total.`} style={{ height: chartHeight }}>
+          <ResponsiveContainer width="100%" height="100%">
+            <BarChart data={chartData} layout="vertical" margin={{ top: 4, right: 24, left: 0, bottom: 4 }}>
+              <CartesianGrid horizontal={false} stroke="var(--border)" strokeOpacity={0.6} strokeDasharray="3 6" />
+              <XAxis type="number" hide />
+              <YAxis
+                type="category"
+                dataKey="category"
+                tickFormatter={(value: string) => CATEGORY_LABELS[value] ?? value}
+                tick={{ fontSize: 11, fill: "var(--muted-foreground)" }}
+                axisLine={false}
+                tickLine={false}
+                width={96}
+              />
+              <Tooltip
+                content={<CategoryTooltip categoryLabel={categoryLabel} valueFormatter={valueFormatter} />}
+                cursor={{ fill: "var(--muted)", opacity: 0.4 }}
+              />
+              <Bar
+                dataKey="total"
+                radius={[0, 4, 4, 0]}
+                maxBarSize={22}
+                label={{
+                  position: "right",
+                  fontSize: 11,
+                  fill: "var(--muted-foreground)",
+                  formatter: (value: unknown) => valueFormatter(Number(value)),
+                }}
+              >
+                {chartData.map((point) => (
+                  <Cell key={point.category} fill="var(--chart-1)" />
+                ))}
+              </Bar>
+            </BarChart>
+          </ResponsiveContainer>
+        </div>
       )}
     </div>
   );

@@ -28,6 +28,15 @@ public sealed class PlatformAdmin : AggregateRoot<PlatformAdminId>, IAuditable
 
     public bool IsActive { get; private set; }
 
+    public bool MfaEnabled { get; private set; }
+
+    /// <summary>Segredo TOTP (base32) criptografado em coluna, mesmo padrao de Identity.Domain.User — ver PlatformDbContext.</summary>
+    public string? MfaSecretEncrypted { get; private set; }
+
+    public int FailedLoginAttemptCount { get; private set; }
+
+    public DateTimeOffset? LockedUntilUtc { get; private set; }
+
     public DateTimeOffset CreatedAtUtc { get; set; }
 
     public string? CreatedBy { get; set; }
@@ -71,4 +80,50 @@ public sealed class PlatformAdmin : AggregateRoot<PlatformAdminId>, IAuditable
     public void Deactivate() => IsActive = false;
 
     public void Activate() => IsActive = true;
+
+    public void EnableMfa(string secret)
+    {
+        MfaSecretEncrypted = secret;
+        MfaEnabled = true;
+    }
+
+    // Sem codigo de recuperacao de proposito (ao contrario de Identity.Domain.User):
+    // o conjunto de admins da plataforma e pequeno e controlado por deploy (ver
+    // comentario da classe) — um TOTP perdido se resolve com acesso direto ao
+    // banco por um operador, nao vale a complexidade extra de codigos de
+    // recuperacao para uma superficie tao pequena. Reavaliar se o numero de
+    // admins crescer.
+    public void DisableMfa()
+    {
+        MfaSecretEncrypted = null;
+        MfaEnabled = false;
+    }
+
+    private const int MaxFailedLoginAttempts = 5;
+    private static readonly TimeSpan LockoutDuration = TimeSpan.FromMinutes(15);
+
+    public bool IsLockedOut(DateTimeOffset nowUtc) => LockedUntilUtc is { } lockedUntil && lockedUntil > nowUtc;
+
+    /// <summary>Mesma logica de Identity.Domain.User.RegisterFailedLoginAttempt — ver o comentario la para o raciocinio completo.</summary>
+    public void RegisterFailedLoginAttempt(DateTimeOffset nowUtc)
+    {
+        if (LockedUntilUtc is { } previousLock && previousLock <= nowUtc)
+        {
+            FailedLoginAttemptCount = 0;
+            LockedUntilUtc = null;
+        }
+
+        FailedLoginAttemptCount++;
+
+        if (FailedLoginAttemptCount >= MaxFailedLoginAttempts)
+        {
+            LockedUntilUtc = nowUtc.Add(LockoutDuration);
+        }
+    }
+
+    public void RegisterSuccessfulLogin()
+    {
+        FailedLoginAttemptCount = 0;
+        LockedUntilUtc = null;
+    }
 }

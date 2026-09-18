@@ -155,7 +155,7 @@ public class TeamInvitationTests(IntegrationTestFixture fixture)
 
         var ownerEmail = $"owner-{Guid.NewGuid():N}@example.com";
         var registerResponse = await client.PostAsJsonAsync(
-            "/api/auth/register", new { tenantId, email = ownerEmail, password = Password, fullName = "Dono" }, cancellationToken);
+            "/api/auth/register", new { tenantId, email = ownerEmail, password = Password, fullName = "Dono", phone = "+5511999999999", cpfCnpj = "12345678909", termsAccepted = true }, cancellationToken);
         registerResponse.StatusCode.ShouldBe(HttpStatusCode.Created);
         await fixture.ConfirmEmailDirectlyAsync(tenantId, ownerEmail, cancellationToken);
 

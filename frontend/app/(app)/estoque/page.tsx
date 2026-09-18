@@ -6,7 +6,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { toast } from "sonner";
-import { Inbox, ListFilter, Package, Plus } from "lucide-react";
+import { Inbox, Info, ListFilter, Package, Plus } from "lucide-react";
 
 import {
   listProducts,
@@ -34,6 +34,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 
 const PAGE_SIZE = 20;
 
@@ -105,7 +106,7 @@ export default function EstoquePage() {
   }
 
   return (
-    <div className="mx-auto flex w-full max-w-5xl flex-1 flex-col">
+    <div className="flex w-full flex-1 flex-col">
       <div className="mb-6">
         <p className="text-muted-foreground text-sm">Produtos revendidos e movimentacoes de entrada e saida.</p>
       </div>
@@ -471,7 +472,18 @@ function ProdutosTab({ accessToken }: { accessToken: string }) {
                   name="sku"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>SKU</FormLabel>
+                      <FormLabel className="gap-1">
+                        SKU
+                        <Tooltip>
+                          <TooltipTrigger type="button" className="text-muted-foreground hover:text-foreground">
+                            <Info className="size-3.5" aria-hidden />
+                            <span className="sr-only">O que e SKU?</span>
+                          </TooltipTrigger>
+                          <TooltipContent>
+                            Codigo unico usado para identificar este produto no seu estoque (ex.: SHP-001).
+                          </TooltipContent>
+                        </Tooltip>
+                      </FormLabel>
                       <FormControl>
                         <Input {...field} />
                       </FormControl>

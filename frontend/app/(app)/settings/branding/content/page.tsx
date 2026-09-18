@@ -17,6 +17,10 @@ import { meetsAaContrast } from "@/lib/tenant/contrast";
 
 const FOREGROUND_HEX = "#FFFFFF";
 
+// Hierarquia label/valor: rotulo pequeno/discreto/uppercase, valor grande/forte.
+const FIELD_LABEL_CLASS = "text-[13px] font-medium tracking-wide text-muted-foreground uppercase";
+const FIELD_VALUE_CLASS = "text-[15px] font-semibold text-foreground";
+
 export default function BrandingContentPage() {
   const { session } = useSession();
   const accessToken = session?.accessToken ?? "";
@@ -63,18 +67,23 @@ export default function BrandingContentPage() {
           <CardDescription>Título, descrição e texto do botão exibidos no topo da sua página pública.</CardDescription>
         </CardHeader>
         <CardContent className="grid gap-4">
-          <div className="grid gap-1">
-            <Label htmlFor="hero-title">Título de destaque</Label>
+          <div className="grid gap-1.5">
+            <Label htmlFor="hero-title" className={FIELD_LABEL_CLASS}>
+              Título de destaque
+            </Label>
             <Input
               id="hero-title"
               placeholder={`Agende seu horário na ${draft.name}`}
               value={draft.homeHeroTitle}
               onChange={(event) => update({ homeHeroTitle: event.target.value })}
               maxLength={200}
+              className={FIELD_VALUE_CLASS}
             />
           </div>
-          <div className="grid gap-1">
-            <Label htmlFor="hero-description">Descrição</Label>
+          <div className="grid gap-1.5">
+            <Label htmlFor="hero-description" className={FIELD_LABEL_CLASS}>
+              Descrição
+            </Label>
             <Textarea
               id="hero-description"
               rows={3}
@@ -82,16 +91,20 @@ export default function BrandingContentPage() {
               value={draft.homeHeroDescription}
               onChange={(event) => update({ homeHeroDescription: event.target.value })}
               maxLength={1000}
+              className={FIELD_VALUE_CLASS}
             />
           </div>
-          <div className="grid max-w-xs gap-1">
-            <Label htmlFor="hero-cta">Texto do botão</Label>
+          <div className="grid max-w-xs gap-1.5">
+            <Label htmlFor="hero-cta" className={FIELD_LABEL_CLASS}>
+              Texto do botão
+            </Label>
             <Input
               id="hero-cta"
               placeholder="Agendar horario"
               value={draft.homeCtaText}
               onChange={(event) => update({ homeCtaText: event.target.value })}
               maxLength={60}
+              className={FIELD_VALUE_CLASS}
             />
           </div>
         </CardContent>

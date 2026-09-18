@@ -17,6 +17,9 @@ public sealed record AppointmentChangeLogItem(
     string? Reason,
     DateTimeOffset PreviousStartUtc,
     DateTimeOffset? NewStartUtc,
+    DateTimeOffset? NewEndUtc,
+    Guid? PreviousResourceId,
+    string? PreviousResourceName,
     bool ByStaff,
     DateTimeOffset OccurredAtUtc);
 

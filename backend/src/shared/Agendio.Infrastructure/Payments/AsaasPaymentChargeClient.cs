@@ -1,6 +1,7 @@
 using System.Net.Http.Json;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using Agendio.SharedKernel.Time;
 
 namespace Agendio.Infrastructure.Payments;
 
@@ -10,7 +11,7 @@ namespace Agendio.Infrastructure.Payments;
 /// (CreateSubscriptionAsync), uma cobranca avulsa (POST /payments) devolve o
 /// invoiceUrl direto na mesma resposta, sem precisar de uma segunda chamada.
 /// </summary>
-public sealed class AsaasPaymentChargeClient(HttpClient httpClient) : IPaymentChargeClient
+public sealed class AsaasPaymentChargeClient(HttpClient httpClient, IClock clock) : IPaymentChargeClient
 {
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
 
@@ -26,7 +27,7 @@ public sealed class AsaasPaymentChargeClient(HttpClient httpClient) : IPaymentCh
         var customerId = await CreateCustomerAsync(customerName, customerCpfCnpj, customerEmail, cancellationToken);
 
         var paymentRequest = new CreatePaymentRequest(
-            customerId, "PIX", amount, DateOnly.FromDateTime(DateTime.UtcNow), description, externalReference);
+            customerId, "PIX", amount, DateOnly.FromDateTime(clock.UtcNow.UtcDateTime), description, externalReference);
 
         using var response = await httpClient.PostAsJsonAsync("payments", paymentRequest, JsonOptions, cancellationToken);
         await EnsureSuccessAsync(response, cancellationToken);

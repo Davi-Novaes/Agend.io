@@ -8,6 +8,8 @@ using Agendio.Modules.Customers.Domain;
 using Agendio.Modules.Customers.Infrastructure.Persistence;
 using Agendio.Modules.Estoque.Domain;
 using Agendio.Modules.Estoque.Infrastructure.Persistence;
+using Agendio.Modules.Feedback.Domain;
+using Agendio.Modules.Feedback.Infrastructure.Persistence;
 using Agendio.Modules.Financeiro.Domain;
 using Agendio.Modules.Financeiro.Infrastructure.Persistence;
 using Agendio.Modules.Identity.Domain;
@@ -171,6 +173,23 @@ public class TenantIsolationRulesTests
     }
 
     [Fact]
+    public void Feedback_Module_Should_Deliberately_Have_Zero_TenantOwned_Entities()
+    {
+        // FeedbackEntry tem coluna tenant_id normal, mas nao e ITenantOwned e
+        // nao tem RLS de proposito (mesmo raciocinio de Subscription/Payment/
+        // Plan acima): agendio_owner e agendio_app sao ambos NOBYPASSRLS,
+        // entao RLS aqui deixaria o painel Super Admin cego pra feedback de
+        // todo tenant. Ver comentario em FeedbackEntry.cs.
+        typeof(ITenantOwned).IsAssignableFrom(typeof(FeedbackEntry)).ShouldBeFalse();
+
+        using var dbContext = CreateFeedbackDbContext();
+        var tenantOwnedEntityTypes = dbContext.Model.GetEntityTypes()
+            .Where(entityType => typeof(ITenantOwned).IsAssignableFrom(entityType.ClrType));
+
+        tenantOwnedEntityTypes.ShouldBeEmpty();
+    }
+
+    [Fact]
     public void Financeiro_Module_Should_Have_Exactly_Three_TenantOwned_Entities_All_With_A_Query_Filter()
     {
         using var dbContext = CreateFinanceiroDbContext();
@@ -293,5 +312,14 @@ public class TenantIsolationRulesTests
             .UseSnakeCaseNamingConvention();
 
         return new BillingDbContext(optionsBuilder.Options);
+    }
+
+    private static FeedbackDbContext CreateFeedbackDbContext()
+    {
+        var optionsBuilder = new DbContextOptionsBuilder<FeedbackDbContext>()
+            .UseNpgsql("Host=localhost;Database=architecture_tests_only")
+            .UseSnakeCaseNamingConvention();
+
+        return new FeedbackDbContext(optionsBuilder.Options);
     }
 }

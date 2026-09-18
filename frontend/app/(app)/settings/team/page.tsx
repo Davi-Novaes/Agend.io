@@ -80,7 +80,7 @@ export default function TeamSettingsPage() {
   });
 
   return (
-    <div className="mx-auto flex w-full max-w-lg flex-1 flex-col gap-6">
+    <div className="flex w-full max-w-lg flex-1 flex-col gap-6">
       <p className="text-muted-foreground text-sm">
         Membros com acesso ao painel do seu estabelecimento.
       </p>

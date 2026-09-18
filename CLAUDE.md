@@ -49,11 +49,19 @@ código). Nunca remova uma "porque a outra já cobre".
 > Uma auditoria de segurança (2026-08, ver `docs/BACKEND_AUDIT.md` achado P1-2 e
 > `docs/BACKLOG.md` BL-06) encontrou uma "Camada 1" documentada aqui anteriormente — resolução de
 > tenant por subdomínio/slug com checagem de divergência contra o JWT — que **nunca existia no
-> código**. A arquitetura real de resolução de tenant é: o cliente informa o tenant explicitamente
-> (slug/Guid) no login/cadastro, e daí em diante todo acesso autenticado usa só a claim `tenant_id`
-> do JWT — não há roteamento por subdomínio em nenhuma camada (a página pública usa path, `/slug`,
-> não subdomínio). Se subdomínio-por-tenant for implementado no futuro, documentar aqui só depois
-> do middleware existir de verdade — não descrever proteção que não está implementada.
+> código**. A arquitetura real de resolução de tenant continua sendo: o cliente informa o tenant
+> explicitamente (slug/Guid) no login/cadastro, e daí em diante **todo acesso autenticado usa só a
+> claim `tenant_id` do JWT** — isso não mudou.
+
+Desde a ADR 0009, a página pública (sem autenticação) do tenant tem uma segunda forma de acesso:
+`barbearia-do-ze.agendiobr.com.br`, além do path (`agendiobr.com.br/barbearia-do-ze`) — ver
+`frontend/proxy.ts`, que reescreve o subdomínio pro mesmo path interno. Isto é **roteamento de
+conveniência, não uma camada de segurança nem de resolução de tenant**: o subdomínio só decide qual
+`slug` mandar pro mesmo endpoint público `GET /api/tenants/by-slug/{slug}` que já existia — nenhum
+acesso autenticado (login, dashboard, API) resolve tenant pelo `Host`, só pela claim do JWT como
+sempre. Slugs que colidiriam com um subdomínio da própria plataforma (`www`, `api`, `admin`...) são
+bloqueados no cadastro (`ReservedSlugs`, backend) — a lista irmã em `frontend/proxy.ts` é só
+defesa de URL, quem garante de verdade é o backend.
 
 **Toda** feature nova que toca dados de tenant precisa de um teste de isolamento cruzado.
 

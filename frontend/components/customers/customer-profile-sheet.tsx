@@ -9,6 +9,7 @@ import {
   getCustomerById,
   getCustomerAppointmentHistory,
   getTenantProfile,
+  TENANT_PROFILE_QUERY_KEY,
   listNotificationHistory,
   redeemCustomerLoyaltyReward,
   ApiError,
@@ -130,7 +131,7 @@ function CustomerProfileContent({
   });
 
   const tenantProfileQuery = useQuery({
-    queryKey: ["tenant", "profile"],
+    queryKey: TENANT_PROFILE_QUERY_KEY,
     queryFn: () => getTenantProfile(accessToken),
     enabled: Boolean(accessToken),
   });

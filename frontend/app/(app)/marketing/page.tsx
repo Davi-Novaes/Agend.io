@@ -114,7 +114,7 @@ export default function MarketingPage() {
   }
 
   return (
-    <div className="mx-auto flex w-full max-w-4xl flex-1 flex-col">
+    <div className="flex w-full flex-1 flex-col">
       <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
         <p className="text-muted-foreground text-sm">Campanhas por e-mail ou WhatsApp para os clientes ativos.</p>
         <Button onClick={openCreateDialog}>

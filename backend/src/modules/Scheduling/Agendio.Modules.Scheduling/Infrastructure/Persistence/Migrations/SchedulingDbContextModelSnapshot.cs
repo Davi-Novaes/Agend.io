@@ -223,6 +223,10 @@ namespace Agendio.Modules.Scheduling.Infrastructure.Persistence.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("customer_id");
 
+                    b.Property<DateTimeOffset?>("NewEndUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("new_end_utc");
+
                     b.Property<DateTimeOffset?>("NewStartUtc")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("new_start_utc");
@@ -230,6 +234,10 @@ namespace Agendio.Modules.Scheduling.Infrastructure.Persistence.Migrations
                     b.Property<DateTimeOffset>("OccurredAtUtc")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("occurred_at_utc");
+
+                    b.Property<Guid?>("PreviousResourceId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("previous_resource_id");
 
                     b.Property<DateTimeOffset>("PreviousStartUtc")
                         .HasColumnType("timestamp with time zone")

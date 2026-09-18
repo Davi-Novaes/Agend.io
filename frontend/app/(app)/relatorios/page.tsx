@@ -13,7 +13,7 @@ import { PeriodFilter } from "@/components/shared/period-filter";
 import { CashFlowChart, CategoryBreakdownChart } from "@/components/financeiro/cash-flow-chart";
 import { RatingEvolutionChart } from "@/components/scheduling/rating-evolution-chart";
 import { StarRating } from "@/components/scheduling/star-rating";
-import { toDateOnly, startOfMonth } from "@/lib/date-utils";
+import { toDateOnly, startOfYear } from "@/lib/date-utils";
 
 function formatCurrency(value: number): string {
   return value.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
@@ -21,7 +21,10 @@ function formatCurrency(value: number): string {
 
 export default function RelatoriosPage() {
   const { session } = useSession();
-  const [from, setFrom] = React.useState(() => toDateOnly(startOfMonth(new Date())));
+  // Mesmo raciocinio do painel (ver painel/page.tsx): ano todo por padrao,
+  // nao so o mes atual -- senao os graficos de tendencia mostram um unico
+  // ponto ate a pessoa achar o seletor de periodo.
+  const [from, setFrom] = React.useState(() => toDateOnly(startOfYear(new Date())));
   const [to, setTo] = React.useState(() => toDateOnly(new Date()));
 
   if (!session) {
@@ -29,7 +32,7 @@ export default function RelatoriosPage() {
   }
 
   return (
-    <div className="mx-auto flex w-full max-w-5xl flex-1 flex-col">
+    <div className="flex w-full flex-1 flex-col">
       <div className="mb-6">
         <p className="text-muted-foreground text-sm">Visao consolidada de financeiro, agenda e estoque.</p>
       </div>

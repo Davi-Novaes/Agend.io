@@ -7,6 +7,7 @@ import { Area, AreaChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YA
 import type { ValueType, NameType } from "recharts/types/component/DefaultTooltipContent";
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
 import type { CashFlowMonthPoint } from "@/lib/api/client";
 
@@ -48,7 +49,8 @@ export function RevenueChart({ data }: { data: CashFlowMonthPoint[] }) {
   const [view, setView] = React.useState<ViewMode>("chart");
 
   return (
-    <div className="rounded-lg border p-4">
+    <Card className="border-border/70 ring-0 shadow-none">
+    <CardContent>
       <div className="mb-3 flex items-center justify-between gap-2">
         <div>
           <h3 className="text-sm font-semibold">Faturamento ao longo do tempo</h3>
@@ -79,8 +81,7 @@ export function RevenueChart({ data }: { data: CashFlowMonthPoint[] }) {
       {data.length === 0 ? (
         <EmptyState
           icon={LineChart}
-          title="Sem dados suficientes para este periodo"
-          description="Assim que houver movimentacoes, seu desempenho aparece aqui."
+          title="Ainda nao existem movimentacoes neste periodo."
           action={
             <Button asChild size="sm" variant="outline">
               <Link href="/financeiro">Ir para financeiro</Link>
@@ -110,7 +111,10 @@ export function RevenueChart({ data }: { data: CashFlowMonthPoint[] }) {
           aria-label={`Grafico de area com o faturamento mensal em ${data.length} meses, de ${formatCurrency(
             Math.min(...data.map((point) => point.received))
           )} a ${formatCurrency(Math.max(...data.map((point) => point.received)))}.`}
-          className="h-56 w-full"
+          // Superficie propria (--surface-inset), mais escura que o card ao
+          // redor -- o grafico "afunda" dentro do card em vez de flutuar
+          // solto sobre a mesma cor de fundo.
+          className="bg-surface-inset h-56 w-full rounded-lg p-3"
         >
           <ResponsiveContainer width="100%" height="100%">
             <AreaChart data={data} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
@@ -148,6 +152,7 @@ export function RevenueChart({ data }: { data: CashFlowMonthPoint[] }) {
           </ResponsiveContainer>
         </div>
       )}
-    </div>
+    </CardContent>
+    </Card>
   );
 }

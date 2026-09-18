@@ -13,6 +13,10 @@ import { useBrandingDraft } from "@/components/settings/branding/branding-draft-
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Switch } from "@/components/ui/switch";
+import { Label } from "@/components/ui/label";
+
+// Hierarquia label/valor: rotulo pequeno/discreto/uppercase, valor grande/forte.
+const FIELD_LABEL_CLASS = "text-[13px] font-medium tracking-wide text-muted-foreground uppercase";
 
 // window.location.origin so ha no cliente — useSyncExternalStore evita hidratacao
 // divergente (SSR sempre "") sem cair no lint de setState sincrono dentro de efeito.
@@ -81,11 +85,14 @@ export default function BrandingPublicPagePage() {
           <CardDescription>Endereço público do seu estabelecimento e se ele está disponível para clientes.</CardDescription>
         </CardHeader>
         <CardContent className="flex flex-col gap-4">
-          <div className="bg-muted flex items-center justify-between gap-2 rounded-lg p-3 text-sm">
-            <span className="truncate">{publicUrl || "Carregando link..."}</span>
-            <Button type="button" variant="ghost" size="icon" aria-label="Copiar link" disabled={!publicUrl} onClick={() => handleCopyShareLink("link", "Link copiado.")}>
-              <Link2 className="size-4" />
-            </Button>
+          <div className="grid gap-1.5">
+            <Label className={FIELD_LABEL_CLASS}>URL pública</Label>
+            <div className="bg-muted flex items-center justify-between gap-2 rounded-lg p-3">
+              <span className="truncate text-[15px] font-semibold text-foreground">{publicUrl || "Carregando link..."}</span>
+              <Button type="button" variant="ghost" size="icon" aria-label="Copiar link" disabled={!publicUrl} onClick={() => handleCopyShareLink("link", "Link copiado.")}>
+                <Link2 className="size-4" />
+              </Button>
+            </div>
           </div>
 
           <div className="flex items-center justify-between gap-4">

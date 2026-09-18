@@ -16,7 +16,8 @@ public sealed class ConfirmEmailCommandHandler(
     IdentityDbContext dbContext,
     ITenantContext tenantContext,
     IRefreshTokenGenerator tokenGenerator,
-    IClock clock) : ICommandHandler<ConfirmEmailCommand>
+    IClock clock,
+    SecurityAuditLogger<IdentityDbContext> securityAuditLogger) : ICommandHandler<ConfirmEmailCommand>
 {
     private static readonly Error InvalidTokenError =
         Error.Unauthorized("Auth.EmailConfirmationTokenInvalid", "Token de confirmacao invalido ou expirado.");
@@ -39,10 +40,12 @@ public sealed class ConfirmEmailCommandHandler(
         var confirmResult = user.ConfirmEmail(clock.UtcNow);
         if (confirmResult.IsFailure)
         {
+            await securityAuditLogger.LogAsync("EmailConfirmed", success: false, user.TenantId.Value, user.Id.Value, null, cancellationToken);
             return confirmResult;
         }
 
         await dbContext.SaveChangesAsync(cancellationToken);
+        await securityAuditLogger.LogAsync("EmailConfirmed", success: true, user.TenantId.Value, user.Id.Value, null, cancellationToken);
 
         return Result.Success();
     }

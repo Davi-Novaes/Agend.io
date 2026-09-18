@@ -1,3 +1,4 @@
+using Agendio.Infrastructure.Security;
 using Agendio.Modules.Identity.Infrastructure.Mfa;
 using Agendio.Modules.Identity.Infrastructure.Persistence;
 using Agendio.Modules.Tenancy.Contracts;
@@ -14,7 +15,8 @@ public sealed class VerifyMfaCommandHandler(
     ITenantLookupService tenantLookupService,
     IMfaChallengeStore mfaChallengeStore,
     IMfaCodeVerifier mfaCodeVerifier,
-    AuthTokenIssuer authTokenIssuer) : ICommandHandler<VerifyMfaCommand, AuthTokensResult>
+    AuthTokenIssuer authTokenIssuer,
+    SecurityAuditLogger<IdentityDbContext> securityAuditLogger) : ICommandHandler<VerifyMfaCommand, AuthTokensResult>
 {
     private static readonly Error InvalidChallengeError =
         Error.Unauthorized("Auth.InvalidMfaChallenge", "Sessao de verificacao invalida ou expirada. Faca login novamente.");
@@ -44,6 +46,7 @@ public sealed class VerifyMfaCommandHandler(
 
         if (!await mfaCodeVerifier.VerifyAsync(user, request.Code, cancellationToken))
         {
+            await securityAuditLogger.LogAsync("LoginFailed", success: false, challenge.TenantId.Value, user.Id.Value, "{\"reason\":\"invalid-mfa-code\"}", cancellationToken);
             return Result.Failure<AuthTokensResult>(InvalidCodeError);
         }
 
@@ -54,6 +57,8 @@ public sealed class VerifyMfaCommandHandler(
         }
 
         var tokens = await authTokenIssuer.IssueAsync(user, tenant, cancellationToken);
+        await securityAuditLogger.LogAsync("LoginSucceeded", success: true, challenge.TenantId.Value, user.Id.Value, null, cancellationToken);
+
         return Result.Success(tokens);
     }
 }

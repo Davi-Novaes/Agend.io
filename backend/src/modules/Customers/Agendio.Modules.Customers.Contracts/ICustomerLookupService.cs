@@ -21,4 +21,13 @@ public interface ICustomerLookupService
     /// qual canal usar por cliente, filtrando por Email/Phone != null no resultado.
     /// </summary>
     Task<IReadOnlyList<CustomerLookupResult>> ListActiveBySegmentAsync(CustomerSegment? segment, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Clientes ativos sem contato ha pelo menos `daysSinceLastContact` dias
+    /// (LastContactedAtUtc null conta como "nunca contatado", ou seja, inativo
+    /// desde sempre) -- usado pelo Assistente pra corte fixo de dias (distinto
+    /// do segmento "Inativo"/"EmRisco" da Fase 9, que usa janela fixa de 90/45
+    /// dias e leva no-show em conta; aqui e so a data de contato, sem mais regra).
+    /// </summary>
+    Task<IReadOnlyList<CustomerLookupResult>> ListInactiveSinceAsync(int daysSinceLastContact, CancellationToken cancellationToken = default);
 }

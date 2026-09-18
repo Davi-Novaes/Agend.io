@@ -9,10 +9,12 @@ import { toast } from "sonner";
 import {
   getTenantProfile,
   updateTenantLoyaltySettings,
+  TENANT_PROFILE_QUERY_KEY,
   ApiError,
   type TenantProfile,
 } from "@/lib/api/client";
 import { useSession } from "@/lib/auth/session-context";
+import { decodeJwtRole } from "@/lib/auth/decode-jwt";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -35,9 +37,14 @@ type SettingsFormInput = z.input<typeof settingsSchema>;
 export default function LoyaltySettingsPage() {
   const { session } = useSession();
   const accessToken = session?.accessToken ?? "";
+  // Escrita (updateTenantLoyaltySettings) e Owner-only no backend -- a
+  // leitura do perfil foi liberada pra qualquer papel, entao sem isto Staff
+  // veria o formulario normal e só descobriria o bloqueio com um 403 confuso
+  // ao clicar em salvar.
+  const isOwner = session ? decodeJwtRole(session.accessToken) === "Owner" : false;
 
   const profileQuery = useQuery({
-    queryKey: ["tenant", "profile"],
+    queryKey: TENANT_PROFILE_QUERY_KEY,
     queryFn: () => getTenantProfile(accessToken),
     enabled: Boolean(session),
   });
@@ -47,22 +54,33 @@ export default function LoyaltySettingsPage() {
   }
 
   return (
-    <div className="mx-auto flex w-full max-w-3xl flex-1 flex-col gap-6">
+    <div className="flex w-full max-w-3xl flex-1 flex-col gap-6">
       <p className="text-muted-foreground text-sm">
         Recompense clientes recorrentes: a cada visita concluída eles ganham 1 ponto automaticamente. Ao atingir o
         número de visitas configurado, o cliente pode resgatar a recompensa.
       </p>
+      {!isOwner && (
+        <p className="text-muted-foreground text-sm">Somente o administrador da conta pode alterar estas configurações.</p>
+      )}
 
       {profileQuery.isLoading || !profileQuery.data ? (
         <Skeleton className="h-64 w-full" />
       ) : (
-        <LoyaltySettingsCard profile={profileQuery.data} accessToken={accessToken} />
+        <LoyaltySettingsCard profile={profileQuery.data} accessToken={accessToken} readOnly={!isOwner} />
       )}
     </div>
   );
 }
 
-function LoyaltySettingsCard({ profile, accessToken }: { profile: TenantProfile; accessToken: string }) {
+function LoyaltySettingsCard({
+  profile,
+  accessToken,
+  readOnly,
+}: {
+  profile: TenantProfile;
+  accessToken: string;
+  readOnly: boolean;
+}) {
   const queryClient = useQueryClient();
 
   const form = useForm<SettingsFormInput, unknown, SettingsFormValues>({
@@ -78,7 +96,7 @@ function LoyaltySettingsCard({ profile, accessToken }: { profile: TenantProfile;
     mutationFn: (values: SettingsFormValues) => updateTenantLoyaltySettings(values, accessToken),
     onSuccess: () => {
       toast.success("Programa de fidelidade atualizado.");
-      queryClient.invalidateQueries({ queryKey: ["tenant", "profile"] });
+      queryClient.invalidateQueries({ queryKey: TENANT_PROFILE_QUERY_KEY });
     },
     onError: (error) => toast.error(error instanceof ApiError ? error.message : "Não foi possível salvar as configurações."),
   });
@@ -92,6 +110,7 @@ function LoyaltySettingsCard({ profile, accessToken }: { profile: TenantProfile;
       <CardContent>
         <Form {...form}>
           <form onSubmit={form.handleSubmit((values) => mutation.mutate(values))} className="flex flex-col gap-4">
+          <fieldset disabled={readOnly} className="contents">
             <FormField
               control={form.control}
               name="loyaltyProgramEnabled"
@@ -134,6 +153,7 @@ function LoyaltySettingsCard({ profile, accessToken }: { profile: TenantProfile;
             <Button type="submit" disabled={mutation.isPending} className="mt-2 w-fit">
               {mutation.isPending ? "Salvando..." : "Salvar fidelidade"}
             </Button>
+          </fieldset>
           </form>
         </Form>
       </CardContent>

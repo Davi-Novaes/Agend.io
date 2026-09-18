@@ -3,7 +3,9 @@ using Agendio.Infrastructure.AiAssistant;
 using Agendio.Infrastructure.Multitenancy;
 using Agendio.Infrastructure.Payments;
 using Agendio.Infrastructure.Security;
+using Agendio.Modules.Assistant.Infrastructure.Persistence;
 using Agendio.Modules.Billing.Infrastructure.Asaas;
+using Agendio.Modules.Feedback.Infrastructure.Persistence;
 using Agendio.Modules.Billing.Infrastructure.Persistence;
 using Agendio.Modules.Catalog.Infrastructure.Persistence;
 using Agendio.Modules.Customers.Infrastructure.Persistence;
@@ -155,6 +157,16 @@ public sealed class IntegrationTestFixture : WebApplicationFactory<Program>, IAs
         await using (var marketingDbContext = CreateMarketingDbContext())
         {
             await marketingDbContext.Database.MigrateAsync();
+        }
+
+        await using (var assistantDbContext = CreateAssistantDbContext())
+        {
+            await assistantDbContext.Database.MigrateAsync();
+        }
+
+        await using (var feedbackDbContext = CreateFeedbackDbContext())
+        {
+            await feedbackDbContext.Database.MigrateAsync();
         }
     }
 
@@ -347,7 +359,10 @@ public sealed class IntegrationTestFixture : WebApplicationFactory<Program>, IAs
             .UseNpgsql(OwnerConnectionString)
             .UseSnakeCaseNamingConvention();
 
-        return new PlatformDbContext(optionsBuilder.Options);
+        var encryptionService = new AesGcmEncryptionService(
+            Options.Create(new ColumnEncryptionOptions { Key = "aW50ZWdyYXRpb24tdGVzdC1jb2wta2V5LTMyYnl0ZXM=" }));
+
+        return new PlatformDbContext(optionsBuilder.Options, encryptionService);
     }
 
     private BillingDbContext CreateBillingDbContext()
@@ -384,6 +399,24 @@ public sealed class IntegrationTestFixture : WebApplicationFactory<Program>, IAs
             .UseSnakeCaseNamingConvention();
 
         return new MarketingDbContext(optionsBuilder.Options, new NullTenantContext());
+    }
+
+    private AssistantDbContext CreateAssistantDbContext()
+    {
+        var optionsBuilder = new DbContextOptionsBuilder<AssistantDbContext>()
+            .UseNpgsql(OwnerConnectionString)
+            .UseSnakeCaseNamingConvention();
+
+        return new AssistantDbContext(optionsBuilder.Options, new NullTenantContext());
+    }
+
+    private FeedbackDbContext CreateFeedbackDbContext()
+    {
+        var optionsBuilder = new DbContextOptionsBuilder<FeedbackDbContext>()
+            .UseNpgsql(OwnerConnectionString)
+            .UseSnakeCaseNamingConvention();
+
+        return new FeedbackDbContext(optionsBuilder.Options);
     }
 
     private string BuildConnectionString(string username, string password)

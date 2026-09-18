@@ -4,12 +4,13 @@ import * as React from "react";
 import Link from "next/link";
 import { Menu, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { MarketingThemeToggle } from "@/components/marketing/marketing-theme-toggle";
 
 const LINKS = [
-  { href: "#segmentos", label: "Segmentos" },
-  { href: "#funcionalidades", label: "Funcionalidades" },
-  { href: "#precos", label: "Preços" },
-  { href: "#faq", label: "Perguntas frequentes" },
+  { href: "#showcase", label: "Produto" },
+  { href: "#funcionalidades", label: "Recursos" },
+  { href: "#como-funciona", label: "Como funciona" },
+  { href: "#precos", label: "Planos" },
 ];
 
 export function MobileNav() {
@@ -45,12 +46,16 @@ export function MobileNav() {
                 {link.label}
               </a>
             ))}
-            <div className="mt-2 flex flex-col gap-2 border-t pt-3">
+            <div className="mt-2 flex items-center justify-between gap-2 border-t pt-3">
+              <span className="text-muted-foreground text-sm">Tema</span>
+              <MarketingThemeToggle />
+            </div>
+            <div className="flex flex-col gap-2">
               <Button variant="outline" asChild>
                 <Link href="/login">Entrar</Link>
               </Button>
               <Button asChild>
-                <Link href="/onboarding">Criar minha conta</Link>
+                <Link href="/onboarding">Cadastre-se</Link>
               </Button>
             </div>
           </nav>

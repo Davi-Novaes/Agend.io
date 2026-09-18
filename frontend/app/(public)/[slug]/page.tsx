@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import Image from "next/image";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { Merriweather, Playfair_Display, Poppins } from "next/font/google";
+import { Inter, Lora, Merriweather, Montserrat, Playfair_Display, Poppins } from "next/font/google";
 import {
   Clock,
   ExternalLink,
@@ -45,12 +45,18 @@ type PageProps = {
 const poppins = Poppins({ weight: ["400", "600", "700"], subsets: ["latin"], variable: "--font-tenant-poppins" });
 const playfairDisplay = Playfair_Display({ subsets: ["latin"], variable: "--font-tenant-playfair" });
 const merriweather = Merriweather({ weight: ["400", "700"], subsets: ["latin"], variable: "--font-tenant-merriweather" });
+const inter = Inter({ weight: ["400", "600", "700"], subsets: ["latin"], variable: "--font-tenant-inter" });
+const montserrat = Montserrat({ weight: ["400", "600", "700"], subsets: ["latin"], variable: "--font-tenant-montserrat" });
+const lora = Lora({ weight: ["400", "700"], subsets: ["latin"], variable: "--font-tenant-lora" });
 
 const FONT_CLASS_NAME: Record<PublicPageFont, string> = {
   Default: "",
   Poppins: poppins.className,
   PlayfairDisplay: playfairDisplay.className,
   Merriweather: merriweather.className,
+  Inter: inter.className,
+  Montserrat: montserrat.className,
+  Lora: lora.className,
 };
 
 const BUTTON_RADIUS: Record<PublicPageButtonStyle, string> = {

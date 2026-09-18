@@ -59,6 +59,42 @@ public class BillingTests(IntegrationTestFixture fixture)
     }
 
     [Fact]
+    public async Task Plan_Catalog_Should_Expose_The_3_Active_Paid_Plans_With_Their_Limits()
+    {
+        // Regressao do BL-04 revisitado: a landing anunciava 3 planos pagos que
+        // nao existiam de verdade no backend — agora existem, com limite real.
+        // "Padrao" e "Gratis" foram desativados (nao fazia sentido oferecer
+        // tudo ilimitado de graca ao lado de planos pagos com limite de
+        // verdade) e nenhum dos dois pode mais aparecer na vitrine publica.
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var client = fixture.CreateClient();
+
+        var response = await client.GetAsync("/api/billing/plans", cancellationToken);
+        response.StatusCode.ShouldBe(HttpStatusCode.OK);
+        var plans = await response.Content.ReadFromJsonAsync<JsonElement>(cancellationToken);
+
+        plans.GetArrayLength().ShouldBe(3);
+        var names = plans.EnumerateArray().Select(p => p.GetProperty("name").GetString()).ToList();
+        names.ShouldContain("Essencial");
+        names.ShouldContain("Profissional");
+        names.ShouldContain("Premium");
+        names.ShouldNotContain("Padrão");
+        names.ShouldNotContain("Grátis");
+
+        var essencial = plans.EnumerateArray().Single(p => p.GetProperty("name").GetString() == "Essencial");
+        essencial.GetProperty("maxUnits").GetInt32().ShouldBe(1);
+        essencial.GetProperty("maxProfessionals").GetInt32().ShouldBe(3);
+        essencial.GetProperty("maxCustomers").GetInt32().ShouldBe(300);
+        essencial.GetProperty("isFeatured").GetBoolean().ShouldBeFalse();
+
+        var profissional = plans.EnumerateArray().Single(p => p.GetProperty("name").GetString() == "Profissional");
+        profissional.GetProperty("isFeatured").GetBoolean().ShouldBeTrue();
+
+        var premium = plans.EnumerateArray().Single(p => p.GetProperty("name").GetString() == "Premium");
+        premium.GetProperty("maxCustomers").ValueKind.ShouldBe(JsonValueKind.Null);
+    }
+
+    [Fact]
     public async Task Owner_Can_Subscribe_To_A_Plan_And_Receives_An_Invoice_Url()
     {
         var cancellationToken = TestContext.Current.CancellationToken;
@@ -71,7 +107,7 @@ public class BillingTests(IntegrationTestFixture fixture)
 
         var subscribeResponse = await AuthorizedRequestHelpers.PostAuthorizedAsync(
             client, accessToken, "/api/billing/subscription/subscribe",
-            new { planId, fullName = "Dono Teste", cpfCnpj = "12345678900", email = "dono@example.com" },
+            new { planId, fullName = "Dono Teste", cpfCnpj = "12345678909", email = "dono@example.com" },
             cancellationToken);
 
         subscribeResponse.StatusCode.ShouldBe(HttpStatusCode.OK);
@@ -82,6 +118,49 @@ public class BillingTests(IntegrationTestFixture fixture)
         var dbContext = scope.ServiceProvider.GetRequiredService<BillingDbContext>();
         var payment = await dbContext.Payments.SingleAsync(p => p.TenantId == TenantId.From(tenantId), cancellationToken);
         payment.Status.ShouldBe(PaymentStatus.Pending);
+    }
+
+    [Fact]
+    public async Task Resubmitting_Subscribe_Before_Paying_Should_Not_Create_A_Second_Asaas_Subscription()
+    {
+        // Regressao: reenviar o formulario de "Assinar" (F5, duplo clique,
+        // voltar do checkout) antes do trial virar pago criava uma SEGUNDA
+        // assinatura recorrente na Asaas a cada envio, deixando a anterior
+        // orfa — encontrado em sandbox com 2 assinaturas ACTIVE simultaneas
+        // de R$99/mes pro mesmo cliente. So pode existir uma fatura pendente.
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var client = fixture.CreateClient();
+        var (tenantId, accessToken) = await CreateTenantWithOwnerAndLoginAsync(client, cancellationToken);
+
+        var plansResponse = await AuthorizedRequestHelpers.GetAuthorizedAsync(client, accessToken, "/api/billing/plans", cancellationToken);
+        var plans = await plansResponse.Content.ReadFromJsonAsync<JsonElement>(cancellationToken);
+        var planId = plans.EnumerateArray().First().GetProperty("id").GetGuid();
+
+        var firstSubscribe = await AuthorizedRequestHelpers.PostAuthorizedAsync(
+            client, accessToken, "/api/billing/subscription/subscribe",
+            new { planId, fullName = "Dono Teste", cpfCnpj = "12345678909", email = "dono@example.com" },
+            cancellationToken);
+        firstSubscribe.StatusCode.ShouldBe(HttpStatusCode.OK);
+        var firstBody = await firstSubscribe.Content.ReadFromJsonAsync<JsonElement>(cancellationToken);
+
+        // Reenvia com dados diferentes (nome/e-mail trocados), como acontece
+        // quando a pessoa edita o formulario antes de clicar de novo.
+        var resubmit = await AuthorizedRequestHelpers.PostAuthorizedAsync(
+            client, accessToken, "/api/billing/subscription/subscribe",
+            new { planId, fullName = "Outro Nome", cpfCnpj = "12345678909", email = "outro@example.com" },
+            cancellationToken);
+        resubmit.StatusCode.ShouldBe(HttpStatusCode.OK);
+        var resubmitBody = await resubmit.Content.ReadFromJsonAsync<JsonElement>(cancellationToken);
+
+        resubmitBody.GetProperty("invoiceUrl").GetString().ShouldBe(firstBody.GetProperty("invoiceUrl").GetString());
+
+        await using var scope = fixture.Services.CreateAsyncScope();
+        var dbContext = scope.ServiceProvider.GetRequiredService<BillingDbContext>();
+        var payments = await dbContext.Payments.Where(p => p.TenantId == TenantId.From(tenantId)).ToListAsync(cancellationToken);
+        payments.Count.ShouldBe(1);
+
+        var subscription = await dbContext.Subscriptions.AsNoTracking().SingleAsync(s => s.TenantId == TenantId.From(tenantId), cancellationToken);
+        subscription.AsaasSubscriptionId.ShouldNotBeNullOrWhiteSpace();
     }
 
     [Fact]
@@ -218,34 +297,22 @@ public class BillingTests(IntegrationTestFixture fixture)
     }
 
     [Fact]
-    public async Task Onboard_Selecting_The_Free_Plan_Should_Activate_The_Subscription_Immediately_Without_Payment()
+    public async Task Onboard_Selecting_The_Retired_Free_Plan_Should_Be_Rejected()
     {
+        // O plano Gratis foi desativado (BL-04 revisitado — nao fazia sentido
+        // oferecer tudo ilimitado de graca ao lado de planos pagos com limite
+        // real). onboard-select-plan so aceita planos ativos, entao escolher
+        // Gratis precisa ser rejeitado, nao silenciosamente aceito.
         var cancellationToken = TestContext.Current.CancellationToken;
         var client = fixture.CreateClient();
-        var (tenantId, _, onboardingToken) = await CreateTenantWithOwnerAsync(client, cancellationToken);
+        var (_, _, onboardingToken) = await CreateTenantWithOwnerAsync(client, cancellationToken);
 
         var response = await AuthorizedRequestHelpers.PostAuthorizedAsync(
             client, onboardingToken, "/api/billing/subscription/onboard-select-plan",
             new { planId = PlanConfiguration.FreePlanId.Value },
             cancellationToken);
 
-        response.StatusCode.ShouldBe(HttpStatusCode.OK);
-        var body = await response.Content.ReadFromJsonAsync<JsonElement>(cancellationToken);
-        body.GetProperty("requiresPayment").GetBoolean().ShouldBeFalse();
-        body.TryGetProperty("checkoutLink", out var checkoutLink).ShouldBeTrue();
-        (checkoutLink.ValueKind is JsonValueKind.Null).ShouldBeTrue();
-
-        await using var scope = fixture.Services.CreateAsyncScope();
-        var dbContext = scope.ServiceProvider.GetRequiredService<BillingDbContext>();
-        var subscription = await dbContext.Subscriptions.SingleAsync(s => s.TenantId == TenantId.From(tenantId), cancellationToken);
-        subscription.Status.ShouldBe(SubscriptionStatus.Active);
-        subscription.PlanId.ShouldBe(PlanConfiguration.FreePlanId);
-        subscription.CurrentPeriodEndsAtUtc.ShouldBeNull();
-
-        var statusResponse = await AuthorizedRequestHelpers.GetAuthorizedAsync(
-            client, onboardingToken, "/api/billing/subscription/onboard-status", cancellationToken);
-        var statusBody = await statusResponse.Content.ReadFromJsonAsync<JsonElement>(cancellationToken);
-        statusBody.GetProperty("isReady").GetBoolean().ShouldBeTrue();
+        response.StatusCode.ShouldBe(HttpStatusCode.NotFound);
     }
 
     [Fact]
@@ -282,7 +349,7 @@ public class BillingTests(IntegrationTestFixture fixture)
 
         var response = await AuthorizedRequestHelpers.PostAuthorizedAsync(
             client, tokenA, "/api/billing/subscription/onboard-select-plan",
-            new { planId = PlanConfiguration.FreePlanId.Value },
+            new { planId = PlanConfiguration.EssencialPlanId.Value },
             cancellationToken);
         response.StatusCode.ShouldBe(HttpStatusCode.OK);
 
@@ -293,30 +360,30 @@ public class BillingTests(IntegrationTestFixture fixture)
     }
 
     [Fact]
-    public async Task Onboard_Selecting_A_Paid_Plan_Should_Return_A_Checkout_Link_Without_Requiring_Customer_Data()
+    public async Task Onboard_Selecting_A_Paid_Plan_Should_Only_Record_Intent_Without_Creating_A_Checkout_Yet()
     {
+        // P1-5 (docs/AUTH_BILLING_SECURITY_AUDIT.md): o Checkout de verdade so
+        // e criado depois do login (que exige e-mail confirmado), via
+        // /subscription/subscribe — nao aqui, ainda no onboarding.
         var cancellationToken = TestContext.Current.CancellationToken;
         var client = fixture.CreateClient();
         var (tenantId, _, onboardingToken) = await CreateTenantWithOwnerAsync(client, cancellationToken);
 
-        // De proposito, sem nome/CPF/e-mail no corpo — o Checkout da Asaas
-        // coleta isso na propria pagina hospedada (ver Fase 24).
         var response = await AuthorizedRequestHelpers.PostAuthorizedAsync(
             client, onboardingToken, "/api/billing/subscription/onboard-select-plan",
-            new { planId = PlanConfiguration.DefaultPlanId.Value },
+            new { planId = PlanConfiguration.EssencialPlanId.Value },
             cancellationToken);
 
         response.StatusCode.ShouldBe(HttpStatusCode.OK);
         var body = await response.Content.ReadFromJsonAsync<JsonElement>(cancellationToken);
         body.GetProperty("requiresPayment").GetBoolean().ShouldBeTrue();
-        body.GetProperty("checkoutLink").GetString().ShouldNotBeNullOrWhiteSpace();
+        body.TryGetProperty("checkoutLink", out _).ShouldBeFalse();
 
-        // Continua Trialing — so vira Active quando o webhook confirmar o
-        // primeiro pagamento (nao no ato de criar o Checkout).
         await using var scope = fixture.Services.CreateAsyncScope();
         var dbContext = scope.ServiceProvider.GetRequiredService<BillingDbContext>();
         var subscription = await dbContext.Subscriptions.SingleAsync(s => s.TenantId == TenantId.From(tenantId), cancellationToken);
         subscription.Status.ShouldBe(SubscriptionStatus.Trialing);
+        subscription.PlanId.ShouldBe(PlanConfiguration.EssencialPlanId);
         subscription.AsaasSubscriptionId.ShouldBeNull();
 
         var statusResponse = await AuthorizedRequestHelpers.GetAuthorizedAsync(
@@ -326,76 +393,65 @@ public class BillingTests(IntegrationTestFixture fixture)
     }
 
     [Fact]
-    public async Task Checkout_Payment_Confirmed_Webhook_Adopts_The_Subscription_Via_ExternalReference_And_Marks_It_Ready()
+    public async Task Onboard_Selecting_A_Plan_Twice_Before_Activating_Should_Just_Update_The_Recorded_Intent()
     {
+        // So registra intencao (P1-5) — mudar de ideia sobre qual plano
+        // escolher ANTES de ativar (ainda na tela de "escolha seu plano") e um
+        // fluxo valido, nao um erro.
         var cancellationToken = TestContext.Current.CancellationToken;
         var client = fixture.CreateClient();
         var (tenantId, _, onboardingToken) = await CreateTenantWithOwnerAsync(client, cancellationToken);
 
-        await AuthorizedRequestHelpers.PostAuthorizedAsync(
-            client, onboardingToken, "/api/billing/subscription/onboard-select-plan",
-            new { planId = PlanConfiguration.DefaultPlanId.Value },
-            cancellationToken);
-
-        // O Checkout do onboarding nunca chama POST /subscriptions — a Asaas cria
-        // a assinatura por conta propria quando o pagador confirma o cartao, entao
-        // este AsaasSubscriptionId/AsaasCustomerId sao "novos" pra nos: o unico jeito
-        // de saber a qual tenant pertencem e o externalReference setado no Checkout.
-        var asaasSubscriptionId = $"fake-checkout-sub-{Guid.NewGuid():N}";
-        var asaasPaymentId = $"fake-checkout-pay-{Guid.NewGuid():N}";
-        var webhookPayload = new
-        {
-            @event = "PAYMENT_CONFIRMED",
-            payment = new
-            {
-                id = asaasPaymentId,
-                status = "CONFIRMED",
-                value = 99.00m,
-                dueDate = DateOnly.FromDateTime(DateTime.UtcNow).ToString("yyyy-MM-dd", CultureInfo.InvariantCulture),
-                invoiceUrl = (string?)null,
-                billingType = "CREDIT_CARD",
-                subscription = asaasSubscriptionId,
-                customer = $"fake-checkout-cus-{Guid.NewGuid():N}",
-                externalReference = tenantId.ToString(),
-            },
-        };
-
-        var webhookResponse = await PostWebhookAsync(client, webhookPayload, AsaasSecretHeader(), cancellationToken);
-        webhookResponse.StatusCode.ShouldBe(HttpStatusCode.OK);
-
-        await using var scope = fixture.Services.CreateAsyncScope();
-        var dbContext = scope.ServiceProvider.GetRequiredService<BillingDbContext>();
-        var subscription = await dbContext.Subscriptions.SingleAsync(s => s.TenantId == TenantId.From(tenantId), cancellationToken);
-        subscription.Status.ShouldBe(SubscriptionStatus.Active);
-        subscription.AsaasSubscriptionId.ShouldBe(asaasSubscriptionId);
-
-        var payment = await dbContext.Payments.SingleAsync(p => p.AsaasPaymentId == asaasPaymentId, cancellationToken);
-        payment.Status.ShouldBe(PaymentStatus.Confirmed);
-
-        var statusResponse = await AuthorizedRequestHelpers.GetAuthorizedAsync(
-            client, onboardingToken, "/api/billing/subscription/onboard-status", cancellationToken);
-        var statusBody = await statusResponse.Content.ReadFromJsonAsync<JsonElement>(cancellationToken);
-        statusBody.GetProperty("isReady").GetBoolean().ShouldBeTrue();
-    }
-
-    [Fact]
-    public async Task Onboard_Selecting_A_Plan_When_Subscription_Already_Active_Should_Be_Rejected()
-    {
-        var cancellationToken = TestContext.Current.CancellationToken;
-        var client = fixture.CreateClient();
-        var (_, _, onboardingToken) = await CreateTenantWithOwnerAsync(client, cancellationToken);
-
         var firstAttempt = await AuthorizedRequestHelpers.PostAuthorizedAsync(
             client, onboardingToken, "/api/billing/subscription/onboard-select-plan",
-            new { planId = PlanConfiguration.FreePlanId.Value },
+            new { planId = PlanConfiguration.EssencialPlanId.Value },
             cancellationToken);
         firstAttempt.StatusCode.ShouldBe(HttpStatusCode.OK);
 
         var secondAttempt = await AuthorizedRequestHelpers.PostAuthorizedAsync(
             client, onboardingToken, "/api/billing/subscription/onboard-select-plan",
-            new { planId = PlanConfiguration.DefaultPlanId.Value },
+            new { planId = PlanConfiguration.ProfissionalPlanId.Value },
             cancellationToken);
-        secondAttempt.StatusCode.ShouldBe(HttpStatusCode.Conflict);
+        secondAttempt.StatusCode.ShouldBe(HttpStatusCode.OK);
+
+        await using var scope = fixture.Services.CreateAsyncScope();
+        var dbContext = scope.ServiceProvider.GetRequiredService<BillingDbContext>();
+        var subscription = await dbContext.Subscriptions.SingleAsync(s => s.TenantId == TenantId.From(tenantId), cancellationToken);
+        subscription.PlanId.ShouldBe(PlanConfiguration.ProfissionalPlanId);
+    }
+
+    [Fact]
+    public async Task Onboard_Selecting_A_Plan_After_The_Subscription_Is_Already_Active_Should_Be_Rejected()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var client = fixture.CreateClient();
+        var (tenantId, ownerEmail, onboardingToken) = await CreateTenantWithOwnerAsync(client, cancellationToken);
+
+        var selectPlan = await AuthorizedRequestHelpers.PostAuthorizedAsync(
+            client, onboardingToken, "/api/billing/subscription/onboard-select-plan",
+            new { planId = PlanConfiguration.EssencialPlanId.Value },
+            cancellationToken);
+        selectPlan.StatusCode.ShouldBe(HttpStatusCode.OK);
+
+        // So ativa de verdade depois do login (que exige e-mail confirmado) —
+        // ver Subscription.SelectPlan/ActivateAsFree. activate-free serve so
+        // pra deixar a assinatura em Active pra este teste (o endpoint em si
+        // nao checa Plan.IsActive, so forca o plano Gratis independente do
+        // que estava selecionado antes).
+        var loginResponse = await client.PostAsJsonAsync(
+            "/api/auth/login", new { tenantId, email = ownerEmail, password = Password }, cancellationToken);
+        var loginBody = await loginResponse.Content.ReadFromJsonAsync<JsonElement>(cancellationToken);
+        var accessToken = loginBody.GetProperty("accessToken").GetString()!;
+
+        var activateResponse = await AuthorizedRequestHelpers.PostAuthorizedAsync(
+            client, accessToken, "/api/billing/subscription/activate-free", new { }, cancellationToken);
+        activateResponse.StatusCode.ShouldBe(HttpStatusCode.NoContent);
+
+        var selectAgain = await AuthorizedRequestHelpers.PostAuthorizedAsync(
+            client, onboardingToken, "/api/billing/subscription/onboard-select-plan",
+            new { planId = PlanConfiguration.EssencialPlanId.Value },
+            cancellationToken);
+        selectAgain.StatusCode.ShouldBe(HttpStatusCode.Conflict);
     }
 
     [Fact]
@@ -408,11 +464,16 @@ public class BillingTests(IntegrationTestFixture fixture)
         var client = fixture.CreateClient();
         var (tenantId, ownerEmail, onboardingToken) = await CreateTenantWithOwnerAsync(client, cancellationToken);
 
-        var selectFree = await AuthorizedRequestHelpers.PostAuthorizedAsync(
+        // O plano escolhido aqui e so pra existir uma Subscription pra
+        // cancelar — activate-free abaixo forca o plano Gratis de qualquer
+        // jeito (o endpoint nao checa Plan.IsActive), entao o teste continua
+        // cobrindo a mesma regressao (reativar como Free depois de cancelar)
+        // mesmo com Gratis desativado no catalogo publico.
+        var selectPlan = await AuthorizedRequestHelpers.PostAuthorizedAsync(
             client, onboardingToken, "/api/billing/subscription/onboard-select-plan",
-            new { planId = PlanConfiguration.FreePlanId.Value },
+            new { planId = PlanConfiguration.EssencialPlanId.Value },
             cancellationToken);
-        selectFree.StatusCode.ShouldBe(HttpStatusCode.OK);
+        selectPlan.StatusCode.ShouldBe(HttpStatusCode.OK);
 
         var loginResponse = await client.PostAsJsonAsync(
             "/api/auth/login", new { tenantId, email = ownerEmail, password = Password }, cancellationToken);
@@ -453,7 +514,7 @@ public class BillingTests(IntegrationTestFixture fixture)
 
         var firstSubscribe = await AuthorizedRequestHelpers.PostAuthorizedAsync(
             client, accessToken, "/api/billing/subscription/subscribe",
-            new { planId = PlanConfiguration.DefaultPlanId.Value, fullName = "Dono Teste", cpfCnpj = "12345678900", email = "dono@example.com" },
+            new { planId = PlanConfiguration.EssencialPlanId.Value, fullName = "Dono Teste", cpfCnpj = "12345678909", email = "dono@example.com" },
             cancellationToken);
         firstSubscribe.StatusCode.ShouldBe(HttpStatusCode.OK);
 
@@ -464,7 +525,7 @@ public class BillingTests(IntegrationTestFixture fixture)
         // Reassina — antes da correcao, isso falhava com Subscription.AlreadyCanceled.
         var resubscribeResponse = await AuthorizedRequestHelpers.PostAuthorizedAsync(
             client, accessToken, "/api/billing/subscription/subscribe",
-            new { planId = PlanConfiguration.DefaultPlanId.Value, fullName = "Dono Teste", cpfCnpj = "12345678900", email = "dono@example.com" },
+            new { planId = PlanConfiguration.EssencialPlanId.Value, fullName = "Dono Teste", cpfCnpj = "12345678909", email = "dono@example.com" },
             cancellationToken);
         resubscribeResponse.StatusCode.ShouldBe(HttpStatusCode.OK);
 
@@ -508,9 +569,14 @@ public class BillingTests(IntegrationTestFixture fixture)
         var client = fixture.CreateClient();
         var (tenantId, _, onboardingToken) = await CreateTenantWithOwnerAsync(client, cancellationToken);
 
+        // So pra existir uma Subscription pra forcar abaixo — Gratis foi
+        // desativado (nao da mais pra selecionar via onboard-select-plan),
+        // entao o PlanId=FreePlanId de verdade (simulando um tenant legado
+        // ainda no Free) e forcado direto no UPDATE junto com o resto do
+        // estado que o job varre.
         await AuthorizedRequestHelpers.PostAuthorizedAsync(
             client, onboardingToken, "/api/billing/subscription/onboard-select-plan",
-            new { planId = PlanConfiguration.FreePlanId.Value },
+            new { planId = PlanConfiguration.EssencialPlanId.Value },
             cancellationToken);
 
         await using (var scope = fixture.Services.CreateAsyncScope())
@@ -524,7 +590,7 @@ public class BillingTests(IntegrationTestFixture fixture)
             await dbContext.Database.ExecuteSqlInterpolatedAsync(
                 $"""
                 UPDATE billing.subscriptions
-                SET status = {SubscriptionStatus.Trialing.ToString()}, trial_ends_at_utc = {DateTimeOffset.UtcNow.AddDays(-30)}
+                SET plan_id = {PlanConfiguration.FreePlanId.Value}, status = {SubscriptionStatus.Trialing.ToString()}, trial_ends_at_utc = {DateTimeOffset.UtcNow.AddDays(-30)}
                 WHERE tenant_id = {tenantId}
                 """,
                 cancellationToken);
@@ -552,7 +618,7 @@ public class BillingTests(IntegrationTestFixture fixture)
 
         await AuthorizedRequestHelpers.PostAuthorizedAsync(
             client, accessToken, "/api/billing/subscription/subscribe",
-            new { planId, fullName = "Dono Teste", cpfCnpj = "12345678900", email = "dono@example.com" },
+            new { planId, fullName = "Dono Teste", cpfCnpj = "12345678909", email = "dono@example.com" },
             cancellationToken);
 
         await using var scope = fixture.Services.CreateAsyncScope();
@@ -597,7 +663,7 @@ public class BillingTests(IntegrationTestFixture fixture)
 
         var ownerEmail = $"owner-{Guid.NewGuid():N}@example.com";
         var registerResponse = await client.PostAsJsonAsync(
-            "/api/auth/register", new { tenantId, email = ownerEmail, password = Password, fullName = "Dono" }, cancellationToken);
+            "/api/auth/register", new { tenantId, email = ownerEmail, password = Password, fullName = "Dono", phone = "+5511999999999", cpfCnpj = "12345678909", termsAccepted = true }, cancellationToken);
         registerResponse.EnsureSuccessStatusCode();
         var registerBody = await registerResponse.Content.ReadFromJsonAsync<JsonElement>(cancellationToken);
         var onboardingToken = registerBody.GetProperty("onboardingToken").GetString()!;

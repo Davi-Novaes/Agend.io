@@ -1,0 +1,489 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+@import "shadcn/tailwind.css";
+
+@custom-variant dark (&:is(.dark *));
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: var(--font-plus-jakarta-sans);
+  --font-mono: var(--font-geist-mono);
+  --font-heading: var(--font-sans);
+  --color-sidebar-ring: var(--sidebar-ring);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar: var(--sidebar);
+  --color-chart-5: var(--chart-5);
+  --color-chart-4: var(--chart-4);
+  --color-chart-3: var(--chart-3);
+  --color-chart-2: var(--chart-2);
+  --color-chart-1: var(--chart-1);
+  --color-ring: var(--ring);
+  --color-input: var(--input);
+  --color-border: var(--border);
+  --color-destructive: var(--destructive);
+  --color-success: var(--success);
+  --color-warning: var(--warning);
+  --color-info: var(--info);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-accent: var(--accent);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-muted: var(--muted);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-secondary: var(--secondary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-primary: var(--primary);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-popover: var(--popover);
+  --color-card-foreground: var(--card-foreground);
+  --color-card: var(--card);
+  --radius-sm: calc(var(--radius) * 0.6);
+  --radius-md: calc(var(--radius) * 0.8);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) * 1.4);
+  --radius-2xl: calc(var(--radius) * 1.8);
+  --radius-3xl: calc(var(--radius) * 2.2);
+  --radius-4xl: calc(var(--radius) * 2.6);
+  --shadow-xs: var(--shadow-xs);
+  --shadow-sm: var(--shadow-sm);
+  --shadow-md: var(--shadow-md);
+  --shadow-lg: var(--shadow-lg);
+  --shadow-xl: var(--shadow-xl);
+}
+
+:root {
+  --background: oklch(1 0 0);
+  --foreground: oklch(0.145 0 0);
+  --card: oklch(1 0 0);
+  --card-foreground: oklch(0.145 0 0);
+  --popover: oklch(1 0 0);
+  --popover-foreground: oklch(0.145 0 0);
+  --primary: oklch(0.475 0.165 275);
+  --primary-foreground: oklch(0.99 0 0);
+  --secondary: oklch(0.97 0 0);
+  --secondary-foreground: oklch(0.205 0 0);
+  --muted: oklch(0.97 0 0);
+  --muted-foreground: oklch(0.556 0 0);
+  --accent: oklch(0.955 0.024 272);
+  --accent-foreground: oklch(0.34 0.11 276);
+  --destructive: oklch(0.577 0.245 27.325);
+  --success: oklch(0.58 0.14 145);
+  --warning: oklch(0.58 0.15 55);
+  --info: oklch(0.55 0.14 235);
+  --border: oklch(0.922 0 0);
+  --input: oklch(0.922 0 0);
+  --ring: oklch(0.475 0.165 275);
+  /* Paleta categorica validada pela skill dataviz (node scripts/validate_palette.js)
+     — os valores anteriores (oklch escolhidos a olho) falhavam separacao CVD entre
+     chart-3/chart-4 (protanopia). Hex fixos em vez de oklch: sao a saida direta do
+     validador, reconverter pra oklch so arriscaria reintroduzir o mesmo erro. */
+  --chart-1: #2a78d6;
+  --chart-2: #eb6834;
+  --chart-3: #1baf7a;
+  --chart-4: #eda100;
+  --chart-5: #e87ba4;
+  /* Recebido/Pago (financeiro) -- verde/vermelho especificos, NAO os tokens
+     genericos --success/--destructive: validados a parte pela skill dataviz
+     pro contraste especifico dessa dupla (ver components/financeiro/cash-flow-chart.tsx). */
+  --chart-received: #008300;
+  --chart-paid: #e34948;
+  --radius: 0.625rem;
+  /* Fase 3: raio dos botoes da pagina publica — TenantThemeProvider sobrescreve
+     quando o dono escolhe um estilo diferente de "Arredondado". */
+  --tenant-button-radius: var(--radius-lg);
+  --shadow-xs: 0 1px 2px 0 oklch(0.145 0.02 275 / 0.04);
+  --shadow-sm: 0 1px 3px 0 oklch(0.145 0.02 275 / 0.06), 0 1px 2px -1px oklch(0.145 0.02 275 / 0.06);
+  --shadow-md: 0 4px 6px -1px oklch(0.145 0.02 275 / 0.07), 0 2px 4px -2px oklch(0.145 0.02 275 / 0.06);
+  --shadow-lg: 0 10px 15px -3px oklch(0.145 0.02 275 / 0.08), 0 4px 6px -4px oklch(0.145 0.02 275 / 0.06);
+  --shadow-xl: 0 20px 25px -5px oklch(0.145 0.02 275 / 0.09), 0 8px 10px -6px oklch(0.145 0.02 275 / 0.06);
+  /* Antes era oklch(0.985 0 0) -- quase identico ao --background (1 0 0),
+     sem separacao visual nenhuma entre sidebar e painel. Leve tom frio (hue
+     275, mesmo do --primary) em vez de so escurecer, pra nao parecer "cinza
+     sujo" — contraste com --sidebar-foreground so aumenta (fica mais escuro),
+     nunca ameaça AA. */
+  --sidebar: oklch(0.955 0.008 275);
+  --sidebar-foreground: oklch(0.145 0 0);
+  --sidebar-primary: oklch(0.475 0.165 275);
+  --sidebar-primary-foreground: oklch(0.99 0 0);
+  --sidebar-accent: oklch(0.93 0.012 275);
+  --sidebar-accent-foreground: oklch(0.205 0 0);
+  --sidebar-border: oklch(0.9 0.01 275);
+  --sidebar-ring: oklch(0.708 0 0);
+}
+
+.dark {
+  /* Fundo bem mais escuro (quase preto) que o padrao shadcn original — pedido
+     explicito do usuario, casando com a imagem de referencia do redesign do
+     dashboard. So a LUMINANCE de background/card/sidebar desce; foreground e
+     as demais cores ficam como estavam, entao o contraste texto-sobre-fundo
+     so AUMENTA (nunca reduz abaixo do que ja passava em AA).
+     Passou por 0.09 (original) -> 0.04 (usuario achou preto demais) -> aqui:
+     0.065, mais perto do original, so um pouco mais escuro que ele. */
+  --background: oklch(0.065 0 0);
+  --foreground: oklch(0.985 0 0);
+  /* Mesmo raciocinio: original 0.14, tentativa 0.075 ficou escura demais —
+     0.11 fica um pouco abaixo do original, mantendo o card lendo como card. */
+  --card: oklch(0.11 0 0);
+  --card-foreground: oklch(0.985 0 0);
+  --popover: oklch(0.11 0 0);
+  --popover-foreground: oklch(0.985 0 0);
+  --primary: oklch(0.56 0.22 278);
+  --primary-foreground: oklch(0.99 0 0);
+  --secondary: oklch(0.2 0 0);
+  --secondary-foreground: oklch(0.985 0 0);
+  --muted: oklch(0.2 0 0);
+  --muted-foreground: oklch(0.708 0 0);
+  --accent: oklch(0.32 0.09 273 / 35%);
+  --accent-foreground: oklch(0.88 0.05 273);
+  --destructive: oklch(0.704 0.191 22.216);
+  --success: oklch(0.72 0.16 145);
+  --warning: oklch(0.78 0.16 60);
+  --info: oklch(0.72 0.13 235);
+  --border: oklch(1 0 0 / 10%);
+  --input: oklch(1 0 0 / 15%);
+  --ring: oklch(0.66 0.14 273);
+  --chart-1: #3987e5;
+  --chart-2: #d95926;
+  --chart-3: #199e70;
+  --chart-4: #c98500;
+  --chart-5: #d55181;
+  --chart-received: #008300;
+  --chart-paid: #e66767;
+  --shadow-xs: 0 1px 2px 0 oklch(0 0 0 / 0.3);
+  --shadow-sm: 0 1px 3px 0 oklch(0 0 0 / 0.35), 0 1px 2px -1px oklch(0 0 0 / 0.3);
+  --shadow-md: 0 4px 6px -1px oklch(0 0 0 / 0.4), 0 2px 4px -2px oklch(0 0 0 / 0.3);
+  --shadow-lg: 0 10px 15px -3px oklch(0 0 0 / 0.45), 0 4px 6px -4px oklch(0 0 0 / 0.3);
+  --shadow-xl: 0 20px 25px -5px oklch(0 0 0 / 0.5), 0 8px 10px -6px oklch(0 0 0 / 0.35);
+  /* Antes era oklch(0.09 0 0) -- LITERALMENTE igual a --background, zero
+     separacao. Mais escura que o painel (que fica com o fundo animado de
+     linhas, ver .app-bg-*): sidebar recua, painel e o "palco", --card (0.11)
+     continua o mais claro dos tres — hierarquia de profundidade deliberada.
+     Acompanhando o --background revisado (0.065): um pouco abaixo dele. */
+  --sidebar: oklch(0.04 0 0);
+  --sidebar-foreground: oklch(0.985 0 0);
+  --sidebar-primary: oklch(0.56 0.22 278);
+  --sidebar-primary-foreground: oklch(0.99 0 0);
+  --sidebar-accent: oklch(0.2 0 0);
+  --sidebar-accent-foreground: oklch(0.985 0 0);
+  --sidebar-border: oklch(1 0 0 / 10%);
+  --sidebar-ring: oklch(0.556 0 0);
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  body {
+    @apply bg-background text-foreground;
+  }
+  html {
+    @apply font-sans;
+  }
+}
+
+/* WCAG 2.2 AA (2.3.3) -- quem pede menos movimento no SO nao deve receber
+   scroll-reveal, contadores animados nem o parallax do mockup da home. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+@layer components {
+  /* Atmosfera de luz do hero -- 3 camadas grandes e muito difusas (nao um
+     "spot" pequeno atras do titulo), cada uma cobrindo boa parte da secao e
+     se movendo devagar em direcoes diferentes pra dar profundidade. Em modo
+     claro fica bem sutil (fundo e branco); em modo escuro a intensidade sobe
+     pra criar a sensacao de ambiente iluminado pedida no redesign. Desativado
+     junto com o resto em prefers-reduced-motion. */
+  .hero-glow {
+    position: absolute;
+    left: 50%;
+    border-radius: 9999px;
+    will-change: transform;
+  }
+
+  .hero-glow-1 {
+    top: -20%;
+    width: min(1400px, 95vw);
+    height: min(900px, 78vh);
+    transform: translateX(-50%);
+    background: radial-gradient(
+      closest-side,
+      color-mix(in oklch, var(--primary), transparent 82%) 0%,
+      color-mix(in oklch, var(--primary), transparent 90%) 40%,
+      transparent 75%
+    );
+    animation: hero-glow-drift-1 18s ease-in-out infinite;
+  }
+  .dark .hero-glow-1 {
+    background: radial-gradient(
+      closest-side,
+      color-mix(in oklch, var(--primary), transparent 42%) 0%,
+      color-mix(in oklch, var(--primary), transparent 68%) 40%,
+      color-mix(in oklch, var(--primary), transparent 88%) 65%,
+      transparent 85%
+    );
+  }
+
+  .hero-glow-2 {
+    top: -5%;
+    width: min(1200px, 88vw);
+    height: min(820px, 68vh);
+    transform: translateX(-80%);
+    background: radial-gradient(
+      closest-side,
+      color-mix(in oklch, var(--info), transparent 86%) 0%,
+      color-mix(in oklch, var(--info), transparent 93%) 45%,
+      transparent 78%
+    );
+    animation: hero-glow-drift-2 24s ease-in-out infinite;
+  }
+  .dark .hero-glow-2 {
+    background: radial-gradient(
+      closest-side,
+      color-mix(in oklch, var(--info), transparent 55%) 0%,
+      color-mix(in oklch, var(--info), transparent 78%) 45%,
+      transparent 80%
+    );
+  }
+
+  .hero-glow-3 {
+    top: 10%;
+    width: min(1600px, 100vw);
+    height: min(750px, 62vh);
+    transform: translateX(-25%);
+    background: radial-gradient(
+      closest-side,
+      color-mix(in oklch, var(--primary), transparent 92%) 0%,
+      transparent 75%
+    );
+    animation: hero-glow-drift-3 30s ease-in-out infinite;
+  }
+  .dark .hero-glow-3 {
+    background: radial-gradient(
+      closest-side,
+      color-mix(in oklch, var(--primary), transparent 82%) 0%,
+      transparent 75%
+    );
+  }
+
+  /* Luz que segue o cursor (tela de cadastro) -- posicao vem de --spotlight-x/y,
+     atualizadas via JS a cada mousemove (ver onboarding/page.tsx). So um
+     efeito de hover direto (a pessoa move o proprio mouse), nao uma animacao
+     automatica -- por isso nao entra na lista de coisas desligadas em
+     prefers-reduced-motion, e some sozinha em telas sem mouse de verdade
+     (o componente ja guarda com matchMedia("(hover: hover)")). */
+  .cursor-spotlight {
+    position: absolute;
+    inset: 0;
+    opacity: 0;
+    transition: opacity 300ms ease-out;
+    /* --spotlight-size: default 480px (hero/onboarding) -- AppBackground passa
+       um valor bem menor via style inline pro efeito discreto do painel. */
+    background: radial-gradient(
+      var(--spotlight-size, 480px) circle at var(--spotlight-x, 50%) var(--spotlight-y, 50%),
+      color-mix(in oklch, var(--primary), transparent 85%),
+      transparent 70%
+    );
+  }
+  .cursor-spotlight.is-active {
+    opacity: 1;
+  }
+
+  @keyframes hero-glow-drift-1 {
+    0%, 100% { transform: translate(-50%, 0) scale(1); }
+    33% { transform: translate(calc(-50% + 6vw), -5vh) scale(1.08); }
+    66% { transform: translate(calc(-50% - 4vw), 4vh) scale(0.96); }
+  }
+  @keyframes hero-glow-drift-2 {
+    0%, 100% { transform: translate(-80%, 0) scale(1); }
+    33% { transform: translate(calc(-80% - 7vw), 5vh) scale(1.06); }
+    66% { transform: translate(calc(-80% + 5vw), -6vh) scale(0.94); }
+  }
+  @keyframes hero-glow-drift-3 {
+    0%, 100% { transform: translate(-25%, 0) scale(1); }
+    33% { transform: translate(calc(-25% + 8vw), 4vh) scale(1.1); }
+    66% { transform: translate(calc(-25% - 6vw), -5vh) scale(0.93); }
+  }
+
+  /* Fundo ambiente do painel interno (AppBackground, atras do conteudo de
+     SidebarInset — nunca atras da sidebar, que fica solida de proposito pra
+     marcar a separacao). Duas camadas: um grid de linhas diagonais que
+     desliza devagar (--primary bem diluido) e um glow parado atras dele pra
+     dar profundidade sem competir com o conteudo. Extremamente sutil de
+     proposito — isto e o fundo de um dashboard de trabalho, nao uma landing
+     page; prefers-reduced-motion ja congela a animacao (regra global no topo
+     do arquivo). */
+  /* Posicionamento 100% aqui (nao via utility do Tailwind no JSX de proposito
+     — "inset-0" da camada @layer utilities do Tailwind v4 vence qualquer
+     "inset"/"top"/"left" declarado aqui na camada @layer components pra essa
+     MESMA propriedade, ordem de layer manda mais que ordem no arquivo). Div
+     30% maior que o container em cada direcao pra transform:translate nunca
+     revelar borda, com a animacao andando exatamente um ciclo do padrao
+     (72px) pra fazer loop sem salto. */
+  /* Reduzido bem abaixo do original (transparent 88%/78%) a pedido do
+     usuario -- "reduza drasticamente esse efeito... deve aparecer apenas
+     como textura de fundo e nunca competir com os conteudos". Continua
+     existindo (identidade do Agendio), so muito mais discreto. */
+  .app-bg-lines {
+    position: absolute;
+    inset: -15%;
+    background-image: repeating-linear-gradient(
+      115deg,
+      color-mix(in oklch, var(--primary), transparent 96%) 0px,
+      color-mix(in oklch, var(--primary), transparent 96%) 1.5px,
+      transparent 1.5px,
+      transparent 72px
+    );
+    animation: app-bg-lines-drift 20s linear infinite;
+  }
+  .dark .app-bg-lines {
+    background-image: repeating-linear-gradient(
+      115deg,
+      color-mix(in oklch, var(--primary), transparent 92%) 0px,
+      color-mix(in oklch, var(--primary), transparent 92%) 1.5px,
+      transparent 1.5px,
+      transparent 72px
+    );
+  }
+  @keyframes app-bg-lines-drift {
+    from { transform: translate(0, 0); }
+    to { transform: translate(72px, 72px); }
+  }
+
+  /* A "cor cortada" reportada nao era este brilho — era .scroll-shadow-x
+     (Table) pintando o proprio fundo com --background em vez de --card (ver
+     table.tsx e o comentario em .scroll-shadow-x). Brilho de volta.
+     background-attachment:fixed (nao um div posicionado): em paginas com
+     conteudo mais alto que a tela, um glow "colado" no topo do CONTEUDO (que
+     rola) so aparecia rolando pra longe da vista depois do primeiro scroll.
+     Preso ao viewport, fica sempre visivel no canto superior direito da
+     TELA, nao da pagina. */
+  .app-bg-glow {
+    position: absolute;
+    inset: 0;
+    background-repeat: no-repeat;
+    background-attachment: fixed;
+    /* vw/vh direto (nao %) -- com attachment:fixed, % de background-size
+       tambem seria relativo ao viewport, mas so length units aceitam
+       "min()"/arredondamento previsivel entre telas bem largas e bem
+       estreitas. Canto superior direito flush (position 100% 0%): o centro
+       do radial (mais brilhante) cai por volta de 60vw/40vh da tela. */
+    background-size: 60vw 60vh;
+    background-position: 100% 0%;
+    background-image: radial-gradient(
+      closest-side,
+      color-mix(in oklch, var(--primary), transparent 93%) 0%,
+      color-mix(in oklch, var(--primary), transparent 96%) 35%,
+      transparent 88%
+    );
+  }
+  .dark .app-bg-glow {
+    /* Reduzido de 78%/88% -- "pequenos efeitos de glow", nao um brilho
+       grande dominando o canto da tela como antes. */
+    background-image: radial-gradient(
+      closest-side,
+      color-mix(in oklch, var(--primary), transparent 84%) 0%,
+      color-mix(in oklch, var(--primary), transparent 91%) 35%,
+      color-mix(in oklch, var(--primary), transparent 96%) 65%,
+      transparent 88%
+    );
+  }
+
+  /* Barra de progresso da troca automatica de aba em ProductShowcase (home) —
+     enche da esquerda pra direita ate a proxima aba entrar sozinha. Duracao
+     vem inline (style) pra bater exatamente com o intervalo em JS; a key={tab}
+     no elemento reinicia a animacao a cada troca. */
+  @keyframes tab-progress-fill {
+    from { width: 0%; }
+    to { width: 100%; }
+  }
+  .animate-tab-progress {
+    animation-name: tab-progress-fill;
+    animation-timing-function: linear;
+    animation-fill-mode: forwards;
+  }
+
+  /* Paines visual do lado esquerdo do login (LoginShowcase) -- flutuacao
+     lenta dos cards e do mockup, brilho que varre a tela do mockup de vez em
+     quando, e o pulsar bem discreto das particulas de fundo. Tudo desligado
+     em prefers-reduced-motion pelo componente (nao so aqui), que tambem pula
+     o entrance/parallax nesse caso. */
+  @keyframes gentle-float {
+    0%, 100% {
+      transform: translateY(0);
+    }
+    50% {
+      transform: translateY(-8px);
+    }
+  }
+  .animate-gentle-float {
+    animation: gentle-float 6s ease-in-out infinite;
+  }
+
+  @keyframes shimmer-sweep {
+    0%,
+    35% {
+      transform: translateX(-120%) rotate(8deg);
+    }
+    55%,
+    100% {
+      transform: translateX(220%) rotate(8deg);
+    }
+  }
+  .animate-shimmer-sweep {
+    animation: shimmer-sweep 7s ease-in-out infinite;
+  }
+
+  @keyframes particle-pulse {
+    0%,
+    100% {
+      opacity: 0.15;
+      transform: scale(0.85);
+    }
+    50% {
+      opacity: 0.6;
+      transform: scale(1);
+    }
+  }
+  .animate-particle-pulse {
+    animation: particle-pulse 4s ease-in-out infinite;
+  }
+
+
+  /* Sombra nas bordas indicando conteudo fora da tela em overflow-x-auto —
+     some sozinha quando o scroll chega no fim daquele lado. So CSS (sem JS/
+     scroll listener): as duas primeiras camadas (attachment local) cobrem a
+     sombra quando o conteudo real ja esta ali; as duas ultimas (attachment
+     scroll) sao a sombra em si, fixas relativas ao viewport do proprio
+     container. Usado em Table (BL-18) e na grade da Agenda (BL-17) —
+     docs/BACKLOG.md.
+     --scroll-shadow-color (default --background, do proprio elemento pra
+     fora): Table fica SEMPRE dentro de um Card, entao pinta o proprio fundo
+     com --background (cor da PAGINA) por baixo do --card do Card ao redor —
+     um retangulo visivelmente mais escuro por dentro do card. table.tsx
+     sobrescreve essa variavel pra --card especificamente. */
+  .scroll-shadow-x {
+    background:
+      linear-gradient(to right, var(--scroll-shadow-color, var(--background)) 30%, transparent),
+      linear-gradient(to left, var(--scroll-shadow-color, var(--background)) 30%, transparent) 100% 0,
+      linear-gradient(to right, color-mix(in oklch, var(--foreground) 20%, transparent), transparent),
+      linear-gradient(to left, color-mix(in oklch, var(--foreground) 20%, transparent), transparent) 100% 0;
+    background-repeat: no-repeat;
+    background-color: var(--scroll-shadow-color, var(--background));
+    background-size: 24px 100%, 24px 100%, 8px 100%, 8px 100%;
+    background-position: 0 0, 100% 0, 0 0, 100% 0;
+    background-attachment: local, local, scroll, scroll;
+  }
+}

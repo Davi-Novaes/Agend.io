@@ -29,6 +29,7 @@ public static class BillingModuleServiceCollectionExtensions
 
         services.AddSingleton<IEndpointModule, BillingEndpoints>();
         services.AddScoped<IBillingAdministrationService, Infrastructure.BillingAdministrationService>();
+        services.AddScoped<IPlanLimitsLookupService, Infrastructure.PlanLimitsLookupService>();
 
         services.Configure<AsaasOptions>(configuration.GetSection(AsaasOptions.SectionName));
         services.AddHttpClient<IAsaasClient, AsaasClient>((serviceProvider, httpClient) =>

@@ -37,6 +37,9 @@
     <ProjectReference Include="..\..\src\modules\Resources\Agendio.Modules.Resources\Agendio.Modules.Resources.csproj" />
     <ProjectReference Include="..\..\src\modules\Customers\Agendio.Modules.Customers\Agendio.Modules.Customers.csproj" />
     <ProjectReference Include="..\..\src\modules\Scheduling\Agendio.Modules.Scheduling\Agendio.Modules.Scheduling.csproj" />
+    <ProjectReference Include="..\..\src\modules\Platform\Agendio.Modules.Platform\Agendio.Modules.Platform.csproj" />
+    <ProjectReference Include="..\..\src\modules\Billing\Agendio.Modules.Billing\Agendio.Modules.Billing.csproj" />
+    <ProjectReference Include="..\..\src\modules\Assistant\Agendio.Modules.Assistant\Agendio.Modules.Assistant.csproj" />
   </ItemGroup>
 
 </Project>

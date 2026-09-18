@@ -2,21 +2,47 @@
 
 import * as React from "react";
 import Image from "next/image";
+import { useRouter } from "next/navigation";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { toast } from "sonner";
 import QRCode from "qrcode";
-import { Copy } from "lucide-react";
+import { Copy, History } from "lucide-react";
 
-import { getMfaStatus, setupMfa, enableMfa, disableMfa, ApiError, type SetupMfaResult } from "@/lib/api/client";
+import {
+  getMfaStatus,
+  getMySecurityActivityLog,
+  setupMfa,
+  enableMfa,
+  disableMfa,
+  changePassword,
+  logoutAllSessions,
+  ApiError,
+  type SetupMfaResult,
+} from "@/lib/api/client";
 import { useSession } from "@/lib/auth/session-context";
+import { strongPasswordSchema } from "@/lib/validation/password";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Card, CardContent } from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Badge } from "@/components/ui/badge";
+import { EmptyState } from "@/components/ui/empty-state";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
+
+const changePasswordSchema = z
+  .object({
+    currentPassword: z.string().min(1, "Informe a senha atual."),
+    newPassword: strongPasswordSchema,
+    confirmPassword: z.string().min(1, "Confirme a nova senha."),
+  })
+  .refine((values) => values.newPassword === values.confirmPassword, {
+    message: "As senhas não coincidem.",
+    path: ["confirmPassword"],
+  });
+type ChangePasswordFormValues = z.infer<typeof changePasswordSchema>;
 
 const confirmSchema = z.object({
   code: z.string().trim().min(1, "Informe o codigo."),
@@ -33,8 +59,18 @@ type DisableFormValues = z.infer<typeof disableSchema>;
 // os demais so existem durante o fluxo de habilitar/desabilitar.
 type Step = "idle" | "setup" | "recovery-codes" | "disable";
 
+function formatOccurredAt(occurredAtUtc: string): string {
+  return new Date(occurredAtUtc).toLocaleString("pt-BR", { dateStyle: "short", timeStyle: "short" });
+}
+
+function locationFrom(entry: { city: string | null; region: string | null; countryCode: string | null }): string | null {
+  const parts = [entry.city, entry.region, entry.countryCode].filter(Boolean);
+  return parts.length > 0 ? parts.join(", ") : null;
+}
+
 export default function SecuritySettingsPage() {
-  const { session } = useSession();
+  const router = useRouter();
+  const { session, logout } = useSession();
   const queryClient = useQueryClient();
 
   const [step, setStep] = React.useState<Step>("idle");
@@ -43,6 +79,8 @@ export default function SecuritySettingsPage() {
   const [recoveryCodes, setRecoveryCodes] = React.useState<string[]>([]);
   const [recoveryCodesAcknowledged, setRecoveryCodesAcknowledged] = React.useState(false);
   const [isSubmitting, setIsSubmitting] = React.useState(false);
+  const [isChangingPassword, setIsChangingPassword] = React.useState(false);
+  const [isLoggingOutAll, setIsLoggingOutAll] = React.useState(false);
 
   const accessToken = session?.accessToken ?? "";
 
@@ -50,6 +88,20 @@ export default function SecuritySettingsPage() {
     queryKey: ["mfa-status"],
     queryFn: () => getMfaStatus(accessToken),
     enabled: Boolean(session),
+  });
+
+  // Sem paginacao: e um log recente (nao um historico completo), mesmo
+  // espirito de listNotificationHistory mas sem a necessidade de Prev/Next
+  // aqui — o endpoint ja devolve so as entradas mais relevantes.
+  const activityQuery = useQuery({
+    queryKey: ["security-activity-log"],
+    queryFn: () => getMySecurityActivityLog(accessToken),
+    enabled: Boolean(session),
+  });
+
+  const changePasswordForm = useForm<ChangePasswordFormValues>({
+    resolver: zodResolver(changePasswordSchema),
+    defaultValues: { currentPassword: "", newPassword: "", confirmPassword: "" },
   });
 
   const confirmForm = useForm<ConfirmFormValues>({
@@ -61,6 +113,39 @@ export default function SecuritySettingsPage() {
     resolver: zodResolver(disableSchema),
     defaultValues: { password: "", code: "" },
   });
+
+  async function onChangePassword(values: ChangePasswordFormValues) {
+    setIsChangingPassword(true);
+    try {
+      await changePassword({ currentPassword: values.currentPassword, newPassword: values.newPassword }, accessToken);
+      // Troca de senha revoga todas as sessoes no servidor (ver
+      // ChangePasswordCommandHandler) — desloga aqui tambem pra nao deixar a
+      // pessoa com a falsa impressao de que a sessao atual continua intacta.
+      toast.success("Senha alterada. Entre novamente.");
+      logout();
+      router.replace("/login");
+    } catch (error) {
+      const message = error instanceof ApiError ? error.message : "Nao foi possivel trocar a senha.";
+      toast.error(message);
+    } finally {
+      setIsChangingPassword(false);
+    }
+  }
+
+  async function onLogoutAllSessions() {
+    setIsLoggingOutAll(true);
+    try {
+      await logoutAllSessions(accessToken);
+      toast.success("Todas as sessões foram encerradas. Entre novamente.");
+      logout();
+      router.replace("/login");
+    } catch (error) {
+      const message = error instanceof ApiError ? error.message : "Nao foi possivel encerrar as sessoes.";
+      toast.error(message);
+    } finally {
+      setIsLoggingOutAll(false);
+    }
+  }
 
   async function startSetup() {
     try {
@@ -109,155 +194,26 @@ export default function SecuritySettingsPage() {
   }
 
   return (
-    <div className="mx-auto flex w-full max-w-lg flex-1 flex-col">
-      <p className="text-muted-foreground mb-6 text-sm">
-        Verificação em duas etapas (MFA) para a sua conta.
-      </p>
+    <div className="flex w-full max-w-2xl flex-1 flex-col gap-6">
+      <div>
+        <h1 className="text-lg font-semibold">Segurança</h1>
+        <p className="text-muted-foreground text-sm">Proteção da sua conta — senha, verificação em duas etapas e sessões.</p>
+      </div>
 
-      {step === "idle" && (
-        <Card>
-        <CardContent className="p-4">
-          {statusQuery.isLoading ? (
-            <Skeleton className="h-16 w-full" />
-          ) : statusQuery.data?.mfaEnabled ? (
-            <>
-              <p className="text-sm">
-                <span className="font-medium">MFA habilitado.</span> Um código do seu aplicativo autenticador é
-                exigido a cada login.
-              </p>
-              <Button variant="outline" className="mt-4" onClick={() => setStep("disable")}>
-                Desabilitar MFA
-              </Button>
-            </>
-          ) : (
-            <>
-              <p className="text-sm">
-                MFA está desabilitado. Habilite para exigir um código do seu aplicativo autenticador a cada login,
-                além da senha.
-              </p>
-              <Button className="mt-4" onClick={startSetup}>
-                Habilitar MFA
-              </Button>
-            </>
-          )}
-        </CardContent>
-        </Card>
-      )}
-
-      {step === "setup" && pendingSetup && (
-        <Card>
-        <CardContent className="p-4">
-          <h2 className="mb-2 text-sm font-medium">1. Escaneie o QR code</h2>
-          <p className="text-muted-foreground mb-3 text-sm">
-            Use um aplicativo autenticador (Google Authenticator, Authy, 1Password...).
-          </p>
-          {qrCodeDataUrl && (
-            <Image
-              src={qrCodeDataUrl}
-              alt="QR code para configurar o aplicativo autenticador"
-              width={200}
-              height={200}
-              className="rounded-md border"
-              unoptimized
-            />
-          )}
-
-          <p className="text-muted-foreground mt-3 text-sm">
-            Não consegue escanear? Digite esta chave manualmente no aplicativo:
-          </p>
-          <code className="bg-muted mt-1 block rounded-md p-2 text-sm break-all select-all">{pendingSetup.secret}</code>
-
-          <h2 className="mt-6 mb-2 text-sm font-medium">2. Confirme com um código</h2>
-          <Form {...confirmForm}>
-            <form onSubmit={confirmForm.handleSubmit(onConfirmSetup)} className="flex flex-col gap-3">
+      <Card>
+        <CardHeader>
+          <CardTitle>Trocar senha</CardTitle>
+          <CardDescription>Ao concluir, todas as sessões ativas (inclusive esta) são encerradas por segurança.</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <Form {...changePasswordForm}>
+            <form onSubmit={changePasswordForm.handleSubmit(onChangePassword)} className="flex max-w-sm flex-col gap-3">
               <FormField
-                control={confirmForm.control}
-                name="code"
+                control={changePasswordForm.control}
+                name="currentPassword"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Código de 6 dígitos</FormLabel>
-                    <FormControl>
-                      <Input inputMode="numeric" autoComplete="one-time-code" placeholder="000000" {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <div className="flex gap-2">
-                <Button type="submit" disabled={isSubmitting}>
-                  {isSubmitting ? "Confirmando..." : "Confirmar e habilitar"}
-                </Button>
-                <Button type="button" variant="outline" onClick={() => setStep("idle")}>
-                  Cancelar
-                </Button>
-              </div>
-            </form>
-          </Form>
-        </CardContent>
-        </Card>
-      )}
-
-      {step === "recovery-codes" && (
-        <Card>
-        <CardContent className="p-4">
-          <h2 className="mb-2 text-sm font-medium">MFA habilitado — guarde seus códigos de recuperação</h2>
-          <p className="text-muted-foreground mb-3 text-sm">
-            Cada código funciona uma única vez e serve para entrar caso você perca acesso ao aplicativo
-            autenticador. Esta é a única vez que eles aparecem — salve em um lugar seguro.
-          </p>
-
-          <ul className="grid grid-cols-2 gap-2 font-mono text-sm">
-            {recoveryCodes.map((code) => (
-              <li key={code} className="bg-muted rounded-md p-2 text-center">
-                {code}
-              </li>
-            ))}
-          </ul>
-
-          <button
-            type="button"
-            onClick={() => {
-              navigator.clipboard.writeText(recoveryCodes.join("\n"));
-              toast.success("Códigos copiados.");
-            }}
-            className="text-muted-foreground hover:text-foreground mt-3 inline-flex items-center gap-1.5 text-sm"
-          >
-            <Copy className="size-4" />
-            Copiar todos
-          </button>
-
-          <label className="mt-4 flex items-start gap-2 text-sm">
-            <input
-              type="checkbox"
-              checked={recoveryCodesAcknowledged}
-              onChange={(event) => setRecoveryCodesAcknowledged(event.target.checked)}
-              className="mt-0.5"
-            />
-            Eu salvei estes códigos em um lugar seguro.
-          </label>
-
-          <Button className="mt-4" disabled={!recoveryCodesAcknowledged} onClick={() => setStep("idle")}>
-            Concluir
-          </Button>
-        </CardContent>
-        </Card>
-      )}
-
-      {step === "disable" && (
-        <Card>
-        <CardContent className="p-4">
-          <h2 className="mb-2 text-sm font-medium">Desabilitar MFA</h2>
-          <p className="text-muted-foreground mb-3 text-sm">
-            Confirme sua senha e um código (do aplicativo autenticador ou de recuperação).
-          </p>
-          <Form {...disableForm}>
-            <form onSubmit={disableForm.handleSubmit(onDisable)} className="flex flex-col gap-3">
-              <FormField
-                control={disableForm.control}
-                name="password"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Senha</FormLabel>
+                    <FormLabel>Senha atual</FormLabel>
                     <FormControl>
                       <Input type="password" autoComplete="current-password" {...field} />
                     </FormControl>
@@ -266,31 +222,268 @@ export default function SecuritySettingsPage() {
                 )}
               />
               <FormField
-                control={disableForm.control}
-                name="code"
+                control={changePasswordForm.control}
+                name="newPassword"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Código</FormLabel>
+                    <FormLabel>Nova senha</FormLabel>
                     <FormControl>
-                      <Input inputMode="numeric" autoComplete="one-time-code" placeholder="000000" {...field} />
+                      <Input type="password" autoComplete="new-password" {...field} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
                 )}
               />
-              <div className="flex gap-2">
-                <Button type="submit" variant="destructive" disabled={isSubmitting}>
-                  {isSubmitting ? "Desabilitando..." : "Desabilitar MFA"}
-                </Button>
-                <Button type="button" variant="outline" onClick={() => setStep("idle")}>
-                  Cancelar
-                </Button>
-              </div>
+              <FormField
+                control={changePasswordForm.control}
+                name="confirmPassword"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Confirme a nova senha</FormLabel>
+                    <FormControl>
+                      <Input type="password" autoComplete="new-password" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <Button type="submit" disabled={isChangingPassword} className="mt-1 self-start">
+                {isChangingPassword ? "Salvando..." : "Trocar senha"}
+              </Button>
             </form>
           </Form>
         </CardContent>
-        </Card>
-      )}
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Verificação em duas etapas</CardTitle>
+          <CardDescription>MFA (código de aplicativo autenticador) para a sua conta.</CardDescription>
+        </CardHeader>
+        <CardContent>
+          {step === "idle" &&
+            (statusQuery.isLoading ? (
+              <Skeleton className="h-16 w-full" />
+            ) : statusQuery.data?.mfaEnabled ? (
+              <>
+                <p className="text-sm">
+                  <span className="font-medium">MFA habilitado.</span> Um código do seu aplicativo autenticador é
+                  exigido a cada login.
+                </p>
+                <Button variant="outline" className="mt-4" onClick={() => setStep("disable")}>
+                  Desabilitar MFA
+                </Button>
+              </>
+            ) : (
+              <>
+                <p className="text-sm">
+                  MFA está desabilitado. Habilite para exigir um código do seu aplicativo autenticador a cada login,
+                  além da senha.
+                </p>
+                <Button className="mt-4" onClick={startSetup}>
+                  Habilitar MFA
+                </Button>
+              </>
+            ))}
+
+          {step === "setup" && pendingSetup && (
+            <div>
+              <h3 className="mb-2 text-sm font-medium">1. Escaneie o QR code</h3>
+              <p className="text-muted-foreground mb-3 text-sm">
+                Use um aplicativo autenticador (Google Authenticator, Authy, 1Password...).
+              </p>
+              {qrCodeDataUrl && (
+                <Image
+                  src={qrCodeDataUrl}
+                  alt="QR code para configurar o aplicativo autenticador"
+                  width={200}
+                  height={200}
+                  className="rounded-md border"
+                  unoptimized
+                />
+              )}
+
+              <p className="text-muted-foreground mt-3 text-sm">
+                Não consegue escanear? Digite esta chave manualmente no aplicativo:
+              </p>
+              <code className="bg-muted mt-1 block rounded-md p-2 text-sm break-all select-all">{pendingSetup.secret}</code>
+
+              <h3 className="mt-6 mb-2 text-sm font-medium">2. Confirme com um código</h3>
+              <Form {...confirmForm}>
+                <form onSubmit={confirmForm.handleSubmit(onConfirmSetup)} className="flex max-w-sm flex-col gap-3">
+                  <FormField
+                    control={confirmForm.control}
+                    name="code"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Código de 6 dígitos</FormLabel>
+                        <FormControl>
+                          <Input inputMode="numeric" autoComplete="one-time-code" placeholder="000000" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <div className="flex gap-2">
+                    <Button type="submit" disabled={isSubmitting}>
+                      {isSubmitting ? "Confirmando..." : "Confirmar e habilitar"}
+                    </Button>
+                    <Button type="button" variant="outline" onClick={() => setStep("idle")}>
+                      Cancelar
+                    </Button>
+                  </div>
+                </form>
+              </Form>
+            </div>
+          )}
+
+          {step === "recovery-codes" && (
+            <div>
+              <h3 className="mb-2 text-sm font-medium">MFA habilitado — guarde seus códigos de recuperação</h3>
+              <p className="text-muted-foreground mb-3 text-sm">
+                Cada código funciona uma única vez e serve para entrar caso você perca acesso ao aplicativo
+                autenticador. Esta é a única vez que eles aparecem — salve em um lugar seguro.
+              </p>
+
+              <ul className="grid grid-cols-2 gap-2 font-mono text-sm">
+                {recoveryCodes.map((code) => (
+                  <li key={code} className="bg-muted rounded-md p-2 text-center">
+                    {code}
+                  </li>
+                ))}
+              </ul>
+
+              <button
+                type="button"
+                onClick={() => {
+                  navigator.clipboard.writeText(recoveryCodes.join("\n"));
+                  toast.success("Códigos copiados.");
+                }}
+                className="text-muted-foreground hover:text-foreground mt-3 inline-flex items-center gap-1.5 text-sm"
+              >
+                <Copy className="size-4" />
+                Copiar todos
+              </button>
+
+              <label className="mt-4 flex items-start gap-2 text-sm">
+                <input
+                  type="checkbox"
+                  checked={recoveryCodesAcknowledged}
+                  onChange={(event) => setRecoveryCodesAcknowledged(event.target.checked)}
+                  className="mt-0.5"
+                />
+                Eu salvei estes códigos em um lugar seguro.
+              </label>
+
+              <Button className="mt-4" disabled={!recoveryCodesAcknowledged} onClick={() => setStep("idle")}>
+                Concluir
+              </Button>
+            </div>
+          )}
+
+          {step === "disable" && (
+            <div>
+              <h3 className="mb-2 text-sm font-medium">Desabilitar MFA</h3>
+              <p className="text-muted-foreground mb-3 text-sm">
+                Confirme sua senha e um código (do aplicativo autenticador ou de recuperação).
+              </p>
+              <Form {...disableForm}>
+                <form onSubmit={disableForm.handleSubmit(onDisable)} className="flex max-w-sm flex-col gap-3">
+                  <FormField
+                    control={disableForm.control}
+                    name="password"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Senha</FormLabel>
+                        <FormControl>
+                          <Input type="password" autoComplete="current-password" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={disableForm.control}
+                    name="code"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Código</FormLabel>
+                        <FormControl>
+                          <Input inputMode="numeric" autoComplete="one-time-code" placeholder="000000" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <div className="flex gap-2">
+                    <Button type="submit" variant="destructive" disabled={isSubmitting}>
+                      {isSubmitting ? "Desabilitando..." : "Desabilitar MFA"}
+                    </Button>
+                    <Button type="button" variant="outline" onClick={() => setStep("idle")}>
+                      Cancelar
+                    </Button>
+                  </div>
+                </form>
+              </Form>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Sessões ativas</CardTitle>
+          <CardDescription>
+            Se suspeitar de acesso indevido, encerre todas as sessões abertas (todos os dispositivos e abas) de uma vez —
+            inclusive esta.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <Button variant="outline" disabled={isLoggingOutAll} onClick={onLogoutAllSessions}>
+            {isLoggingOutAll ? "Encerrando..." : "Sair de todos os dispositivos"}
+          </Button>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Atividade recente</CardTitle>
+          <CardDescription>Últimos logins e eventos de segurança da sua conta.</CardDescription>
+        </CardHeader>
+        <CardContent>
+          {activityQuery.isLoading ? (
+            <div className="flex flex-col gap-2">
+              <Skeleton className="h-10 w-full" />
+              <Skeleton className="h-10 w-full" />
+              <Skeleton className="h-10 w-full" />
+            </div>
+          ) : !activityQuery.data || activityQuery.data.length === 0 ? (
+            <EmptyState icon={History} title="Nenhuma atividade registrada ainda." />
+          ) : (
+            <ul className="flex flex-col gap-2">
+              {activityQuery.data.map((entry) => {
+                const location = locationFrom(entry);
+                return (
+                  <li
+                    key={entry.id}
+                    className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1 rounded-md border p-3 text-sm"
+                  >
+                    <div className="flex flex-col">
+                      <span className="font-medium">{entry.eventType}</span>
+                      <span className="text-muted-foreground text-xs">
+                        {formatOccurredAt(entry.occurredAtUtc)}
+                        {entry.ipAddress ? ` · ${entry.ipAddress}` : ""}
+                        {location ? ` · ${location}` : ""}
+                      </span>
+                    </div>
+                    <Badge variant={entry.success ? "success" : "destructive"}>{entry.success ? "Sucesso" : "Falhou"}</Badge>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+        </CardContent>
+      </Card>
     </div>
   );
 }

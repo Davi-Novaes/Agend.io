@@ -61,6 +61,33 @@ public class AppointmentChangeLogEntryTests
     }
 
     [Fact]
+    public void RecordReschedule_Should_Store_Previous_Resource_And_New_End_When_Provided()
+    {
+        var newStart = PreviousStart.AddDays(2);
+        var newEnd = newStart.AddMinutes(45);
+        var previousResource = Guid.NewGuid();
+
+        var result = AppointmentChangeLogEntry.RecordReschedule(
+            Tenant, Appointment, Customer, Resource, "Corte", PreviousStart, newStart, reason: null, DateTimeOffset.UtcNow,
+            previousResourceId: previousResource, newEndUtc: newEnd);
+
+        result.IsSuccess.ShouldBeTrue();
+        result.Value.PreviousResourceId.ShouldBe(previousResource);
+        result.Value.NewEndUtc.ShouldBe(newEnd);
+    }
+
+    [Fact]
+    public void RecordReschedule_Should_Leave_Previous_Resource_And_New_End_Null_By_Default()
+    {
+        var result = AppointmentChangeLogEntry.RecordReschedule(
+            Tenant, Appointment, Customer, Resource, "Corte", PreviousStart, PreviousStart.AddDays(1), reason: null, DateTimeOffset.UtcNow);
+
+        result.IsSuccess.ShouldBeTrue();
+        result.Value.PreviousResourceId.ShouldBeNull();
+        result.Value.NewEndUtc.ShouldBeNull();
+    }
+
+    [Fact]
     public void RecordReschedule_Should_Fail_When_Reason_Exceeds_Max_Length()
     {
         var longReason = new string('a', 501);

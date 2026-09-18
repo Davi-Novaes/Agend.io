@@ -17,7 +17,7 @@ public sealed class UpdateUnitCommandHandler(TenancyDbContext dbContext) : IComm
             return Result.Failure(Error.NotFound("Unit.NotFound", "Unidade nao encontrada."));
         }
 
-        var updateResult = unit.Update(request.Name, request.Address);
+        var updateResult = unit.Update(request.Name, request.Address, request.City, request.State, request.Country);
 
         if (updateResult.IsFailure)
         {

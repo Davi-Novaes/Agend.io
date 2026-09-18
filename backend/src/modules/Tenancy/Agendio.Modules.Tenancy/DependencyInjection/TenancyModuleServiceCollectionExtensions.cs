@@ -4,6 +4,8 @@ using Agendio.Infrastructure.Endpoints;
 using Agendio.Modules.Tenancy.Contracts;
 using Agendio.Modules.Tenancy.Endpoints;
 using Agendio.Modules.Tenancy.Infrastructure;
+using Agendio.Modules.Tenancy.Infrastructure.Jobs;
+using Agendio.Modules.Tenancy.Infrastructure.Messaging;
 using Agendio.Modules.Tenancy.Infrastructure.Persistence;
 using Agendio.SharedKernel.Messaging;
 using FluentValidation;
@@ -29,6 +31,9 @@ public static class TenancyModuleServiceCollectionExtensions
         services.AddHandlersFromAssembly(moduleAssembly);
 
         services.AddSingleton<IEndpointModule, TenancyEndpoints>();
+
+        services.AddHostedService<TenancyIntegrationEventConsumer>();
+        services.AddScoped<OrphanTenantCleanupJob>();
 
         return services;
     }

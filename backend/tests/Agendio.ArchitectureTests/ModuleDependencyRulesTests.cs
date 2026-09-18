@@ -69,6 +69,31 @@ public class ModuleDependencyRulesTests
     }
 
     [Fact]
+    public void Tenancy_Module_Should_Not_Depend_On_Billing_Internals()
+    {
+        // Planos pagos com limite: Tenancy checa quota de unidades via
+        // IPlanLimitsLookupService — nunca deveria enxergar Plan/Subscription
+        // (Billing.Domain) diretamente.
+        var forbiddenNamespaces = new[]
+        {
+            "Agendio.Modules.Billing.Domain",
+            "Agendio.Modules.Billing.Application",
+            "Agendio.Modules.Billing.Infrastructure",
+            "Agendio.Modules.Billing.Endpoints",
+            "Agendio.Modules.Billing.DependencyInjection",
+        };
+
+        var result = Types.InAssembly(TenancyAssembly)
+            .That().ResideInNamespace("Agendio.Modules.Tenancy")
+            .ShouldNot().HaveDependencyOnAny(forbiddenNamespaces)
+            .GetResult();
+
+        result.IsSuccessful.ShouldBeTrue(
+            "Tenancy so pode depender do .Contracts de Billing, nunca do modulo inteiro. " +
+            "Tipos violando a regra: " + string.Join(", ", result.FailingTypeNames ?? []));
+    }
+
+    [Fact]
     public void Identity_Module_Should_Not_Depend_On_Tenancy_Internals()
     {
         // So ".Contracts" e permitido — listado explicitamente (em vez de checar
@@ -116,6 +141,31 @@ public class ModuleDependencyRulesTests
 
         result.IsSuccessful.ShouldBeTrue(
             "Resources so pode depender do .Contracts de Tenancy, nunca do modulo inteiro. " +
+            "Tipos violando a regra: " + string.Join(", ", result.FailingTypeNames ?? []));
+    }
+
+    [Fact]
+    public void Resources_Module_Should_Not_Depend_On_Billing_Internals()
+    {
+        // Planos pagos com limite: Resources checa quota de profissionais via
+        // IPlanLimitsLookupService — nunca deveria enxergar Plan/Subscription
+        // (Billing.Domain) diretamente.
+        var forbiddenNamespaces = new[]
+        {
+            "Agendio.Modules.Billing.Domain",
+            "Agendio.Modules.Billing.Application",
+            "Agendio.Modules.Billing.Infrastructure",
+            "Agendio.Modules.Billing.Endpoints",
+            "Agendio.Modules.Billing.DependencyInjection",
+        };
+
+        var result = Types.InAssembly(ResourcesAssembly)
+            .That().ResideInNamespace("Agendio.Modules.Resources")
+            .ShouldNot().HaveDependencyOnAny(forbiddenNamespaces)
+            .GetResult();
+
+        result.IsSuccessful.ShouldBeTrue(
+            "Resources so pode depender do .Contracts de Billing, nunca do modulo inteiro. " +
             "Tipos violando a regra: " + string.Join(", ", result.FailingTypeNames ?? []));
     }
 
@@ -186,11 +236,12 @@ public class ModuleDependencyRulesTests
     }
 
     [Fact]
-    public void Platform_Module_Should_Not_Depend_On_Any_Tenant_Facing_Module_Internals()
+    public void Platform_Module_Should_Not_Depend_On_Any_Tenant_Facing_Module_Internals_Or_Identity_Billing_Or_Feedback_Internals()
     {
         // Platform e a autoridade do Super Admin — nao deveria nem PRECISAR
-        // conhecer Identity/Customers/Catalog/Resources/Scheduling. So Tenancy
-        // e permitido, e so via .Contracts (ITenantAdministrationService).
+        // conhecer Identity/Customers/Catalog/Resources/Scheduling. Tenancy,
+        // Identity, Billing e Feedback so sao permitidos via .Contracts
+        // (ITenantAdministrationService/ISecurityAuditReader/IFeedbackReader).
         var forbiddenNamespaces = new[]
         {
             "Agendio.Modules.Identity.Domain",
@@ -228,6 +279,11 @@ public class ModuleDependencyRulesTests
             "Agendio.Modules.Billing.Infrastructure",
             "Agendio.Modules.Billing.Endpoints",
             "Agendio.Modules.Billing.DependencyInjection",
+            "Agendio.Modules.Feedback.Domain",
+            "Agendio.Modules.Feedback.Application",
+            "Agendio.Modules.Feedback.Infrastructure",
+            "Agendio.Modules.Feedback.Endpoints",
+            "Agendio.Modules.Feedback.DependencyInjection",
         };
 
         var result = Types.InAssembly(PlatformAssembly)
@@ -236,7 +292,7 @@ public class ModuleDependencyRulesTests
             .GetResult();
 
         result.IsSuccessful.ShouldBeTrue(
-            "Platform so pode depender dos .Contracts de Tenancy/Billing, nunca de nenhum modulo inteiro. " +
+            "Platform so pode depender dos .Contracts de Tenancy/Identity/Billing/Feedback, nunca de nenhum modulo inteiro. " +
             "Tipos violando a regra: " + string.Join(", ", result.FailingTypeNames ?? []));
     }
 
@@ -429,13 +485,40 @@ public class ModuleDependencyRulesTests
     }
 
     [Fact]
-    public void Assistant_Module_Should_Not_Depend_On_Any_Module_Internals_Except_Financeiro_Estoque_Scheduling_And_Tenancy_Contracts()
+    public void Customers_Module_Should_Not_Depend_On_Billing_Internals()
     {
-        // Assistente (Fase 22) so orquestra leituras agregadas — resolve caixa e
-        // comissoes via IFinanceSummaryLookupService, estoque via
-        // IInventorySummaryLookupService, agendamentos/avaliacoes via
-        // IAppointmentStatsLookupService/IReviewsSummaryLookupService, e
-        // nome/fuso do tenant via ITenantLookupService — nunca deveria enxergar
+        // Planos pagos com limite: Customers checa quota de clientes via
+        // IPlanLimitsLookupService — nunca deveria enxergar Plan/Subscription
+        // (Billing.Domain) diretamente.
+        var forbiddenNamespaces = new[]
+        {
+            "Agendio.Modules.Billing.Domain",
+            "Agendio.Modules.Billing.Application",
+            "Agendio.Modules.Billing.Infrastructure",
+            "Agendio.Modules.Billing.Endpoints",
+            "Agendio.Modules.Billing.DependencyInjection",
+        };
+
+        var result = Types.InAssembly(CustomersAssembly)
+            .That().ResideInNamespace("Agendio.Modules.Customers")
+            .ShouldNot().HaveDependencyOnAny(forbiddenNamespaces)
+            .GetResult();
+
+        result.IsSuccessful.ShouldBeTrue(
+            "Customers so pode depender do .Contracts de Billing, nunca do modulo inteiro. " +
+            "Tipos violando a regra: " + string.Join(", ", result.FailingTypeNames ?? []));
+    }
+
+    [Fact]
+    public void Assistant_Module_Should_Not_Depend_On_Any_Module_Internals_Except_Financeiro_Estoque_Scheduling_Tenancy_And_Customers_Contracts()
+    {
+        // Assistente (Fase 22 + expansao "Agendio Assist") so orquestra leituras
+        // agregadas — resolve caixa e comissoes via IFinanceSummaryLookupService,
+        // estoque via IInventorySummaryLookupService, agendamentos/avaliacoes via
+        // IAppointmentStatsLookupService/IReviewsSummaryLookupService, contagem/
+        // lista agregada de clientes via ICustomerDirectoryLookupService/
+        // ICustomerLookupService (nunca dado de um cliente especifico por nome),
+        // e nome/fuso do tenant via ITenantLookupService — nunca deveria enxergar
         // nenhum modulo inteiro nem ler tabela diretamente.
         var forbiddenNamespaces = new[]
         {
@@ -502,7 +585,7 @@ public class ModuleDependencyRulesTests
             .GetResult();
 
         result.IsSuccessful.ShouldBeTrue(
-            "Assistant so pode depender dos .Contracts de Financeiro/Estoque/Scheduling/Tenancy, nunca de nenhum modulo inteiro. " +
+            "Assistant so pode depender dos .Contracts de Financeiro/Estoque/Scheduling/Tenancy/Customers, nunca de nenhum modulo inteiro. " +
             "Tipos violando a regra: " + string.Join(", ", result.FailingTypeNames ?? []));
     }
 }

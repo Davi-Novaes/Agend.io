@@ -6,7 +6,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { toast } from "sonner";
-import { Plus, Search, Sparkles } from "lucide-react";
+import { Plus, Search, Tag } from "lucide-react";
 
 import {
   listServices,
@@ -230,7 +230,7 @@ export default function ServicesPage() {
   }
 
   return (
-    <div className="mx-auto flex w-full max-w-4xl flex-1 flex-col">
+    <div className="flex w-full flex-1 flex-col">
       <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
         <p className="text-muted-foreground text-sm">Catalogo de servicos oferecidos.</p>
         <Button onClick={openCreateDialog}>
@@ -315,7 +315,7 @@ export default function ServicesPage() {
                       />
                     ) : (
                       <EmptyState
-                        icon={Sparkles}
+                        icon={Tag}
                         title="Nenhum servico cadastrado ainda"
                         description="Cadastre o primeiro servico do seu catalogo."
                         action={
@@ -342,7 +342,7 @@ export default function ServicesPage() {
                           />
                         ) : (
                           <div className="bg-muted flex size-8 shrink-0 items-center justify-center rounded-md">
-                            <Sparkles className="text-muted-foreground size-4" />
+                            <Tag className="text-muted-foreground size-4" />
                           </div>
                         )}
                         {service.name}

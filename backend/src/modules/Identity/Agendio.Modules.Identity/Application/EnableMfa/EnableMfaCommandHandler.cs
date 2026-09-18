@@ -11,7 +11,7 @@ using OtpNet;
 
 namespace Agendio.Modules.Identity.Application.EnableMfa;
 
-public sealed class EnableMfaCommandHandler(IdentityDbContext dbContext, IRefreshTokenGenerator codeGenerator, IClock clock)
+public sealed class EnableMfaCommandHandler(IdentityDbContext dbContext, IRefreshTokenGenerator codeGenerator, IClock clock, SecurityAuditLogger<IdentityDbContext> securityAuditLogger)
     : ICommandHandler<EnableMfaCommand, IReadOnlyList<string>>
 {
     private const int RecoveryCodeCount = 10;
@@ -53,6 +53,7 @@ public sealed class EnableMfaCommandHandler(IdentityDbContext dbContext, IRefres
         }
 
         await dbContext.SaveChangesAsync(cancellationToken);
+        await securityAuditLogger.LogAsync("MfaEnabled", success: true, user.TenantId.Value, user.Id.Value, null, cancellationToken);
 
         return Result.Success<IReadOnlyList<string>>(plaintextCodes);
     }

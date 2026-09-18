@@ -3,7 +3,7 @@ import {
   LayoutDashboard,
   CalendarDays,
   Users,
-  Sparkles,
+  Tag,
   Armchair,
   Wallet,
   Package,
@@ -12,15 +12,15 @@ import {
   Building2,
   Palette,
   UserCog,
-  CreditCard,
   ShieldCheck,
   MessageCircle,
   Bell,
   Gift,
   Hourglass,
   Banknote,
-  Bot,
-  Landmark,
+  UserRound,
+  HelpCircle,
+  MessageSquareHeart,
 } from "lucide-react";
 
 export type NavItem = {
@@ -52,10 +52,7 @@ export type NavGroup = {
 export const NAV_GROUPS: NavGroup[] = [
   {
     label: "Visão Geral",
-    items: [
-      { href: "/painel", label: "Painel", icon: LayoutDashboard },
-      { href: "/assistente", label: "Assistente", icon: Bot },
-    ],
+    items: [{ href: "/painel", label: "Painel", icon: LayoutDashboard }],
   },
   {
     label: "Gestão",
@@ -63,7 +60,7 @@ export const NAV_GROUPS: NavGroup[] = [
       { href: "/agenda", label: "Agenda", icon: CalendarDays },
       { href: "/waitlist", label: "Lista de espera", icon: Hourglass },
       { href: "/clientes", label: "Clientes", icon: Users },
-      { href: "/servicos", label: "Serviços", icon: Sparkles },
+      { href: "/servicos", label: "Serviços", icon: Tag },
       { href: "/recursos", label: "Recursos", icon: Armchair },
     ],
   },
@@ -93,21 +90,28 @@ export const NAV_GROUPS: NavGroup[] = [
     items: [
       // Unidades: back-end restringe o grupo /api/units inteiro a Owner
       // (nem a leitura fica aberta) -- ownerOnly aqui evita Staff clicar e
-      // cair num 403. Dados da empresa/Marca/Equipe seguem o padrao oposto,
-      // ja usado por Marca: leitura liberada a qualquer papel (o backend so
-      // bloqueia ESCRITA a Owner), entao ficam visiveis com o formulario
-      // desabilitado pra quem nao e Owner (ver fieldset em cada pagina).
+      // cair num 403. Marca/Equipe seguem o padrao oposto: leitura liberada
+      // a qualquer papel (o backend so bloqueia ESCRITA a Owner), entao
+      // ficam visiveis com o formulario desabilitado pra quem nao e Owner
+      // (ver fieldset em cada pagina). Dados da empresa e Plano NAO estao
+      // mais aqui -- moveram pra dentro de Minha conta (Configuracoes,
+      // abaixo), pedido explicito do usuario (2026-09-05): membro comum nao
+      // deve ver nem essas duas abas nem os dados delas (backend tambem
+      // passou a rejeitar a leitura com 403 pra quem nao e Owner).
       { href: "/settings/units", label: "Unidades", icon: Building2, ownerOnly: true },
-      { href: "/settings/company", label: "Dados da empresa", icon: Landmark },
       { href: "/settings/branding", label: "Marca", icon: Palette, matchPrefix: true },
       { href: "/settings/team", label: "Equipe", icon: UserCog },
-      { href: "/settings/billing", label: "Plano", icon: CreditCard, ownerOnly: true },
     ],
   },
   {
     label: "Configurações",
     items: [
       { href: "/settings/security", label: "Segurança", icon: ShieldCheck },
+      // matchPrefix: Empresa/Plano (Owner) vivem em /settings/account/company
+      // e /settings/account/plan, sub-abas do mesmo mini-builder de Marca.
+      { href: "/settings/account", label: "Minha conta", icon: UserRound, matchPrefix: true },
+      { href: "/settings/help", label: "Ajuda e informações", icon: HelpCircle },
+      { href: "/settings/feedback", label: "Feedback", icon: MessageSquareHeart },
     ],
   },
 ];

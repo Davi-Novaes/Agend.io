@@ -6,6 +6,7 @@ import { CalendarCheck, CalendarDays, CheckCircle2, Clock, UserX, XCircle } from
 import { Cell, Pie, PieChart, ResponsiveContainer, Tooltip } from "recharts";
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
 import type { AppointmentStats } from "@/lib/api/client";
 
@@ -43,8 +44,9 @@ export function AppointmentStatusChart({ stats }: { stats: AppointmentStats }) {
   }
 
   return (
-    <div className="rounded-lg border p-4">
-      <div className="mb-3 flex items-center justify-between gap-2">
+    <Card className="border-border/70 ring-0 shadow-none">
+    <CardContent className="@container">
+      <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
         <div>
           <h3 className="text-sm font-semibold">Status dos agendamentos</h3>
           <p className="text-muted-foreground text-xs">Distribuicao por status, no periodo selecionado</p>
@@ -102,7 +104,7 @@ export function AppointmentStatusChart({ stats }: { stats: AppointmentStats }) {
           </TableBody>
         </Table>
       ) : (
-        <div className="flex flex-col items-center gap-4 sm:flex-row">
+        <div className="bg-surface-inset flex flex-col items-center gap-4 rounded-lg p-3 @sm:flex-row">
           <div
             className="relative size-40 shrink-0"
             role="img"
@@ -152,8 +154,8 @@ export function AppointmentStatusChart({ stats }: { stats: AppointmentStats }) {
               <li key={segment.key} className="flex items-center gap-2 text-xs">
                 <span aria-hidden="true" className="inline-block size-2.5 shrink-0 rounded-full" style={{ backgroundColor: segment.color }} />
                 <segment.icon className="text-muted-foreground size-3.5 shrink-0" aria-hidden="true" />
-                <span className="flex-1">{segment.label}</span>
-                <span className="tabular-nums">
+                <span className="min-w-0 flex-1 truncate">{segment.label}</span>
+                <span className="shrink-0 tabular-nums">
                   {segment.count} ({percentOf(segment.count)}%)
                 </span>
               </li>
@@ -161,6 +163,7 @@ export function AppointmentStatusChart({ stats }: { stats: AppointmentStats }) {
           </ul>
         </div>
       )}
-    </div>
+    </CardContent>
+    </Card>
   );
 }

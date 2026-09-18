@@ -20,6 +20,8 @@ namespace Agendio.Modules.Billing.Application.GetMySubscription;
 public sealed class GetMySubscriptionQueryHandler(BillingDbContext dbContext, ITenantContext tenantContext, IClock clock)
     : IQueryHandler<GetMySubscriptionQuery, MySubscriptionResult>
 {
+    private const int InvoiceVisibilityWindowDays = 10;
+
     public async Task<Result<MySubscriptionResult>> Handle(GetMySubscriptionQuery request, CancellationToken cancellationToken)
     {
         var subscription = await SubscriptionProvisioning.FindOrCreateAsync(dbContext, tenantContext.TenantId, clock, cancellationToken);
@@ -33,7 +35,23 @@ public sealed class GetMySubscriptionQueryHandler(BillingDbContext dbContext, IT
             .Select(p => new LatestPaymentSummary(p.Status.ToString(), p.Amount, p.DueDate, p.InvoiceUrl))
             .FirstOrDefaultAsync(cancellationToken);
 
+        // A fatura so pode ser visualizada a partir de 10 dias antes do
+        // vencimento (pedido do usuario) -- decisao de negocio fica aqui, no
+        // handler, pra nao depender do frontend aplicar a mesma regra
+        // corretamente (e pra nunca vazar a InvoiceUrl da Asaas fora da
+        // janela). Fora da janela, o link some (InvoiceUrl null) mas o resto
+        // do resumo (status, valor, vencimento) continua visivel normalmente.
+        if (latestPayment is { InvoiceUrl: not null } payment)
+        {
+            var today = DateOnly.FromDateTime(clock.UtcNow.UtcDateTime);
+            if (payment.DueDate > today.AddDays(InvoiceVisibilityWindowDays))
+            {
+                latestPayment = payment with { InvoiceUrl = null };
+            }
+        }
+
         return Result.Success(new MySubscriptionResult(
-            plan.Name, subscription.Status.ToString(), subscription.TrialEndsAtUtc, subscription.CurrentPeriodEndsAtUtc, latestPayment));
+            plan.Id.Value, plan.Name, subscription.Status.ToString(), subscription.TrialEndsAtUtc,
+            subscription.CurrentPeriodEndsAtUtc, subscription.CanceledAtUtc, latestPayment));
     }
 }

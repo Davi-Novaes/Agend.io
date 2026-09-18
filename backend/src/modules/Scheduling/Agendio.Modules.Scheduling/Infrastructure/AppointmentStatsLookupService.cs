@@ -18,6 +18,7 @@ public sealed class AppointmentStatsLookupService(IDispatcher dispatcher) : IApp
             stats.TotalCount, stats.CompletedCount, stats.NoShowCount, stats.CancelledCount, stats.RescheduledCount,
             stats.NoShowRate, stats.CancellationRate, stats.RescheduleRate,
             stats.RevenueByService.Select(p => new ServiceRevenueLookupPoint(p.ServiceName, p.Total)).ToList(),
-            stats.RevenueByProfessional.Select(p => new ProfessionalRevenueLookupPoint(p.ResourceId, p.ResourceName, p.Total)).ToList());
+            stats.RevenueByProfessional.Select(p => new ProfessionalRevenueLookupPoint(p.ResourceId, p.ResourceName, p.Total)).ToList(),
+            stats.CountByProfessional.Select(p => new ProfessionalCountLookupPoint(p.ResourceId, p.ResourceName, p.Count)).ToList());
     }
 }

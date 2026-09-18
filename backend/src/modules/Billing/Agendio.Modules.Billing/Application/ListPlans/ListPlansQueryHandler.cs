@@ -13,7 +13,16 @@ public sealed class ListPlansQueryHandler(BillingDbContext dbContext) : IQueryHa
             .AsNoTracking()
             .Where(p => p.IsActive)
             .OrderBy(p => p.PriceAmount)
-            .Select(p => new PlanSummary(p.Id.Value, p.Name, p.PriceAmount, p.Currency, p.BillingCycle.ToString()))
+            .Select(p => new PlanSummary(
+                p.Id.Value,
+                p.Name,
+                p.PriceAmount,
+                p.Currency,
+                p.BillingCycle.ToString(),
+                p.MaxUnits,
+                p.MaxProfessionals,
+                p.MaxCustomers,
+                p.IsFeatured))
             .ToListAsync(cancellationToken);
 
         return Result.Success<IReadOnlyList<PlanSummary>>(plans);

@@ -3,12 +3,12 @@
 import * as React from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueries, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { toast } from "sonner";
-import { ChevronLeft, ChevronRight, Users } from "lucide-react";
+import { CalendarDays, ChevronLeft, ChevronRight, Plus, Search, Users, X } from "lucide-react";
 
 import {
   listAppointments,
@@ -26,9 +26,13 @@ import {
   createCustomer,
   listServices,
   listUnits,
+  getResourceById,
+  listTimeOffs,
   ApiError,
   type AppointmentSummary,
   type AppointmentStatus,
+  type ResourceSummary,
+  CUSTOMER_RECOVERY_QUERY_KEY,
 } from "@/lib/api/client";
 import { useSession } from "@/lib/auth/session-context";
 import { APPOINTMENT_STATUS_LABELS, APPOINTMENT_STATUS_VARIANTS } from "@/lib/appointment-status";
@@ -42,7 +46,15 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { EmptyState } from "@/components/ui/empty-state";
+import { AgendaKpiRow } from "@/components/agenda/kpi-row";
+import { NextAppointmentCard } from "@/components/agenda/next-appointment-card";
+import { ResourceColumnHeader, type ResourceAvailability } from "@/components/agenda/resource-column-header";
+import { AppointmentChip } from "@/components/agenda/appointment-chip";
+import { BreakBand, type BlockedBand } from "@/components/agenda/break-band";
+import { AgendaFiltersPopover, isFiltersEmpty, type AgendaFilters } from "@/components/agenda/filters-popover";
+import { AgendaToolbarFooter, DEFAULT_ZOOM_PX, type Density } from "@/components/agenda/agenda-toolbar-footer";
 
 // Sentinela pro item "+ Novo cliente" dentro do proprio Select de cliente do
 // modal de agendamento — nunca colide com um Id real (GUID). Cenario comum
@@ -50,32 +62,21 @@ import { EmptyState } from "@/components/ui/empty-state";
 // ainda (BL-13, docs/BACKLOG.md).
 const NEW_CUSTOMER_VALUE = "__new_customer__";
 
-const DAY_START_HOUR = 7;
-const DAY_END_HOUR = 21;
+// Grade cobre o dia inteiro (00:00 -> 23:59): da pra marcar em qualquer
+// horario, sem faixa de "fora do expediente" ocupando espaco. O expediente
+// real vira so um rotulo informativo no topo da coluna de horarios.
+const DAY_START_HOUR = 0;
+const DAY_END_HOUR = 24;
 const SLOT_MINUTES = 30;
-const ROW_HEIGHT_PX = 32;
 // Alvo minimo de toque recomendado pelo WCAG 2.2 (criterio 2.5.8, AA) — sem
 // isso, um agendamento curto (ex. Sobrancelha, 15min) rendia um chip de
 // 16px de altura, abaixo do minimo, relevante pra uso em tablet/touch na
-// recepcao (BL-19, docs/BACKLOG.md).
+// recepcao (BL-19, docs/BACKLOG.md). Fixo independente do zoom escolhido —
+// o alvo de toque e um requisito absoluto, nao proporcional.
 const MIN_CHIP_HEIGHT_PX = 24;
-const TOTAL_MINUTES = (DAY_END_HOUR - DAY_START_HOUR) * 60;
-const GRID_HEIGHT_PX = (TOTAL_MINUTES / SLOT_MINUTES) * ROW_HEIGHT_PX;
 
 const STATUS_LABELS = APPOINTMENT_STATUS_LABELS;
 const STATUS_VARIANTS = APPOINTMENT_STATUS_VARIANTS;
-
-// Mesmo agrupamento bom/ruim de components/dashboard/appointment-status-chart.tsx (Etapa 3),
-// aplicado como tom de fundo em vez de paleta fixa de status — aqui e badge de UI, nao mark de grafico.
-const CHIP_TONE: Record<AppointmentStatus, string> = {
-  Scheduled: "bg-secondary/70 text-secondary-foreground border-transparent",
-  Confirmed: "bg-info/10 text-info border-info/30",
-  InProgress: "bg-primary/10 text-primary border-primary/30",
-  Completed: "bg-muted text-muted-foreground opacity-70 border-l-4 border-l-success",
-  NoShow: "bg-muted text-muted-foreground opacity-70 border-l-4 border-l-destructive",
-  CancelledByCustomer: "bg-muted text-muted-foreground opacity-70 border-l-4 border-l-destructive",
-  CancelledByStaff: "bg-muted text-muted-foreground opacity-70 border-l-4 border-l-destructive",
-};
 
 const RESCHEDULABLE_STATUSES: AppointmentStatus[] = ["Scheduled", "Confirmed"];
 
@@ -102,8 +103,8 @@ function startOfMonth(date: Date): Date {
   return new Date(date.getFullYear(), date.getMonth(), 1);
 }
 
-function minutesFromDayStart(date: Date): number {
-  return (date.getHours() - DAY_START_HOUR) * 60 + date.getMinutes();
+function minutesFromDayStart(date: Date, dayStartHour: number): number {
+  return (date.getHours() - dayStartHour) * 60 + date.getMinutes();
 }
 
 function toDatetimeLocalValue(date: Date): string {
@@ -117,6 +118,27 @@ function formatTime(iso: string): string {
 
 function formatDayLabel(date: Date): string {
   return date.toLocaleDateString("pt-BR", { day: "2-digit", month: "short" });
+}
+
+// Proximo slot de 30min dentro do expediente, a partir de agora — usado
+// tanto pelo deep link ?novo=1 (vindo do Painel) quanto pelo botao "+ Novo
+// agendamento" do cabecalho, pra nao duplicar a mesma logica duas vezes.
+function nextAvailableSlot(dayStartHour: number, dayEndHour: number): Date {
+  const now = new Date();
+  const start = new Date(now);
+  start.setSeconds(0, 0);
+  start.setMinutes(Math.ceil(now.getMinutes() / SLOT_MINUTES) * SLOT_MINUTES);
+  if (start.getHours() < dayStartHour || start.getHours() >= dayEndHour) {
+    start.setHours(dayStartHour, 0, 0, 0);
+    if (start.getTime() <= now.getTime()) {
+      start.setDate(start.getDate() + 1);
+    }
+  }
+  return start;
+}
+
+function formatHourLabel(hour: number, minutes: number): string {
+  return `${String(hour).padStart(2, "0")}:${String(minutes).padStart(2, "0")}`;
 }
 
 const createAppointmentSchema = z.object({
@@ -157,6 +179,9 @@ export default function AgendaPage() {
   const [createDialogState, setCreateDialogState] = React.useState<{ resourceId: string; start: Date } | null>(null);
   const [selectedAppointmentId, setSelectedAppointmentId] = React.useState<string | null>(null);
   const [reschedulingOpen, setReschedulingOpen] = React.useState(false);
+  // Fora do rescheduleForm (zod) de proposito — reatribuir e opcional e nao
+  // tem validacao propria, so precisa saber "mudou ou nao" no submit.
+  const [reassignResourceId, setReassignResourceId] = React.useState<string | null>(null);
   const [cancelingOpen, setCancelingOpen] = React.useState(false);
   const [draggingId, setDraggingId] = React.useState<string | null>(null);
   // Drag-and-drop HTML5 nao tem equivalente em touch — em vez de oferecer um
@@ -167,6 +192,17 @@ export default function AgendaPage() {
   const [isCoarsePointer] = React.useState(
     () => typeof window !== "undefined" && window.matchMedia("(pointer: coarse)").matches
   );
+  const [selectedIds, setSelectedIds] = React.useState<Set<string>>(new Set());
+  const [searchQuery, setSearchQuery] = React.useState("");
+  const [filters, setFilters] = React.useState<AgendaFilters>({
+    statuses: new Set(),
+    serviceIds: new Set(),
+    resourceIds: new Set(),
+  });
+  const [rowHeightPx, setRowHeightPx] = React.useState(DEFAULT_ZOOM_PX);
+  const [density, setDensity] = React.useState<Density>("normal");
+  const gridScrollRef = React.useRef<HTMLDivElement | null>(null);
+  const hasAutoScrolled = React.useRef(false);
 
   const accessToken = session?.accessToken ?? "";
 
@@ -244,6 +280,73 @@ export default function AgendaPage() {
     enabled: Boolean(session),
   });
 
+  // Sempre "hoje", independente do dia/semana/mes selecionado no grid acima —
+  // mesmo padrao do Painel (todayAppointmentsQuery em painel/page.tsx) pra
+  // alimentar os cards de resumo/proximo atendimento sem misturar com o que
+  // esta sendo navegado no momento.
+  const todayStart = React.useMemo(() => startOfDay(new Date()), []);
+  const todayEnd = React.useMemo(() => addDays(todayStart, 1), [todayStart]);
+  const todayAppointmentsQuery = useQuery({
+    queryKey: ["appointments", "hoje", todayStart.toISOString()],
+    queryFn: () => listAppointments({ fromUtc: todayStart.toISOString(), toUtc: todayEnd.toISOString() }, accessToken),
+    enabled: Boolean(session),
+  });
+
+  // Horario de trabalho e folga NAO vem em listResources (so em getResourceById) —
+  // busca por recurso ativo, em paralelo, pra desenhar intervalo/fora-do-expediente/
+  // ausente na grade com dado real (nunca fabricado).
+  const workingHoursQueries = useQueries({
+    queries: activeResources.map((resource) => ({
+      queryKey: ["resource-details", resource.id],
+      queryFn: () => getResourceById(resource.id, accessToken),
+      enabled: Boolean(session),
+    })),
+  });
+  const timeOffQueries = useQueries({
+    queries: activeResources.map((resource) => ({
+      queryKey: ["resource-timeoff", resource.id],
+      queryFn: () => listTimeOffs(resource.id, accessToken),
+      enabled: Boolean(session),
+    })),
+  });
+
+  const workingHoursByResourceId = React.useMemo(() => {
+    const map = new Map<string, { dayOfWeek: string; startTime: string; endTime: string }[]>();
+    activeResources.forEach((resource, index) => {
+      map.set(resource.id, workingHoursQueries[index]?.data?.workingHours ?? []);
+    });
+    return map;
+  }, [activeResources, workingHoursQueries]);
+
+  // A grade e sempre 24h (ver DAY_START_HOUR/DAY_END_HOUR). Isto aqui e so o
+  // rotulo informativo "Horario funcionamento HH:MM - HH:MM" no topo da coluna
+  // de horarios — a menor abertura e o maior fechamento entre os profissionais.
+  const workingHoursLabel = React.useMemo(() => {
+    let startHour = 24;
+    let endHour = 0;
+
+    for (const windows of workingHoursByResourceId.values()) {
+      for (const window of windows) {
+        const [windowStartHour] = window.startTime.split(":").map(Number);
+        const [windowEndHour, windowEndMinutes] = window.endTime.split(":").map(Number);
+        startHour = Math.min(startHour, windowStartHour);
+        endHour = Math.max(endHour, windowEndMinutes > 0 ? windowEndHour + 1 : windowEndHour);
+      }
+    }
+
+    return startHour < endHour ? { start: startHour, end: endHour } : null;
+  }, [workingHoursByResourceId]);
+
+  const totalMinutes = (DAY_END_HOUR - DAY_START_HOUR) * 60;
+
+  const timeOffByResourceId = React.useMemo(() => {
+    const map = new Map<string, { startDate: string; endDate: string }[]>();
+    activeResources.forEach((resource, index) => {
+      map.set(resource.id, timeOffQueries[index]?.data ?? []);
+    });
+    return map;
+  }, [activeResources, timeOffQueries]);
+
   const customerNameById = React.useMemo(() => {
     const map = new Map<string, string>();
     for (const customer of customersQuery.data?.items ?? []) {
@@ -260,7 +363,124 @@ export default function AgendaPage() {
     return map;
   }, [activeResources]);
 
-  const invalidateAppointments = () => queryClient.invalidateQueries({ queryKey: ["appointments"] });
+  // Busca + filtros sao 100% client-side sobre o que ja esta carregado — sem
+  // endpoint novo. Chips fora do filtro simplesmente nao renderizam na grade.
+  const visibleAppointments = React.useMemo(() => {
+    const query = searchQuery.trim().toLowerCase();
+    return (appointmentsQuery.data ?? []).filter((appointment) => {
+      if (filters.statuses.size > 0 && !filters.statuses.has(appointment.status)) {
+        return false;
+      }
+      if (filters.serviceIds.size > 0 && !filters.serviceIds.has(appointment.serviceId)) {
+        return false;
+      }
+      if (filters.resourceIds.size > 0 && !filters.resourceIds.has(appointment.resourceId)) {
+        return false;
+      }
+      if (query) {
+        const customerName = (customerNameById.get(appointment.customerId) ?? "").toLowerCase();
+        const serviceName = appointment.serviceName.toLowerCase();
+        if (!customerName.includes(query) && !serviceName.includes(query)) {
+          return false;
+        }
+      }
+      return true;
+    });
+  }, [appointmentsQuery.data, filters, searchQuery, customerNameById]);
+
+  function computeResourceAvailability(resourceId: string): ResourceAvailability {
+    const now = new Date();
+    const todayIso = startOfDay(now).toISOString().slice(0, 10);
+    const onTimeOff = (timeOffByResourceId.get(resourceId) ?? []).some(
+      (timeOff) => timeOff.startDate <= todayIso && todayIso <= timeOff.endDate
+    );
+    if (onTimeOff) {
+      return "Ausente";
+    }
+
+    const inProgress = (appointmentsQuery.data ?? []).some(
+      (appointment) => appointment.resourceId === resourceId && appointment.status === "InProgress"
+    );
+    if (inProgress) {
+      return "EmAtendimento";
+    }
+
+    const dayOfWeekName = now.toLocaleDateString("en-US", { weekday: "long" });
+    const nowTime = `${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}:00`;
+    const windows = workingHoursByResourceId.get(resourceId) ?? [];
+    const withinWorkingHours = windows.some(
+      (w) => w.dayOfWeek === dayOfWeekName && w.startTime <= nowTime && nowTime <= w.endTime
+    );
+    return withinWorkingHours ? "Disponivel" : null;
+  }
+
+  function computeBlockedBands(resourceId: string, columnDate: Date, rowHeightPxValue: number): BlockedBand[] {
+    const localIso = columnDate.toISOString().slice(0, 10);
+    const onTimeOff = (timeOffByResourceId.get(resourceId) ?? []).some(
+      (timeOff) => timeOff.startDate <= localIso && localIso <= timeOff.endDate
+    );
+    const gridHeightPx = (totalMinutes / SLOT_MINUTES) * rowHeightPxValue;
+    if (onTimeOff) {
+      return [{ top: 0, height: gridHeightPx, kind: "Ausente" }];
+    }
+
+    const dayOfWeekName = columnDate.toLocaleDateString("en-US", { weekday: "long" });
+    const windows = (workingHoursByResourceId.get(resourceId) ?? [])
+      .filter((w) => w.dayOfWeek === dayOfWeekName)
+      .map((w) => ({ start: w.startTime, end: w.endTime }))
+      .sort((a, b) => a.start.localeCompare(b.start));
+
+    if (windows.length === 0) {
+      return [];
+    }
+
+    function timeToTop(time: string): number {
+      const [h, m] = time.split(":").map(Number);
+      const minutesFromStart = (h - DAY_START_HOUR) * 60 + m;
+      return Math.max(0, Math.min(gridHeightPx, (minutesFromStart / SLOT_MINUTES) * rowHeightPxValue));
+    }
+
+    function toShortTime(time: string): string {
+      return time.slice(0, 5);
+    }
+
+    // So intervalo (buraco entre duas janelas do MESMO dia, ex. almoco). Fora
+    // do expediente nao vira faixa: a grade e 24h e marcar fora do horario
+    // padrao e permitido — hachurar o dia inteiro so poluiria a tela.
+    const bands: BlockedBand[] = [];
+    for (let i = 0; i < windows.length - 1; i += 1) {
+      const gapTop = timeToTop(windows[i].end);
+      const gapBottom = timeToTop(windows[i + 1].start);
+      if (gapBottom > gapTop) {
+        bands.push({
+          top: gapTop,
+          height: gapBottom - gapTop,
+          kind: "Intervalo",
+          timeRange: `${toShortTime(windows[i].end)} - ${toShortTime(windows[i + 1].start)}`,
+        });
+      }
+    }
+
+    return bands;
+  }
+
+  // So folga de dia inteiro bloqueia o clique — e o unico caso que o backend
+  // de fato rejeita (AppointmentAvailabilityGuard). Intervalo fica marcado
+  // visualmente, mas continua clicavel: encaixar um atendimento no almoco e
+  // decisao do dono, nao erro.
+  function isMinuteBlocked(bands: BlockedBand[], top: number): boolean {
+    return bands.some((band) => band.kind === "Ausente" && top >= band.top && top < band.top + band.height);
+  }
+
+  // Tambem invalida a recuperacao de clientes: ela e calculada a partir do
+  // ultimo atendimento concluido e de agendamentos futuros, entao qualquer
+  // mutacao de agendamento (concluir, criar, cancelar, remarcar, faltou) pode
+  // tirar ou colocar um cliente na lista de "ausentes" — sem isto, o cliente
+  // continuava marcado como ausente no Painel/Clientes ate um F5.
+  const invalidateAppointments = () => {
+    queryClient.invalidateQueries({ queryKey: ["appointments"] });
+    queryClient.invalidateQueries({ queryKey: CUSTOMER_RECOVERY_QUERY_KEY });
+  };
 
   const createForm = useForm<CreateAppointmentFormValues>({
     resolver: zodResolver(createAppointmentSchema),
@@ -390,8 +610,19 @@ export default function AgendaPage() {
   });
 
   const rescheduleMutation = useMutation({
-    mutationFn: ({ id, newStartAtUtc, reason }: { id: string; newStartAtUtc: string; reason: string | null }) =>
-      rescheduleAppointment(id, newStartAtUtc, reason, accessToken),
+    mutationFn: ({
+      id,
+      newStartAtUtc,
+      reason,
+      newDurationMinutes,
+      newResourceId,
+    }: {
+      id: string;
+      newStartAtUtc: string;
+      reason: string | null;
+      newDurationMinutes?: number;
+      newResourceId?: string;
+    }) => rescheduleAppointment(id, { newStartAtUtc, reason, newDurationMinutes, newResourceId }, accessToken),
     onSuccess: () => {
       toast.success("Agendamento remarcado.");
       invalidateAppointments();
@@ -412,26 +643,26 @@ export default function AgendaPage() {
   // slot de 30min dentro do expediente) em vez do usuario clicar numa celula da grade.
   // Le window.location direto (em vez de useSearchParams) pra nao exigir um
   // boundary de Suspense so por causa desse efeito de montagem.
+  // Guarda de "so uma vez": o efeito depende de dado assincrono e sem
+  // isto reabriria o dialog que o usuario acabou de fechar.
+  const hasHandledNovoParam = React.useRef(false);
+
   React.useEffect(() => {
-    if (typeof window === "undefined" || new URLSearchParams(window.location.search).get("novo") !== "1" || !resolvedResourceId) {
+    if (
+      hasHandledNovoParam.current ||
+      typeof window === "undefined" ||
+      new URLSearchParams(window.location.search).get("novo") !== "1" ||
+      !resolvedResourceId
+    ) {
       return;
     }
+    hasHandledNovoParam.current = true;
 
-    const now = new Date();
-    const start = new Date(now);
-    start.setSeconds(0, 0);
-    start.setMinutes(Math.ceil(now.getMinutes() / SLOT_MINUTES) * SLOT_MINUTES);
-    if (start.getHours() < DAY_START_HOUR || start.getHours() >= DAY_END_HOUR) {
-      start.setHours(DAY_START_HOUR, 0, 0, 0);
-      if (start.getTime() <= now.getTime()) {
-        start.setDate(start.getDate() + 1);
-      }
-    }
+    const start = nextAvailableSlot(DAY_START_HOUR, DAY_END_HOUR);
 
     // Legitimo "esperar um dado assincrono (recursos) chegar, entao sincronizar" —
     // nao da pra resolver via useState(() => ...) porque resolvedResourceId so
     // existe depois que resourcesQuery volta da API.
-    // eslint-disable-next-line react-hooks/set-state-in-effect
     setCreateDialogState({ resourceId: resolvedResourceId, start });
     createForm.reset({ customerId: "", serviceId: "", startAtLocal: toDatetimeLocalValue(start), notes: "" });
     router.replace("/agenda");
@@ -452,14 +683,58 @@ export default function AgendaPage() {
     if (!appointment || !RESCHEDULABLE_STATUSES.includes(appointment.status)) {
       return;
     }
-    // Drag & drop so muda o horario — trocar de recurso exigiria um comando
-    // diferente no backend (Reschedule so aceita novo horario, nao novo
-    // recurso), entao ignoramos solto fora da coluna original.
-    if (resourceId !== appointment.resourceId) {
-      toast.error("Arraste apenas dentro da mesma coluna para remarcar o horario.");
+    // Soltar numa coluna diferente reatribui o profissional (rescheduleAppointment
+    // aceita newResourceId desde a extensao do redesign da Agenda) — mesma
+    // chamada de sempre, so com o campo extra quando de fato mudou de coluna.
+    rescheduleMutation.mutate({
+      id: draggingId,
+      newStartAtUtc: start.toISOString(),
+      reason: null,
+      newResourceId: resourceId !== appointment.resourceId ? resourceId : undefined,
+    });
+  }
+
+  function handleQuickStatusAction(id: string, action: "confirm" | "start" | "complete" | "noshow" | "cancel") {
+    if (action === "confirm") confirmMutation.mutate(id);
+    else if (action === "start") startMutation.mutate(id);
+    else if (action === "complete") completeMutation.mutate(id);
+    else if (action === "noshow") noShowMutation.mutate(id);
+    else cancelMutation.mutate({ id, reason: null });
+  }
+
+  function handleResizeCommit(id: string, newDurationMinutes: number) {
+    const appointment = appointmentsQuery.data?.find((a) => a.id === id);
+    if (!appointment) {
       return;
     }
-    rescheduleMutation.mutate({ id: draggingId, newStartAtUtc: start.toISOString(), reason: null });
+    rescheduleMutation.mutate({ id, newStartAtUtc: appointment.startUtc, reason: null, newDurationMinutes });
+  }
+
+  function toggleSelection(id: string) {
+    setSelectedIds((current) => {
+      const next = new Set(current);
+      if (next.has(id)) {
+        next.delete(id);
+      } else {
+        next.add(id);
+      }
+      return next;
+    });
+  }
+
+  async function handleBulkAction(action: "confirm" | "cancel") {
+    const ids = Array.from(selectedIds);
+    const results = await Promise.allSettled(
+      ids.map((id) => (action === "confirm" ? confirmAppointment(id, accessToken) : cancelAppointment(id, true, null, accessToken)))
+    );
+    const failures = results.filter((r) => r.status === "rejected").length;
+    invalidateAppointments();
+    setSelectedIds(new Set());
+    if (failures > 0) {
+      toast.error(`${failures} de ${ids.length} nao puderam ser processados.`);
+    } else {
+      toast.success(action === "confirm" ? "Agendamentos confirmados." : "Agendamentos cancelados.");
+    }
   }
 
   const selectedAppointment = appointmentsQuery.data?.find((a) => a.id === selectedAppointmentId) ?? null;
@@ -470,94 +745,211 @@ export default function AgendaPage() {
     }
   }, [selectedAppointment, rescheduleForm]);
 
-  function renderTimeGrid(columns: { key: string; label: string; resourceId: string; date: Date }[]) {
-    const slotCount = TOTAL_MINUTES / SLOT_MINUTES;
+  // A grade cobre 24h, mas abrir em 00:00 mostraria so madrugada vazia — rola
+  // ate o comeco do expediente (ou 07:00 se ninguem configurou horario) na
+  // primeira vez que o grid monta com dados.
+  const isGridReady = !resourcesQuery.isLoading && !appointmentsQuery.isLoading && activeResources.length > 0;
+
+  React.useEffect(() => {
+    const container = gridScrollRef.current;
+    if (hasAutoScrolled.current || !container || !isGridReady) {
+      return;
+    }
+    hasAutoScrolled.current = true;
+    const targetHour = workingHoursLabel?.start ?? 7;
+    container.scrollTop = (((targetHour - DAY_START_HOUR) * 60) / SLOT_MINUTES) * rowHeightPx;
+  }, [isGridReady, workingHoursLabel, rowHeightPx]);
+
+  function renderTimeGrid(
+    columns: { key: string; label: string; resourceId: string; date: Date; resource?: ResourceSummary }[],
+    options: { showAddResourceColumn?: boolean } = {}
+  ) {
+    const slotCount = totalMinutes / SLOT_MINUTES;
+    const gridHeightPx = slotCount * rowHeightPx;
+    const selectionMode = selectedIds.size > 0;
+    const now = new Date();
+    const columnCount = columns.length + (options.showAddResourceColumn ? 1 : 0);
 
     return (
-      <div className="scroll-shadow-x overflow-x-auto rounded-lg">
-        <div className="grid" style={{ gridTemplateColumns: `4rem repeat(${columns.length}, minmax(9rem, 1fr))` }}>
-          <div className="border-b border-r" />
-          {columns.map((column) => (
-            <div key={column.key} className="text-muted-foreground border-b border-r p-2 text-center text-xs font-medium last:border-r-0">
-              {column.label}
-            </div>
-          ))}
-
-          <div className="relative border-r" style={{ height: GRID_HEIGHT_PX }}>
-            {Array.from({ length: slotCount }).map((_, index) => (
-              <div
-                key={index}
-                className="text-muted-foreground absolute right-1 -translate-y-1/2 text-[10px]"
-                style={{ top: index * ROW_HEIGHT_PX }}
-              >
-                {index % 2 === 0 ? `${String(DAY_START_HOUR + index / 2).padStart(2, "0")}:00` : ""}
+      // Rola nos dois eixos: 24h de grade nao cabe na tela, e o cabecalho de
+      // profissionais/coluna de horas ficam presos (sticky) pra nao se perder
+      // a referencia ao rolar.
+      <div ref={gridScrollRef} className="scroll-shadow-x max-h-[calc(100vh-19rem)] min-h-96 overflow-auto rounded-lg border">
+        <div className="grid w-full" style={{ gridTemplateColumns: `4.5rem repeat(${columnCount}, minmax(13rem, 1fr))` }}>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <div className="bg-card sticky top-0 left-0 z-40 flex flex-col items-center justify-center gap-0.5 border-r border-b px-1 py-2.5">
+                <span className="text-muted-foreground truncate text-[9px] leading-none">Expediente</span>
+                <span className="text-[10px] leading-none font-medium tabular-nums">00:00</span>
+                <span className="text-muted-foreground text-[9px] leading-none">a</span>
+                <span className="text-[10px] leading-none font-medium tabular-nums">23:59</span>
               </div>
-            ))}
+            </TooltipTrigger>
+            <TooltipContent side="right">
+              {workingHoursLabel
+                ? `Grade cobre o dia inteiro — expediente configurado: ${formatHourLabel(workingHoursLabel.start, 0)} - ${formatHourLabel(workingHoursLabel.end, 0)}`
+                : "Grade cobre o dia inteiro — nenhum horario de funcionamento configurado."}
+            </TooltipContent>
+          </Tooltip>
+          {columns.map((column) =>
+            column.resource ? (
+              <div key={column.key} className="bg-card sticky top-0 z-30 border-r border-b last:border-r-0">
+                <ResourceColumnHeader
+                  resource={column.resource}
+                  availability={computeResourceAvailability(column.resourceId)}
+                  appointmentCount={
+                    visibleAppointments.filter(
+                      (a) =>
+                        a.resourceId === column.resourceId &&
+                        startOfDay(new Date(a.startUtc)).getTime() === startOfDay(column.date).getTime()
+                    ).length
+                  }
+                  utilizationPercent={(() => {
+                    const windows = (workingHoursByResourceId.get(column.resourceId) ?? []).filter(
+                      (w) => w.dayOfWeek === column.date.toLocaleDateString("en-US", { weekday: "long" })
+                    );
+                    if (windows.length === 0) {
+                      return null;
+                    }
+                    const workingMinutes = windows.reduce((sum, w) => {
+                      const [sh, sm] = w.startTime.split(":").map(Number);
+                      const [eh, em] = w.endTime.split(":").map(Number);
+                      return sum + (eh * 60 + em - (sh * 60 + sm));
+                    }, 0);
+                    const bookedMinutes = (appointmentsQuery.data ?? [])
+                      .filter(
+                        (a) =>
+                          a.resourceId === column.resourceId &&
+                          startOfDay(new Date(a.startUtc)).getTime() === startOfDay(column.date).getTime() &&
+                          a.status !== "CancelledByCustomer" &&
+                          a.status !== "CancelledByStaff"
+                      )
+                      .reduce((sum, a) => sum + (new Date(a.endUtc).getTime() - new Date(a.startUtc).getTime()) / 60000, 0);
+                    return workingMinutes > 0 ? (bookedMinutes / workingMinutes) * 100 : null;
+                  })()}
+                />
+              </div>
+            ) : (
+              <div key={column.key} className="text-muted-foreground border-r border-b p-3 text-center text-xs font-medium capitalize last:border-r-0">
+                {column.label}
+              </div>
+            )
+          )}
+          {options.showAddResourceColumn && (
+            <div className="bg-card sticky top-0 z-30 flex items-center justify-center border-b p-3">
+              <Button asChild variant="ghost" size="sm" className="border-border/70 text-muted-foreground h-auto border border-dashed py-2">
+                <Link href="/recursos">
+                  <Plus className="size-3.5" />
+                  Adicionar profissional
+                </Link>
+              </Button>
+            </div>
+          )}
+
+          <div className="bg-card sticky left-0 z-20 border-r" style={{ height: gridHeightPx }}>
+            {Array.from({ length: slotCount }).map((_, index) => {
+              const totalMinutesFromStart = DAY_START_HOUR * 60 + index * SLOT_MINUTES;
+              return (
+                <div
+                  key={index}
+                  // O primeiro rotulo nao pode subir metade da altura: ficaria
+                  // por cima da borda do cabecalho (fora da area do grid).
+                  className={`text-muted-foreground absolute right-2 text-[10px] tabular-nums ${index === 0 ? "" : "-translate-y-1/2"} ${index % 2 === 0 ? "font-medium" : "opacity-60"}`}
+                  style={{ top: index * rowHeightPx + (index === 0 ? 2 : 0) }}
+                >
+                  {formatHourLabel(Math.floor(totalMinutesFromStart / 60), totalMinutesFromStart % 60)}
+                </div>
+              );
+            })}
           </div>
 
-          {columns.map((column) => (
-            <div key={column.key} className="relative border-r last:border-r-0" style={{ height: GRID_HEIGHT_PX }}>
-              {Array.from({ length: slotCount }).map((_, index) => {
-                const slotStart = new Date(column.date);
-                slotStart.setHours(DAY_START_HOUR, 0, 0, 0);
-                slotStart.setMinutes(slotStart.getMinutes() + index * SLOT_MINUTES);
-                return (
-                  <button
-                    key={index}
-                    type="button"
-                    aria-label={`Novo agendamento em ${column.label} as ${slotStart.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}`}
-                    className="hover:bg-muted/50 absolute inset-x-0 border-t first:border-t-0"
-                    style={{ top: index * ROW_HEIGHT_PX, height: ROW_HEIGHT_PX }}
-                    onClick={() => openCreateDialog(column.resourceId, slotStart)}
-                    onDragOver={(event) => event.preventDefault()}
-                    onDrop={(event) => {
-                      event.preventDefault();
-                      handleDropOnSlot(column.resourceId, slotStart);
-                    }}
-                  />
-                );
-              })}
+          {columns.map((column) => {
+            const bands = computeBlockedBands(column.resourceId, column.date, rowHeightPx);
+            const isToday = startOfDay(column.date).getTime() === startOfDay(now).getTime();
+            const nowTop = (minutesFromDayStart(now, DAY_START_HOUR) / SLOT_MINUTES) * rowHeightPx;
+            const showNowLine = isToday && nowTop >= 0 && nowTop <= gridHeightPx;
 
-              {(appointmentsQuery.data ?? [])
-                .filter((appointment) => {
-                  if (appointment.resourceId !== column.resourceId) {
-                    return false;
-                  }
-                  const start = new Date(appointment.startUtc);
-                  return startOfDay(start).getTime() === startOfDay(column.date).getTime();
-                })
-                .map((appointment) => {
-                  const start = new Date(appointment.startUtc);
-                  const end = new Date(appointment.endUtc);
-                  const top = (minutesFromDayStart(start) / SLOT_MINUTES) * ROW_HEIGHT_PX;
-                  const height = Math.max(((end.getTime() - start.getTime()) / 60000 / SLOT_MINUTES) * ROW_HEIGHT_PX, MIN_CHIP_HEIGHT_PX);
+            return (
+              <div key={column.key} className="relative border-r last:border-r-0" style={{ height: gridHeightPx }}>
+                {bands.map((band, index) => (
+                  <BreakBand key={index} band={band} />
+                ))}
 
+                {Array.from({ length: slotCount }).map((_, index) => {
+                  const slotStart = new Date(column.date);
+                  slotStart.setHours(DAY_START_HOUR, 0, 0, 0);
+                  slotStart.setMinutes(slotStart.getMinutes() + index * SLOT_MINUTES);
+                  const top = index * rowHeightPx;
+                  const blocked = isMinuteBlocked(bands, top);
                   return (
                     <button
-                      key={appointment.id}
+                      key={index}
                       type="button"
-                      draggable={!isCoarsePointer && RESCHEDULABLE_STATUSES.includes(appointment.status)}
-                      onDragStart={() => setDraggingId(appointment.id)}
-                      onDragEnd={() => setDraggingId(null)}
-                      onClick={(event) => {
-                        event.stopPropagation();
-                        openDetailDialog(appointment.id);
+                      disabled={blocked}
+                      aria-label={`Novo agendamento em ${column.label} as ${slotStart.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}`}
+                      className={`hover:enabled:bg-primary/5 absolute inset-x-0 disabled:cursor-not-allowed ${index % 2 === 0 ? "border-t" : "border-border/40 border-t border-dashed"} first:border-t-0`}
+                      style={{ top, height: rowHeightPx }}
+                      onClick={() => openCreateDialog(column.resourceId, slotStart)}
+                      onDoubleClick={() => openCreateDialog(column.resourceId, slotStart)}
+                      onDragOver={(event) => event.preventDefault()}
+                      onDrop={(event) => {
+                        event.preventDefault();
+                        handleDropOnSlot(column.resourceId, slotStart);
                       }}
-                      title={
-                        !isCoarsePointer && RESCHEDULABLE_STATUSES.includes(appointment.status)
-                          ? "Arraste para remarcar rapido, ou clique para ver detalhes."
-                          : undefined
-                      }
-                      className={`absolute inset-x-0.5 z-10 overflow-hidden rounded-md border p-1 text-left text-[11px] leading-tight shadow-sm ${CHIP_TONE[appointment.status]}`}
-                      style={{ top, height }}
-                    >
-                      <p className="truncate font-medium">{customerNameById.get(appointment.customerId) ?? "Cliente"}</p>
-                      <p className="truncate">{appointment.serviceName}</p>
-                    </button>
+                    />
                   );
                 })}
-            </div>
-          ))}
+
+                {/* Linha do horario atual — so na coluna de hoje, atravessando
+                    toda a largura dela. Rotulo so na primeira coluna pra nao
+                    repetir a mesma etiqueta N vezes lado a lado. */}
+                {showNowLine && (
+                  <div className="pointer-events-none absolute inset-x-0 z-20 flex items-center" style={{ top: nowTop }}>
+                    <span className="bg-destructive size-1.5 shrink-0 rounded-full" aria-hidden="true" />
+                    <span className="bg-destructive h-px flex-1" aria-hidden="true" />
+                  </div>
+                )}
+
+                {visibleAppointments
+                  .filter((appointment) => {
+                    if (appointment.resourceId !== column.resourceId) {
+                      return false;
+                    }
+                    const start = new Date(appointment.startUtc);
+                    return startOfDay(start).getTime() === startOfDay(column.date).getTime();
+                  })
+                  .map((appointment) => {
+                    const start = new Date(appointment.startUtc);
+                    const end = new Date(appointment.endUtc);
+                    const top = (minutesFromDayStart(start, DAY_START_HOUR) / SLOT_MINUTES) * rowHeightPx;
+                    const height = Math.max(((end.getTime() - start.getTime()) / 60000 / SLOT_MINUTES) * rowHeightPx, MIN_CHIP_HEIGHT_PX);
+
+                    return (
+                      <AppointmentChip
+                        key={appointment.id}
+                        appointment={appointment}
+                        customerName={customerNameById.get(appointment.customerId) ?? "Cliente"}
+                        draggable={!isCoarsePointer && RESCHEDULABLE_STATUSES.includes(appointment.status)}
+                        selected={selectedIds.has(appointment.id)}
+                        selectionMode={selectionMode}
+                        onSelectToggle={toggleSelection}
+                        onOpenDetail={openDetailDialog}
+                        onDragStart={() => setDraggingId(appointment.id)}
+                        onDragEnd={() => setDraggingId(null)}
+                        onQuickStatusAction={handleQuickStatusAction}
+                        onResizeCommit={handleResizeCommit}
+                        style={{ top, height }}
+                        rowHeightPx={rowHeightPx}
+                        slotMinutes={SLOT_MINUTES}
+                        density={density}
+                      />
+                    );
+                  })}
+              </div>
+            );
+          })}
+
+          {options.showAddResourceColumn && <div className="bg-muted/20" style={{ height: gridHeightPx }} />}
         </div>
       </div>
     );
@@ -619,6 +1011,7 @@ export default function AgendaPage() {
     label: resource.name,
     resourceId: resource.id,
     date: currentDate,
+    resource,
   }));
 
   const weekColumns = Array.from({ length: 7 }).map((_, index) => {
@@ -649,66 +1042,172 @@ export default function AgendaPage() {
   }
 
   const isLoadingGrid = resourcesQuery.isLoading || appointmentsQuery.isLoading;
+  const hasError = resourcesQuery.isError || appointmentsQuery.isError;
 
   return (
-    <div className="mx-auto flex w-full max-w-6xl flex-1 flex-col">
-      <Card>
-        <CardContent className="flex flex-col gap-6">
-          <Tabs value={view} onValueChange={(value) => setView(value as typeof view)}>
-            <div className="flex flex-wrap items-center justify-between gap-3">
-              <p className="text-muted-foreground text-sm capitalize">{rangeLabel}</p>
-              <div className="flex flex-wrap items-center gap-2">
-                {showUnitFilter && (
-                  <Select
-                    value={selectedUnitId ?? undefined}
-                    onValueChange={(value) => {
-                      setSelectedUnitId(value);
-                      setSelectedResourceId(null);
-                    }}
-                  >
-                    <SelectTrigger className="w-40" aria-label="Filtrar por unidade">
-                      <SelectValue placeholder="Todas as unidades" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {(unitsQuery.data ?? []).map((unit) => (
-                        <SelectItem key={unit.id} value={unit.id}>
-                          {unit.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                )}
-                {view === "week" && (
-                  <Select value={resolvedResourceId ?? undefined} onValueChange={setSelectedResourceId}>
-                    <SelectTrigger className="w-40" aria-label="Filtrar por recurso">
-                      <SelectValue placeholder="Recurso" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {activeResources.map((resource) => (
-                        <SelectItem key={resource.id} value={resource.id}>
-                          {resource.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                )}
-                <div className="flex overflow-hidden rounded-lg border">
-                  <Button variant="ghost" size="sm" className="rounded-none" onClick={() => navigate(-1)} aria-label="Anterior">
-                    <ChevronLeft className="size-4" />
-                  </Button>
-                  <Button variant="ghost" size="sm" className="rounded-none border-x" onClick={() => setCurrentDate(startOfDay(new Date()))}>
-                    Hoje
-                  </Button>
-                  <Button variant="ghost" size="sm" className="rounded-none" onClick={() => navigate(1)} aria-label="Proximo">
-                    <ChevronRight className="size-4" />
-                  </Button>
-                </div>
-                <TabsList>
-                  <TabsTrigger value="day">Dia</TabsTrigger>
-                  <TabsTrigger value="week">Semana</TabsTrigger>
-                  <TabsTrigger value="month">Mes</TabsTrigger>
-                </TabsList>
-              </div>
+    // Margem negativa pra recuperar parte do padding generoso do layout
+    // (p-6 sm:p-10, calibrado pra telas de formulario): a Agenda e a tela mais
+    // densa do app — cada pixel horizontal vira largura de coluna de
+    // profissional. O layout continua igual pras outras telas.
+    <div className="-mx-2 flex w-[calc(100%+1rem)] flex-1 flex-col gap-4 overflow-x-hidden sm:-mx-6 sm:w-[calc(100%+3rem)]">
+      {/* Navegacao de data a esquerda, acoes a direita — mesma hierarquia da
+          referencia: primeiro "que dia estou vendo", depois "o que faco". */}
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="flex flex-wrap items-center gap-2">
+          <div className="flex overflow-hidden rounded-lg border">
+            <Button variant="ghost" size="sm" className="rounded-none" onClick={() => navigate(-1)} aria-label="Anterior">
+              <ChevronLeft className="size-4" />
+            </Button>
+            <Button variant="ghost" size="sm" className="rounded-none border-x" onClick={() => setCurrentDate(startOfDay(new Date()))}>
+              Hoje
+            </Button>
+            <Button variant="ghost" size="sm" className="rounded-none" onClick={() => navigate(1)} aria-label="Proximo">
+              <ChevronRight className="size-4" />
+            </Button>
+          </div>
+          <div className="flex items-center gap-2">
+            <CalendarDays className="text-muted-foreground size-4" aria-hidden="true" />
+            <span className="text-base font-semibold capitalize">{rangeLabel}</span>
+          </div>
+        </div>
+
+        <div className="flex flex-wrap items-center gap-2">
+          <div className="relative">
+            <Search className="text-muted-foreground pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2" />
+            <Input
+              value={searchQuery}
+              onChange={(event) => setSearchQuery(event.target.value)}
+              placeholder="Buscar cliente, servico..."
+              className="w-56 pl-8"
+            />
+          </div>
+          <AgendaFiltersPopover
+            filters={filters}
+            onChange={setFilters}
+            services={servicesQuery.data?.items ?? []}
+            resources={activeResources}
+          />
+          <Button
+            size="sm"
+            onClick={() => {
+              if (resolvedResourceId) {
+                openCreateDialog(resolvedResourceId, nextAvailableSlot(DAY_START_HOUR, DAY_END_HOUR));
+              }
+            }}
+            disabled={!resolvedResourceId}
+          >
+            <Plus className="size-4" />
+            Novo agendamento
+          </Button>
+        </div>
+      </div>
+
+      {!isFiltersEmpty(filters) && (
+        <div className="flex flex-wrap items-center gap-1.5">
+          {Array.from(filters.statuses).map((status) => (
+            <Badge key={status} variant="secondary" className="gap-1">
+              {APPOINTMENT_STATUS_LABELS[status]}
+              <button type="button" onClick={() => setFilters({ ...filters, statuses: new Set([...filters.statuses].filter((s) => s !== status)) })}>
+                <X className="size-3" />
+              </button>
+            </Badge>
+          ))}
+          {Array.from(filters.serviceIds).map((id) => (
+            <Badge key={id} variant="secondary" className="gap-1">
+              {servicesQuery.data?.items.find((s) => s.id === id)?.name ?? "Servico"}
+              <button type="button" onClick={() => setFilters({ ...filters, serviceIds: new Set([...filters.serviceIds].filter((s) => s !== id)) })}>
+                <X className="size-3" />
+              </button>
+            </Badge>
+          ))}
+          {Array.from(filters.resourceIds).map((id) => (
+            <Badge key={id} variant="secondary" className="gap-1">
+              {resourceNameById.get(id) ?? "Profissional"}
+              <button
+                type="button"
+                onClick={() => setFilters({ ...filters, resourceIds: new Set([...filters.resourceIds].filter((r) => r !== id)) })}
+              >
+                <X className="size-3" />
+              </button>
+            </Badge>
+          ))}
+          <Button variant="ghost" size="sm" onClick={() => setFilters({ statuses: new Set(), serviceIds: new Set(), resourceIds: new Set() })}>
+            Limpar filtros
+          </Button>
+        </div>
+      )}
+
+      <div className="grid grid-cols-1 gap-3 xl:grid-cols-[minmax(0,1fr)_18rem]">
+        <AgendaKpiRow appointmentsToday={todayAppointmentsQuery.data} isLoading={todayAppointmentsQuery.isLoading} />
+        <NextAppointmentCard
+          appointmentsToday={todayAppointmentsQuery.data}
+          customerNameById={customerNameById}
+          resourceNameById={resourceNameById}
+          isLoading={todayAppointmentsQuery.isLoading}
+          onOpenDetail={openDetailDialog}
+        />
+      </div>
+
+      {selectedIds.size > 0 && (
+        <div className="bg-card flex items-center justify-between gap-3 rounded-lg border p-3 text-sm shadow-sm">
+          <span>{selectedIds.size} selecionado(s)</span>
+          <div className="flex gap-2">
+            <Button size="sm" variant="outline" onClick={() => handleBulkAction("confirm")}>
+              Confirmar selecionados
+            </Button>
+            <Button size="sm" variant="destructive" onClick={() => handleBulkAction("cancel")}>
+              Cancelar selecionados
+            </Button>
+            <Button size="sm" variant="ghost" onClick={() => setSelectedIds(new Set())}>
+              Limpar selecao
+            </Button>
+          </div>
+        </div>
+      )}
+
+      <Card className="min-w-0 py-4">
+        <CardContent className="flex min-w-0 flex-col gap-4 px-4">
+          <Tabs value={view} onValueChange={(value) => setView(value as typeof view)} className="min-w-0">
+            <div className="flex flex-wrap items-center justify-end gap-2">
+              {showUnitFilter && (
+                <Select
+                  value={selectedUnitId ?? undefined}
+                  onValueChange={(value) => {
+                    setSelectedUnitId(value);
+                    setSelectedResourceId(null);
+                  }}
+                >
+                  <SelectTrigger size="sm" className="w-40" aria-label="Filtrar por unidade">
+                    <SelectValue placeholder="Todas as unidades" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {(unitsQuery.data ?? []).map((unit) => (
+                      <SelectItem key={unit.id} value={unit.id}>
+                        {unit.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
+              {view === "week" && (
+                <Select value={resolvedResourceId ?? undefined} onValueChange={setSelectedResourceId}>
+                  <SelectTrigger size="sm" className="w-40" aria-label="Filtrar por recurso">
+                    <SelectValue placeholder="Recurso" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {activeResources.map((resource) => (
+                      <SelectItem key={resource.id} value={resource.id}>
+                        {resource.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
+              <TabsList>
+                <TabsTrigger value="day">Dia</TabsTrigger>
+                <TabsTrigger value="week">Semana</TabsTrigger>
+                <TabsTrigger value="month">Mes</TabsTrigger>
+              </TabsList>
             </div>
 
             {isLoadingGrid ? (
@@ -721,6 +1220,23 @@ export default function AgendaPage() {
               ) : (
                 <Skeleton className="h-[500px] rounded-lg" />
               )
+            ) : hasError ? (
+              <div className="border-destructive/50 bg-destructive/5 rounded-lg border p-4 text-sm">
+                <p className="text-destructive font-medium">Nao foi possivel carregar a agenda agora.</p>
+                <p className="text-muted-foreground mt-1">Tente novamente em instantes — pode ser uma falha temporaria de rede.</p>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="mt-3"
+                  onClick={() => {
+                    resourcesQuery.refetch();
+                    appointmentsQuery.refetch();
+                  }}
+                >
+                  Tentar novamente
+                </Button>
+              </div>
             ) : activeResources.length === 0 ? (
               <EmptyState
                 icon={Users}
@@ -734,12 +1250,20 @@ export default function AgendaPage() {
               />
             ) : (
               <>
-                <TabsContent value="day">{renderTimeGrid(dayColumns)}</TabsContent>
-                <TabsContent value="week">{renderTimeGrid(weekColumns)}</TabsContent>
+                <TabsContent value="day" className="min-w-0">
+                  {renderTimeGrid(dayColumns, { showAddResourceColumn: true })}
+                </TabsContent>
+                <TabsContent value="week" className="min-w-0">
+                  {renderTimeGrid(weekColumns)}
+                </TabsContent>
                 <TabsContent value="month">{renderMonthView()}</TabsContent>
               </>
             )}
           </Tabs>
+
+          {!isLoadingGrid && !hasError && activeResources.length > 0 && view !== "month" && (
+            <AgendaToolbarFooter rowHeightPx={rowHeightPx} onRowHeightChange={setRowHeightPx} density={density} onDensityChange={setDensity} />
+          )}
         </CardContent>
       </Card>
 
@@ -935,6 +1459,8 @@ export default function AgendaPage() {
                         id: selectedAppointment.id,
                         newStartAtUtc: new Date(values.newStartAtLocal).toISOString(),
                         reason: values.reason.trim() === "" ? null : values.reason.trim(),
+                        newResourceId:
+                          reassignResourceId && reassignResourceId !== selectedAppointment.resourceId ? reassignResourceId : undefined,
                       })
                     )}
                     className="flex flex-col gap-3"
@@ -952,6 +1478,28 @@ export default function AgendaPage() {
                         </FormItem>
                       )}
                     />
+                    {activeResources.length > 1 && (
+                      <FormItem>
+                        <FormLabel>Profissional</FormLabel>
+                        <Select
+                          value={reassignResourceId ?? selectedAppointment.resourceId}
+                          onValueChange={setReassignResourceId}
+                        >
+                          <FormControl>
+                            <SelectTrigger className="w-full">
+                              <SelectValue />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            {activeResources.map((resource) => (
+                              <SelectItem key={resource.id} value={resource.id}>
+                                {resource.name}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </FormItem>
+                    )}
                     <FormField
                       control={rescheduleForm.control}
                       name="reason"
@@ -1030,6 +1578,7 @@ export default function AgendaPage() {
                         variant="outline"
                         onClick={() => {
                           rescheduleForm.reset({ newStartAtLocal: "", reason: "" });
+                          setReassignResourceId(null);
                           setReschedulingOpen(true);
                         }}
                       >
@@ -1091,6 +1640,16 @@ export default function AgendaPage() {
                         {entry.changeType === "Rescheduled" && entry.newStartUtc && (
                           <p className="text-muted-foreground">
                             {formatChangeLogDateTime(entry.previousStartUtc)} {"->"} {formatChangeLogDateTime(entry.newStartUtc)}
+                          </p>
+                        )}
+                        {entry.previousResourceId && (
+                          <p className="text-muted-foreground">
+                            Profissional: {entry.previousResourceName ?? "—"} {"->"} {entry.resourceName}
+                          </p>
+                        )}
+                        {entry.newEndUtc && (
+                          <p className="text-muted-foreground">
+                            Duracao ate {new Date(entry.newEndUtc).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}
                           </p>
                         )}
                         {entry.reason && <p className="italic">&ldquo;{entry.reason}&rdquo;</p>}

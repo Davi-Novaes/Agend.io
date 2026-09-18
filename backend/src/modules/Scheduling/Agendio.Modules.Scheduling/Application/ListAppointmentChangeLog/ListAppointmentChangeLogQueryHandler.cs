@@ -39,7 +39,11 @@ public sealed class ListAppointmentChangeLogQueryHandler(
             customerNames[itemCustomerId] = customer?.FullName ?? "Cliente removido";
         }
 
-        foreach (var resourceId in paged.Items.Select(e => e.ResourceId).Distinct())
+        var resourceIds = paged.Items.Select(e => e.ResourceId)
+            .Concat(paged.Items.Where(e => e.PreviousResourceId is not null).Select(e => e.PreviousResourceId!.Value))
+            .Distinct();
+
+        foreach (var resourceId in resourceIds)
         {
             var resource = await resourceLookup.FindByIdAsync(resourceId, cancellationToken);
             resourceNames[resourceId] = resource?.Name ?? "Profissional removido";
@@ -58,6 +62,9 @@ public sealed class ListAppointmentChangeLogQueryHandler(
                 e.Reason,
                 e.PreviousStartUtc,
                 e.NewStartUtc,
+                e.NewEndUtc,
+                e.PreviousResourceId,
+                e.PreviousResourceId is { } previousResourceId ? resourceNames[previousResourceId] : null,
                 e.ByStaff,
                 e.OccurredAtUtc))
             .ToList();

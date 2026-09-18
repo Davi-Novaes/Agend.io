@@ -37,6 +37,8 @@ public sealed class UserConfiguration : IEntityTypeConfiguration<User>
         builder.Property(u => u.IsActive).IsRequired();
 
         builder.Property(u => u.MfaEnabled).IsRequired().HasDefaultValue(false);
+        builder.Property(u => u.LockoutEscalationLevel).IsRequired().HasDefaultValue(0);
+        builder.Property(u => u.AvatarUrl).HasMaxLength(500);
 
         // Mesma logica de TeamInvitation.TokenHash: SHA-256 hex de um segredo de
         // alta entropia. Indice unico como defesa extra — nulo enquanto nao ha

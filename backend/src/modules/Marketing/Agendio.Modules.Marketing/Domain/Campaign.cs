@@ -58,9 +58,14 @@ public sealed class Campaign : AggregateRoot<CampaignId>, ITenantOwned, IAuditab
         SentAtUtc = sentAtUtc;
     }
 
+    /// <summary>
+    /// recipientCustomerIds so alimenta o CampaignSentDomainEvent (quem foi
+    /// contatado, pra Customers marcar LastContactedAtUtc) — NAO e persistido
+    /// no agregado (RecipientCount ja e o snapshot que importa aqui).
+    /// </summary>
     public static Result<Campaign> Create(
-        TenantId tenantId, string? subject, string? body, CampaignChannel channel, string? targetSegment, int recipientCount,
-        DateTimeOffset sentAtUtc)
+        TenantId tenantId, string? subject, string? body, CampaignChannel channel, string? targetSegment,
+        IReadOnlyList<Guid> recipientCustomerIds, DateTimeOffset sentAtUtc)
     {
         if (string.IsNullOrWhiteSpace(subject))
         {
@@ -72,11 +77,8 @@ public sealed class Campaign : AggregateRoot<CampaignId>, ITenantOwned, IAuditab
             return Result.Failure<Campaign>(Error.Validation("Campaign.BodyRequired", "Informe o texto da campanha."));
         }
 
-        if (recipientCount < 0)
-        {
-            return Result.Failure<Campaign>(Error.Validation("Campaign.InvalidRecipientCount", "Quantidade de destinatarios invalida."));
-        }
-
-        return Result.Success(new Campaign(tenantId, subject.Trim(), body.Trim(), channel, targetSegment, recipientCount, sentAtUtc));
+        var campaign = new Campaign(tenantId, subject.Trim(), body.Trim(), channel, targetSegment, recipientCustomerIds.Count, sentAtUtc);
+        campaign.Raise(new CampaignSentDomainEvent(campaign.Id, tenantId, recipientCustomerIds, sentAtUtc));
+        return Result.Success(campaign);
     }
 }

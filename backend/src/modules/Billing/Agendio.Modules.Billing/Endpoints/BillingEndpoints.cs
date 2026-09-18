@@ -4,6 +4,7 @@ using Agendio.Modules.Billing.Application.ActivateFreePlan;
 using Agendio.Modules.Billing.Application.CancelSubscription;
 using Agendio.Modules.Billing.Application.GetMySubscription;
 using Agendio.Modules.Billing.Application.GetOnboardingSubscriptionStatus;
+using Agendio.Modules.Billing.Application.GetSubscriptionGateStatus;
 using Agendio.Modules.Billing.Application.ListPlans;
 using Agendio.Modules.Billing.Application.OnboardSelectPlan;
 using Agendio.Modules.Billing.Application.ProcessAsaasWebhook;
@@ -43,8 +44,25 @@ public sealed class BillingEndpoints : IEndpointModule
             var result = await dispatcher.Query(new GetMySubscriptionQuery(), cancellationToken);
             return result.IsSuccess ? Results.Ok(result.Value) : result.Error.ToProblemResult();
         })
+        // So o Owner ve dados de assinatura/cobranca — e informacao financeira da
+        // conta, nao operacional do dia a dia (Staff nao deve ver nem o status).
+        .RequireAuthorization(policy => policy.RequireRole("Owner"))
         .WithName("GetMySubscription")
         .WithSummary("Status da assinatura do estabelecimento atual (trial, ativa, atrasada...).");
+
+        // Sem RequireRole("Owner") de proposito: Staff nao ve detalhe de plano/
+        // pagamento (isso fica em /subscription, agora so-Owner), mas o app
+        // shell inteiro (qualquer papel) precisa saber "a assinatura esta em
+        // dia?" pra decidir se bloqueia o uso do sistema (ver AppLayout no
+        // frontend) — sem este endpoint, Staff nunca seria bloqueado por
+        // assinatura vencida, porque a query completa passaria a devolver 403.
+        group.MapGet("/subscription/gate-status", async (IDispatcher dispatcher, CancellationToken cancellationToken) =>
+        {
+            var result = await dispatcher.Query(new GetSubscriptionGateStatusQuery(), cancellationToken);
+            return result.IsSuccess ? Results.Ok(result.Value) : result.Error.ToProblemResult();
+        })
+        .WithName("GetSubscriptionGateStatus")
+        .WithSummary("Status minimo da assinatura (sem dado de billing) — usado para o gate de pagamento pendente.");
 
         group.MapPost("/subscription/subscribe", async (SubscribeRequest request, IDispatcher dispatcher, CancellationToken cancellationToken) =>
         {
@@ -52,6 +70,7 @@ public sealed class BillingEndpoints : IEndpointModule
             var result = await dispatcher.Send(command, cancellationToken);
             return result.IsSuccess ? Results.Ok(result.Value) : result.Error.ToProblemResult();
         })
+        .RequireAuthorization(policy => policy.RequireRole("Owner"))
         .WithName("SubscribeToPlan")
         .WithSummary("Assina um plano — devolve a URL de pagamento hospedada pela Asaas (PIX/boleto/cartao).");
 
@@ -65,6 +84,7 @@ public sealed class BillingEndpoints : IEndpointModule
             var result = await dispatcher.Send(new ActivateFreePlanCommand(), cancellationToken);
             return result.IsSuccess ? Results.NoContent() : result.Error.ToProblemResult();
         })
+        .RequireAuthorization(policy => policy.RequireRole("Owner"))
         .WithName("ActivateFreePlan")
         .WithSummary("Ativa o plano Free para o estabelecimento atual, sem Asaas.");
 
@@ -73,6 +93,7 @@ public sealed class BillingEndpoints : IEndpointModule
             var result = await dispatcher.Send(new CancelSubscriptionCommand(), cancellationToken);
             return result.IsSuccess ? Results.NoContent() : result.Error.ToProblemResult();
         })
+        .RequireAuthorization(policy => policy.RequireRole("Owner"))
         .WithName("CancelSubscription")
         .WithSummary("Cancela a assinatura do estabelecimento atual.");
 
@@ -96,7 +117,7 @@ public sealed class BillingEndpoints : IEndpointModule
         .RequireAuthorization(OnboardingAuthConstants.AuthorizationPolicy)
         .WithTags("Billing")
         .WithName("OnboardSelectPlan")
-        .WithSummary("Escolhe o plano no onboarding — Free ativa direto, pago devolve o link do checkout Asaas.");
+        .WithSummary("Registra a intencao de plano no onboarding — nao ativa nada ainda (so apos confirmar e-mail e logar).");
 
         endpoints.MapGet("/api/billing/subscription/onboard-status", async (
             ClaimsPrincipal user, IDispatcher dispatcher, CancellationToken cancellationToken) =>

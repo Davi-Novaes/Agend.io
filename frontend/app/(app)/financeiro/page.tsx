@@ -52,7 +52,7 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { CashFlowChart, CATEGORY_LABELS } from "@/components/financeiro/cash-flow-chart";
 import { PeriodFilter } from "@/components/shared/period-filter";
-import { toDateOnly, startOfMonth } from "@/lib/date-utils";
+import { toDateOnly, startOfYear } from "@/lib/date-utils";
 
 const PAGE_SIZE = 20;
 
@@ -116,7 +116,7 @@ export default function FinanceiroPage() {
   }
 
   return (
-    <div className="mx-auto flex w-full max-w-5xl flex-1 flex-col">
+    <div className="flex w-full flex-1 flex-col">
       <div className="mb-6">
         <p className="text-muted-foreground text-sm">Contas a pagar, a receber, comissoes e fluxo de caixa.</p>
       </div>
@@ -147,7 +147,10 @@ export default function FinanceiroPage() {
 }
 
 function ResumoTab({ accessToken, onNavigateToPagar }: { accessToken: string; onNavigateToPagar: () => void }) {
-  const [from, setFrom] = React.useState(() => toDateOnly(startOfMonth(new Date())));
+  // Mesmo raciocinio do painel/relatorios: ano todo por padrao, nao so o mes
+  // atual -- senao "Evolucao mensal" abre com um unico mes, escondendo o
+  // historico ja acumulado ate a pessoa achar o seletor de periodo.
+  const [from, setFrom] = React.useState(() => toDateOnly(startOfYear(new Date())));
   const [to, setTo] = React.useState(() => toDateOnly(new Date()));
 
   const summaryQuery = useQuery({

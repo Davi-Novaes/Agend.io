@@ -38,18 +38,26 @@ public sealed class AsaasClient(HttpClient httpClient) : IAsaasClient
         var subscriptionBody = await subscriptionResponse.Content.ReadFromJsonAsync<CreateSubscriptionResponse>(JsonOptions, cancellationToken)
             ?? throw new InvalidOperationException("Resposta vazia da Asaas ao criar assinatura.");
 
+        return await FetchLatestPaymentAsync(subscriptionBody.Id, cancellationToken);
+    }
+
+    public Task<AsaasNewSubscriptionResult> GetLatestSubscriptionPaymentAsync(string asaasSubscriptionId, CancellationToken cancellationToken) =>
+        FetchLatestPaymentAsync(asaasSubscriptionId, cancellationToken);
+
+    private async Task<AsaasNewSubscriptionResult> FetchLatestPaymentAsync(string asaasSubscriptionId, CancellationToken cancellationToken)
+    {
         // POST /subscriptions nao devolve invoiceUrl — a fatura so existe como
         // um Payment separado, gerado automaticamente pela assinatura.
         using var paymentsResponse = await httpClient.GetAsync(
-            $"subscriptions/{subscriptionBody.Id}/payments?limit=1", cancellationToken);
+            $"subscriptions/{asaasSubscriptionId}/payments?limit=1", cancellationToken);
         await EnsureSuccessAsync(paymentsResponse, cancellationToken);
 
         var paymentsBody = await paymentsResponse.Content.ReadFromJsonAsync<SubscriptionPaymentsResponse>(JsonOptions, cancellationToken);
         var firstPayment = paymentsBody?.Data.FirstOrDefault()
-            ?? throw new InvalidOperationException("Assinatura criada na Asaas sem nenhum pagamento gerado.");
+            ?? throw new InvalidOperationException("Assinatura na Asaas sem nenhum pagamento gerado.");
 
         return new AsaasNewSubscriptionResult(
-            subscriptionBody.Id, firstPayment.Id, firstPayment.InvoiceUrl,
+            asaasSubscriptionId, firstPayment.Id, firstPayment.InvoiceUrl,
             DateOnly.Parse(firstPayment.DueDate, CultureInfo.InvariantCulture), firstPayment.BillingType);
     }
 

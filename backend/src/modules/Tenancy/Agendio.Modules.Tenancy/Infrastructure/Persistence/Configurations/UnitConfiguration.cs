@@ -22,6 +22,9 @@ public sealed class UnitConfiguration : IEntityTypeConfiguration<Unit>
 
         builder.Property(u => u.Name).IsRequired().HasMaxLength(200);
         builder.Property(u => u.Address).HasMaxLength(500);
+        builder.Property(u => u.City).HasMaxLength(150);
+        builder.Property(u => u.State).HasMaxLength(2);
+        builder.Property(u => u.Country).HasMaxLength(100);
         builder.Property(u => u.IsActive).IsRequired();
 
         builder.Property(u => u.CreatedBy).HasMaxLength(256);

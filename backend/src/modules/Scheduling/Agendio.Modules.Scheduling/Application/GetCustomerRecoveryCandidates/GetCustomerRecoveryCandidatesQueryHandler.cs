@@ -85,6 +85,17 @@ public sealed class GetCustomerRecoveryCandidatesQueryHandler(
                 continue;
             }
 
+            // Pedido explicito do usuario (2026-09-05): quem ja foi contatado
+            // (mensagem avulsa ou campanha) DEPOIS da ultima visita nao deve
+            // continuar aparecendo — ja recebeu o toque de "sentimos sua
+            // falta" para este ciclo de atraso. Uma NOVA visita reseta
+            // LastVisitAtUtc pra depois do contato antigo, reabrindo a
+            // sugestao se o cliente ficar overdue de novo no futuro.
+            if (customer.LastContactedAtUtc is { } lastContactedAtUtc && lastContactedAtUtc >= stats.LastVisitAtUtc)
+            {
+                continue;
+            }
+
             results.Add(new CustomerRecoveryCandidate(
                 customerId, customer.FullName, customer.Email,
                 stats.AverageIntervalDays, stats.DaysSinceLastVisit, stats.DaysOverdue, stats.LastVisitAtUtc));

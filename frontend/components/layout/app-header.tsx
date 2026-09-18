@@ -5,14 +5,14 @@ import { useQuery } from "@tanstack/react-query";
 import { Bell, ChevronDown, LogOut } from "lucide-react";
 
 import { ALL_NAV_ITEMS, resolveNavLabel } from "@/components/layout/nav-config";
-import { getTenantProfile } from "@/lib/api/client";
+import { getTenantProfile, getMyProfile, resolveAssetUrl, TENANT_PROFILE_QUERY_KEY } from "@/lib/api/client";
 import { useSession } from "@/lib/auth/session-context";
 import { decodeJwtEmail, decodeJwtFullName, decodeJwtRole } from "@/lib/auth/decode-jwt";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { Button } from "@/components/ui/button";
 import { SidebarTrigger } from "@/components/ui/sidebar";
 import { Separator } from "@/components/ui/separator";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -47,8 +47,14 @@ export function AppHeader() {
   // Mesma fonte de terminologia do AppSidebar — evita o titulo do header
   // dizer "Recursos" enquanto o menu ja diz "Barbeiros" (BL-14, docs/BACKLOG.md).
   const profileQuery = useQuery({
-    queryKey: ["tenant-profile"],
+    queryKey: TENANT_PROFILE_QUERY_KEY,
     queryFn: () => getTenantProfile(session!.accessToken),
+    enabled: Boolean(session),
+  });
+
+  const myProfileQuery = useQuery({
+    queryKey: ["my-profile"],
+    queryFn: () => getMyProfile(session!.accessToken),
     enabled: Boolean(session),
   });
 
@@ -59,7 +65,7 @@ export function AppHeader() {
     ALL_NAV_ITEMS.find((item) => item.matchPrefix && pathname.startsWith(item.href));
   const title = matchedItem
     ? resolveNavLabel(matchedItem.href, matchedItem.label, profileQuery.data?.terminology.staffPlural)
-    : "Agendio";
+    : "AgendioBR";
   const email = session ? decodeJwtEmail(session.accessToken) : null;
   const fullName = session ? decodeJwtFullName(session.accessToken) : null;
   const role = session ? decodeJwtRole(session.accessToken) : null;
@@ -87,6 +93,9 @@ export function AppHeader() {
           <DropdownMenuTrigger asChild>
             <button className="flex items-center gap-2 rounded-md py-1 pl-1 pr-2 hover:bg-accent" aria-label="Menu da conta">
               <Avatar className="size-8">
+                {myProfileQuery.data?.avatarUrl && (
+                  <AvatarImage src={resolveAssetUrl(myProfileQuery.data.avatarUrl)} alt="" />
+                )}
                 {/* bg-muted/text-muted-foreground nao atinge contraste AA em text-xs
                     (achado pelo axe-core no e2e) — usa o par primary/primary-foreground,
                     ja auditado para AA (ver components/ui/button.tsx). */}

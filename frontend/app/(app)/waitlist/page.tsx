@@ -139,7 +139,7 @@ export default function WaitlistPage() {
   }
 
   return (
-    <div className="mx-auto flex w-full max-w-5xl flex-1 flex-col">
+    <div className="flex w-full flex-1 flex-col">
       <div className="mb-6">
         <p className="text-muted-foreground text-sm">
           Clientes que entraram na fila quando nao havia horario disponivel. Ao cancelar um agendamento compativel, as entradas

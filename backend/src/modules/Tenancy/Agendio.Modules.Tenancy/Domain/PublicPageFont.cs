@@ -11,4 +11,7 @@ public enum PublicPageFont
     Poppins,
     PlayfairDisplay,
     Merriweather,
+    Inter,
+    Montserrat,
+    Lora,
 }
