@@ -21,6 +21,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
+import { formatPhoneDisplay } from "@/lib/format/br-masks";
 
 type Step = "service" | "resource" | "datetime" | "details" | "confirmed";
 
@@ -131,7 +132,7 @@ export function BookingFlow({
     const profile = customerPortalQuery.data;
     setFullName((current) => current || profile.fullName);
     setEmail((current) => current || profile.email);
-    setPhone((current) => current || profile.phone || "");
+    setPhone((current) => current || (profile.phone ? formatPhoneDisplay(profile.phone) : ""));
   }, [customerPortalQuery.data]);
 
   const scheduleMutation = useMutation({
@@ -459,7 +460,7 @@ export function BookingFlow({
                     <label htmlFor="waitlist-phone" className="mb-1 block text-sm font-medium">
                       Telefone (opcional)
                     </label>
-                    <Input id="waitlist-phone" value={phone} onChange={(event) => setPhone(event.target.value)} autoComplete="tel" />
+                    <Input id="waitlist-phone" value={phone} onChange={(event) => setPhone(formatPhoneDisplay(event.target.value))} autoComplete="tel" />
                   </div>
                   {formError && (
                     <p role="alert" className="text-destructive text-sm">
@@ -520,7 +521,7 @@ export function BookingFlow({
               <label htmlFor="booking-phone" className="mb-1 block text-sm font-medium">
                 Telefone (opcional)
               </label>
-              <Input id="booking-phone" value={phone} onChange={(event) => setPhone(event.target.value)} autoComplete="tel" />
+              <Input id="booking-phone" value={phone} onChange={(event) => setPhone(formatPhoneDisplay(event.target.value))} autoComplete="tel" />
             </div>
             {paymentRequired && (
               <div>
