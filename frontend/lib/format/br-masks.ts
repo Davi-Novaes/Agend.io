@@ -46,6 +46,16 @@ export function formatPhone(value: string): string {
   return `(${digits.slice(0, 2)}) ${digits.slice(2, 7)}-${digits.slice(7)}`;
 }
 
+/** Mesma mascara de formatPhone, mas tambem reconhece um telefone ja
+ * normalizado em E.164 pelo backend (+5511999998888, ver PhoneNumber.Create)
+ * -- o "+55" so pode vir de la, nunca de digitacao manual, entao e o unico
+ * sinal confiavel pra saber que os 2 primeiros digitos sao DDI e nao DDD
+ * (DDD 55 existe de verdade, contar digito sozinho seria ambiguo). */
+export function formatPhoneDisplay(value: string): string {
+  const trimmed = value.trim();
+  return trimmed.startsWith("+55") ? `+55 ${formatPhone(trimmed.slice(3))}` : formatPhone(trimmed);
+}
+
 /** Mesma ideia do telefone, mas o formato muda de vez (nao so reflui) ao
  * passar de 11 digitos -- ate ali e CPF (000.000.000-00), dali em diante CNPJ
  * (00.000.000/0000-00). Consistente com isValidCpfCnpj (mesmo corte). */
