@@ -3,6 +3,7 @@ using Agendio.Infrastructure.DependencyInjection;
 using Agendio.Infrastructure.Endpoints;
 using Agendio.Modules.Customers.Contracts;
 using Agendio.Modules.Customers.Endpoints;
+using Agendio.Modules.Customers.Application.CustomerPortal;
 using Agendio.SharedKernel.Messaging;
 using FluentValidation;
 using Microsoft.Extensions.Configuration;
@@ -27,6 +28,9 @@ public static class CustomersModuleServiceCollectionExtensions
         services.AddScoped<ICustomerLookupService, Infrastructure.CustomerLookupService>();
         services.AddScoped<ICustomerDirectoryLookupService, Infrastructure.CustomerLookupService>();
         services.AddScoped<ICustomerRegistrationService, Infrastructure.CustomerRegistrationService>();
+        services.AddScoped<ICustomerPortalAccessStore, Infrastructure.RedisCustomerPortalAccessStore>();
+        services.AddScoped<Infrastructure.Notifications.CustomerPortalAccessEmailJob>();
+        services.AddScoped<CustomerPortalAccessCodeSender>();
         services.AddHostedService<Infrastructure.Messaging.LoyaltyIntegrationEventConsumer>();
         services.AddHostedService<Infrastructure.Messaging.MarketingIntegrationEventConsumer>();
 
