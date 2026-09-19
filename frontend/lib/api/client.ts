@@ -584,6 +584,60 @@ export function getPublicLoyaltyStatus(tenantId: string, email: string): Promise
   return request(`/api/public/tenants/${tenantId}/loyalty?email=${encodeURIComponent(email)}`);
 }
 
+export type CustomerPortalAppointment = {
+  id: string;
+  serviceId: string;
+  serviceName: string;
+  resourceName: string;
+  startAtUtc: string;
+  endAtUtc: string;
+  price: number;
+  currency: string;
+  status: "Scheduled" | "Confirmed" | "InProgress" | "Completed" | "CancelledByCustomer" | "CancelledByStaff" | "NoShow";
+};
+
+export type CustomerPortalProfile = {
+  fullName: string;
+  email: string;
+  phone: string | null;
+  loyaltyPoints: number;
+  loyaltyVisitsForReward: number | null;
+  loyaltyRewardDescription: string | null;
+  appointments: CustomerPortalAppointment[];
+};
+
+export function registerCustomerPortalAccount(
+  tenantId: string,
+  input: { fullName: string; email: string; phone?: string | null }
+): Promise<void> {
+  return request(`/api/public/tenants/${tenantId}/customer-portal/register`, {
+    method: "POST",
+    body: JSON.stringify(input),
+  });
+}
+
+export function requestCustomerPortalCode(tenantId: string, email: string): Promise<void> {
+  return request(`/api/public/tenants/${tenantId}/customer-portal/request-code`, {
+    method: "POST",
+    body: JSON.stringify({ email }),
+  });
+}
+
+export function verifyCustomerPortalCode(tenantId: string, email: string, code: string): Promise<{ expiresAtUtc: string }> {
+  return request(`/api/public/tenants/${tenantId}/customer-portal/verify-code`, {
+    method: "POST",
+    body: JSON.stringify({ email, code }),
+  });
+}
+
+export function getCustomerPortal(tenantId: string): Promise<CustomerPortalProfile> {
+  return request(`/api/public/tenants/${tenantId}/customer-portal/me`);
+}
+
+export function logoutCustomerPortal(tenantId: string): Promise<void> {
+  return request(`/api/public/tenants/${tenantId}/customer-portal/logout`, { method: "POST" });
+}
+
 export type NotificationLogItem = {
   id: string;
   appointmentId: string;

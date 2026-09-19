@@ -1,7 +1,9 @@
 "use client";
 
 import * as React from "react";
+import Image from "next/image";
 import { useQuery, useMutation } from "@tanstack/react-query";
+import { ArrowLeft, ArrowRight, Check, Clock3, Scissors, UserRound } from "lucide-react";
 import {
   publicListServices,
   publicListResources,
@@ -12,6 +14,7 @@ import {
   type PublicServiceSummary,
   type PublicResourceSummary,
   type AvailableSlot,
+  resolveAssetUrl,
 } from "@/lib/api/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -21,9 +24,9 @@ import { cn } from "@/lib/utils";
 type Step = "service" | "resource" | "datetime" | "details" | "confirmed";
 
 const STEP_LABELS: Record<Exclude<Step, "confirmed">, string> = {
-  service: "Servico",
+  service: "Serviço",
   resource: "Profissional",
-  datetime: "Data e horario",
+  datetime: "Data e horário",
   details: "Seus dados",
 };
 
@@ -49,6 +52,10 @@ export function BookingFlow({
   buttonRadiusClassName,
   paymentRequired = false,
   depositPercentage = 0,
+  initialServices = [],
+  initialResources = [],
+  initialServiceId,
+  customerPortalHref,
 }: {
   tenantId: string;
   /** Estilo de botao do estabelecimento (Fase 3 — Personalizacao da pagina). */
@@ -56,10 +63,22 @@ export function BookingFlow({
   /** Fase 16 — se o tenant exige sinal, o formulario passa a pedir CPF e a confirmacao mostra o link de pagamento. */
   paymentRequired?: boolean;
   depositPercentage?: number;
+  /** Dados ja carregados no SSR evitam o estado vazio ao abrir a pagina publica. */
+  initialServices?: PublicServiceSummary[];
+  initialResources?: PublicResourceSummary[];
+  /** Permite que um card da vitrine abra o agendamento com o servico escolhido. */
+  initialServiceId?: string;
+  customerPortalHref?: string;
 }) {
-  const [step, setStep] = React.useState<Step>("service");
-  const [selectedService, setSelectedService] = React.useState<PublicServiceSummary | null>(null);
-  const [selectedResource, setSelectedResource] = React.useState<PublicResourceSummary | null>(null);
+  const initialService = initialServices.find((service) => service.id === initialServiceId) ?? null;
+  const hasSingleInitialResource = initialResources.length === 1;
+  const [step, setStep] = React.useState<Step>(() =>
+    initialService ? (hasSingleInitialResource ? "datetime" : "resource") : "service"
+  );
+  const [selectedService, setSelectedService] = React.useState<PublicServiceSummary | null>(initialService);
+  const [selectedResource, setSelectedResource] = React.useState<PublicResourceSummary | null>(
+    hasSingleInitialResource ? initialResources[0] : null
+  );
   const [selectedDate, setSelectedDate] = React.useState(() => toDateInputValue(new Date()));
   const [selectedSlot, setSelectedSlot] = React.useState<AvailableSlot | null>(null);
 
@@ -75,11 +94,15 @@ export function BookingFlow({
   const servicesQuery = useQuery({
     queryKey: ["public-services", tenantId],
     queryFn: () => publicListServices(tenantId),
+    initialData: initialServices.length > 0 ? initialServices : undefined,
+    staleTime: initialServices.length > 0 ? 60_000 : 0,
   });
 
   const resourcesQuery = useQuery({
     queryKey: ["public-resources", tenantId],
     queryFn: () => publicListResources(tenantId),
+    initialData: initialResources.length > 0 ? initialResources : undefined,
+    staleTime: initialResources.length > 0 ? 60_000 : 0,
   });
 
   const slotsQuery = useQuery({
@@ -106,7 +129,7 @@ export function BookingFlow({
       setStep("confirmed");
     },
     onError: (error) => {
-      setFormError(error instanceof ApiError ? error.message : "Nao foi possivel concluir o agendamento. Tente novamente.");
+      setFormError(error instanceof ApiError ? error.message : "Não foi possível concluir o agendamento. Tente novamente.");
     },
   });
 
@@ -122,7 +145,7 @@ export function BookingFlow({
         notes: notes.trim() === "" ? null : notes.trim(),
       }),
     onError: (error) => {
-      setFormError(error instanceof ApiError ? error.message : "Nao foi possivel entrar na lista de espera. Tente novamente.");
+      setFormError(error instanceof ApiError ? error.message : "Não foi possível entrar na lista de espera. Tente novamente.");
     },
   });
 
@@ -174,47 +197,94 @@ export function BookingFlow({
   const currentStepIndex = step === "confirmed" ? stepOrder.length : stepOrder.indexOf(step);
 
   return (
-    <div className="mx-auto w-full max-w-lg">
+    <div className="mx-auto w-full max-w-3xl">
       {step !== "confirmed" && (
-        <p className="text-muted-foreground mb-6 text-center text-xs" aria-live="polite">
-          Passo {currentStepIndex + 1} de {stepOrder.length} — {STEP_LABELS[step]}
-        </p>
+        <div className="mb-8" aria-label="Progresso do agendamento">
+          <div className="mb-3 flex items-center justify-between gap-2">
+            {stepOrder.map((item, index) => {
+              const isComplete = index < currentStepIndex;
+              const isCurrent = index === currentStepIndex;
+              return (
+                <React.Fragment key={item}>
+                  {index > 0 && <span aria-hidden className={cn("h-px flex-1", isComplete || isCurrent ? "bg-primary" : "bg-border")} />}
+                  <div className="flex min-w-0 flex-col items-center gap-1.5">
+                    <span
+                      className={cn(
+                        "flex size-8 items-center justify-center rounded-full border text-xs font-semibold",
+                        isComplete && "border-primary bg-primary text-primary-foreground",
+                        isCurrent && "border-primary bg-primary/10 text-primary",
+                        !isComplete && !isCurrent && "border-border bg-background text-muted-foreground"
+                      )}
+                      aria-current={isCurrent ? "step" : undefined}
+                    >
+                      {isComplete ? <Check className="size-4" /> : index + 1}
+                    </span>
+                    <span className={cn("hidden text-[11px] font-medium sm:block", isCurrent ? "text-foreground" : "text-muted-foreground")}>
+                      {STEP_LABELS[item]}
+                    </span>
+                  </div>
+                </React.Fragment>
+              );
+            })}
+          </div>
+          <p className="text-muted-foreground text-center text-xs sm:hidden" aria-live="polite">
+            Passo {currentStepIndex + 1} de {stepOrder.length} — {STEP_LABELS[step]}
+          </p>
+        </div>
+      )}
+
+      {step !== "service" && step !== "confirmed" && selectedService && (
+        <div className="bg-primary/5 border-primary/15 mb-6 flex flex-wrap items-center gap-x-5 gap-y-2 rounded-xl border px-4 py-3 text-sm">
+          <span className="flex items-center gap-2 font-medium"><Scissors className="text-primary size-4" />{selectedService.name}</span>
+          <span className="text-muted-foreground flex items-center gap-1.5"><Clock3 className="size-3.5" />{selectedService.durationMinutes} min</span>
+          <span className="ml-auto font-semibold">{formatPrice(selectedService.price, selectedService.currency)}</span>
+        </div>
       )}
 
       {step === "service" && (
         <section aria-labelledby="step-service-heading">
-          <h2 id="step-service-heading" className="mb-4 text-lg font-medium">
-            Escolha um servico
-          </h2>
-          {servicesQuery.isLoading && <p className="text-muted-foreground text-sm">Carregando servicos...</p>}
+          <div className="mb-5">
+            <h2 id="step-service-heading" className="text-xl font-semibold tracking-tight">O que você gostaria de agendar?</h2>
+            <p className="text-muted-foreground mt-1 text-sm">Escolha uma opção para ver profissionais e horários disponíveis.</p>
+          </div>
+          {servicesQuery.isLoading && <p className="text-muted-foreground text-sm">Carregando serviços...</p>}
           {servicesQuery.isError && (
             <div className="border-destructive/50 bg-destructive/5 rounded-lg border p-4 text-sm">
-              <p className="text-destructive font-medium">Nao foi possivel carregar os servicos agora.</p>
-              <p className="text-muted-foreground mt-1">Tente novamente em instantes — pode ser uma falha temporaria, nao falta de cadastro.</p>
+              <p className="text-destructive font-medium">Não foi possível carregar os serviços agora.</p>
+              <p className="text-muted-foreground mt-1">Tente novamente em instantes — pode ser uma falha temporária, não falta de cadastro.</p>
               <Button type="button" variant="outline" size="sm" className="mt-3" onClick={() => servicesQuery.refetch()}>
                 Tentar novamente
               </Button>
             </div>
           )}
           {!servicesQuery.isError && servicesQuery.data?.length === 0 && (
-            <p className="text-muted-foreground text-sm">Nenhum servico disponivel no momento.</p>
+            <p className="text-muted-foreground text-sm">Nenhum serviço disponível no momento.</p>
           )}
-          <ul className="flex flex-col gap-2">
+          <ul className="grid gap-3 sm:grid-cols-2">
             {(servicesQuery.data ?? []).map((service) => (
               <li key={service.id}>
                 <button
                   type="button"
                   onClick={() => selectService(service)}
                   className={cn(
-                    "hover:border-primary focus-visible:outline-primary w-full rounded-lg border p-4 text-left focus-visible:outline-2",
+                    "group/service hover:border-primary/60 hover:bg-primary/[0.035] focus-visible:outline-primary flex h-full w-full overflow-hidden rounded-xl border bg-background text-left shadow-xs transition-all hover:-translate-y-0.5 hover:shadow-md focus-visible:outline-2",
                     buttonRadiusClassName
                   )}
                 >
-                  <p className="font-medium">{service.name}</p>
-                  <p className="text-muted-foreground text-sm">
-                    {service.durationMinutes} min · {formatPrice(service.price, service.currency)}
-                  </p>
-                  {service.description && <p className="text-muted-foreground mt-1 text-sm">{service.description}</p>}
+                  {service.imageUrl ? (
+                    <Image src={resolveAssetUrl(service.imageUrl)} alt="" width={112} height={112} className="h-full min-h-32 w-28 shrink-0 object-cover" unoptimized />
+                  ) : (
+                    <span className="bg-primary/8 flex min-h-32 w-24 shrink-0 items-center justify-center"><Scissors className="text-primary size-7" strokeWidth={1.5} /></span>
+                  )}
+                  <span className="flex min-w-0 flex-1 flex-col p-4">
+                    {service.category && <span className="text-primary mb-1 text-[11px] font-semibold tracking-wider uppercase">{service.category}</span>}
+                    <span className="font-semibold">{service.name}</span>
+                    {service.description && <span className="text-muted-foreground mt-1 line-clamp-2 text-xs leading-relaxed">{service.description}</span>}
+                    <span className="mt-auto flex items-end justify-between gap-2 pt-4">
+                      <span className="text-muted-foreground flex items-center gap-1 text-xs"><Clock3 className="size-3.5" />{service.durationMinutes} min</span>
+                      <span className="flex items-center gap-1 font-semibold">{formatPrice(service.price, service.currency)}<ArrowRight className="text-primary size-4 transition-transform group-hover/service:translate-x-0.5" /></span>
+                    </span>
+                  </span>
                 </button>
               </li>
             ))}
@@ -224,34 +294,44 @@ export function BookingFlow({
 
       {step === "resource" && (
         <section aria-labelledby="step-resource-heading">
-          <button type="button" onClick={() => setStep("service")} className="text-muted-foreground mb-4 text-sm underline">
-            Voltar
+          <button type="button" onClick={() => setStep("service")} className="text-muted-foreground hover:text-foreground mb-4 inline-flex items-center gap-1.5 text-sm">
+            <ArrowLeft className="size-4" /> Voltar aos serviços
           </button>
-          <h2 id="step-resource-heading" className="mb-4 text-lg font-medium">
-            Escolha o profissional
-          </h2>
+          <div className="mb-5">
+            <h2 id="step-resource-heading" className="text-xl font-semibold tracking-tight">Com quem você quer ser atendido?</h2>
+            <p className="text-muted-foreground mt-1 text-sm">Selecione o profissional de sua preferência.</p>
+          </div>
           {resourcesQuery.isLoading && <p className="text-muted-foreground text-sm">Carregando profissionais...</p>}
           {resourcesQuery.isError && (
             <div className="border-destructive/50 bg-destructive/5 rounded-lg border p-4 text-sm">
-              <p className="text-destructive font-medium">Nao foi possivel carregar os profissionais agora.</p>
+              <p className="text-destructive font-medium">Não foi possível carregar os profissionais agora.</p>
               <p className="text-muted-foreground mt-1">Tente novamente em instantes.</p>
               <Button type="button" variant="outline" size="sm" className="mt-3" onClick={() => resourcesQuery.refetch()}>
                 Tentar novamente
               </Button>
             </div>
           )}
-          <ul className="flex flex-col gap-2">
+          <ul className="grid gap-3 sm:grid-cols-2">
             {(resourcesQuery.data ?? []).map((resource) => (
               <li key={resource.id}>
                 <button
                   type="button"
                   onClick={() => selectResource(resource)}
                   className={cn(
-                    "hover:border-primary focus-visible:outline-primary w-full rounded-lg border p-4 text-left focus-visible:outline-2",
+                    "hover:border-primary/60 hover:bg-primary/[0.035] focus-visible:outline-primary flex w-full items-center gap-3 rounded-xl border bg-background p-4 text-left shadow-xs transition-all hover:-translate-y-0.5 hover:shadow-md focus-visible:outline-2",
                     buttonRadiusClassName
                   )}
                 >
-                  <p className="font-medium">{resource.name}</p>
+                  {resource.photoUrl ? (
+                    <Image src={resolveAssetUrl(resource.photoUrl)} alt="" width={52} height={52} className="size-13 rounded-full object-cover" unoptimized />
+                  ) : (
+                    <span className="bg-primary/10 text-primary flex size-13 shrink-0 items-center justify-center rounded-full"><UserRound className="size-5" /></span>
+                  )}
+                  <span className="min-w-0 flex-1">
+                    <span className="block font-semibold">{resource.name}</span>
+                    {resource.specialties.length > 0 && <span className="text-muted-foreground mt-0.5 block truncate text-xs">{resource.specialties.join(" · ")}</span>}
+                  </span>
+                  <ArrowRight className="text-primary size-4" />
                 </button>
               </li>
             ))}
@@ -269,7 +349,7 @@ export function BookingFlow({
             Voltar
           </button>
           <h2 id="step-datetime-heading" className="mb-4 text-lg font-medium">
-            Escolha data e horario
+            Escolha data e horário
           </h2>
           <label htmlFor="booking-date" className="mb-1 block text-sm font-medium">
             Data
@@ -287,11 +367,11 @@ export function BookingFlow({
             className="mb-4 max-w-48"
           />
 
-          {slotsQuery.isLoading && <p className="text-muted-foreground text-sm">Carregando horarios...</p>}
+          {slotsQuery.isLoading && <p className="text-muted-foreground text-sm">Carregando horários...</p>}
           {slotsQuery.isError && (
             <div className="border-destructive/50 bg-destructive/5 rounded-lg border p-4 text-sm">
-              <p className="text-destructive font-medium">Nao foi possivel carregar os horarios agora.</p>
-              <p className="text-muted-foreground mt-1">Tente novamente em instantes — pode ser uma falha temporaria, nao falta de horario.</p>
+              <p className="text-destructive font-medium">Não foi possível carregar os horários agora.</p>
+              <p className="text-muted-foreground mt-1">Tente novamente em instantes — pode ser uma falha temporária, não falta de horário.</p>
               <Button type="button" variant="outline" size="sm" className="mt-3" onClick={() => slotsQuery.refetch()}>
                 Tentar novamente
               </Button>
@@ -317,10 +397,10 @@ export function BookingFlow({
 
           {slotsQuery.data?.length === 0 && (
             <div>
-              <p className="text-muted-foreground text-sm">Nenhum horario disponivel nesta data. Tente outra data.</p>
+              <p className="text-muted-foreground text-sm">Nenhum horário disponível nesta data. Tente outra data.</p>
 
               {waitlistMutation.isSuccess ? (
-                <p className="text-sm mt-3">Voce entrou na lista de espera! Avisaremos por e-mail se uma vaga abrir.</p>
+                <p className="text-sm mt-3">Você entrou na lista de espera! Avisaremos por e-mail se uma vaga abrir.</p>
               ) : showWaitlistForm ? (
                 <form
                   className="mt-3 flex flex-col gap-3"
@@ -387,7 +467,7 @@ export function BookingFlow({
             Seus dados
           </h2>
           <p className="text-muted-foreground mb-4 text-sm capitalize">
-            {selectedService.name} · {formatDate(selectedSlot.startUtc)} as {formatTime(selectedSlot.startUtc)}
+            {selectedService.name} · {formatDate(selectedSlot.startUtc)} às {formatTime(selectedSlot.startUtc)}
           </p>
           <form onSubmit={handleSubmitDetails} className="flex flex-col gap-3">
             <div>
@@ -428,7 +508,7 @@ export function BookingFlow({
             )}
             <div>
               <label htmlFor="booking-notes" className="mb-1 block text-sm font-medium">
-                Observacoes (opcional)
+                Observações (opcional)
               </label>
               <Textarea id="booking-notes" rows={2} value={notes} onChange={(event) => setNotes(event.target.value)} />
             </div>
@@ -454,7 +534,7 @@ export function BookingFlow({
                 : "Agendamento confirmado!"}
           </h2>
           <p className="text-muted-foreground text-sm capitalize">
-            {selectedService.name} em {formatDate(selectedSlot.startUtc)} as {formatTime(selectedSlot.startUtc)}
+            {selectedService.name} em {formatDate(selectedSlot.startUtc)} às {formatTime(selectedSlot.startUtc)}
           </p>
           {paymentUrl ? (
             <>
@@ -479,6 +559,11 @@ export function BookingFlow({
             </p>
           ) : (
             <p className="text-muted-foreground mt-4 text-sm">Enviamos os detalhes para {email}.</p>
+          )}
+          {customerPortalHref && (
+            <Button variant="outline" className={cn("mt-4", buttonRadiusClassName)} asChild>
+              <a href={customerPortalHref}>Ver meus agendamentos</a>
+            </Button>
           )}
         </section>
       )}

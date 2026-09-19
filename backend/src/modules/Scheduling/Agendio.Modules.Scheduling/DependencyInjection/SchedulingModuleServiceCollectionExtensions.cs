@@ -32,6 +32,7 @@ public static class SchedulingModuleServiceCollectionExtensions
         services.AddScoped<ICustomerVisitStatsLookupService, CustomerVisitStatsLookupService>();
         services.AddScoped<IAppointmentStatsLookupService, AppointmentStatsLookupService>();
         services.AddScoped<IReviewsSummaryLookupService, ReviewsSummaryLookupService>();
+        services.AddScoped<ICustomerPortalAppointmentsLookupService, CustomerPortalAppointmentsLookupService>();
 
         return services;
     }
