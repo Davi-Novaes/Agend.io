@@ -10,6 +10,7 @@ import {
   getAvailableSlots,
   publicScheduleAppointment,
   joinWaitlist,
+  getCustomerPortal,
   ApiError,
   type PublicServiceSummary,
   type PublicResourceSummary,
@@ -111,6 +112,27 @@ export function BookingFlow({
       getAvailableSlots(tenantId, { resourceId: selectedResource!.id, serviceId: selectedService!.id, date: selectedDate }),
     enabled: step === "datetime" && Boolean(selectedResource) && Boolean(selectedService),
   });
+
+  // Mesma queryKey do PortalAccountMenu/CustomerPortal — reaproveita o cache
+  // em vez de checar a sessao de novo, e responde 401 silenciosamente se o
+  // cliente nao estiver logado (ver GetCustomerPortalQueryHandler).
+  const customerPortalQuery = useQuery({
+    queryKey: ["customer-portal", tenantId],
+    queryFn: () => getCustomerPortal(tenantId),
+    retry: false,
+  });
+
+  // So preenche uma vez, e so o que ainda estiver vazio — nunca sobrescreve o
+  // que o cliente ja digitou (ex.: quer agendar pra outra pessoa).
+  const hasPrefilledFromPortalRef = React.useRef(false);
+  React.useEffect(() => {
+    if (!customerPortalQuery.data || hasPrefilledFromPortalRef.current) return;
+    hasPrefilledFromPortalRef.current = true;
+    const profile = customerPortalQuery.data;
+    setFullName((current) => current || profile.fullName);
+    setEmail((current) => current || profile.email);
+    setPhone((current) => current || profile.phone || "");
+  }, [customerPortalQuery.data]);
 
   const scheduleMutation = useMutation({
     mutationFn: () =>
@@ -469,6 +491,11 @@ export function BookingFlow({
           <p className="text-muted-foreground mb-4 text-sm capitalize">
             {selectedService.name} · {formatDate(selectedSlot.startUtc)} às {formatTime(selectedSlot.startUtc)}
           </p>
+          {customerPortalQuery.data && (
+            <p className="border-primary/15 bg-primary/5 text-muted-foreground mb-4 rounded-lg border px-3 py-2 text-sm">
+              Preenchido com os dados de <span className="text-foreground font-medium">{customerPortalQuery.data.fullName}</span>, da sua conta.
+            </p>
+          )}
           <form onSubmit={handleSubmitDetails} className="flex flex-col gap-3">
             <div>
               <label htmlFor="booking-name" className="mb-1 block text-sm font-medium">
