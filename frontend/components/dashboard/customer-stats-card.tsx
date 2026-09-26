@@ -81,7 +81,7 @@ export function CustomerStatsCard({
         {isLoading ? (
           <div className="flex items-center gap-4 p-3">
             <Skeleton className="size-40 shrink-0 rounded-full" />
-            <div className="flex w-full flex-col gap-2">
+            <div className="flex min-w-0 flex-1 flex-col gap-2">
               <Skeleton className="h-5 w-full" />
               <Skeleton className="h-5 w-full" />
               <Skeleton className="h-5 w-full" />
@@ -134,7 +134,7 @@ export function CustomerStatsCard({
               </div>
             </div>
 
-            <ul className="flex w-full flex-col gap-1.5" aria-label="Legenda de clientes por segmento">
+            <ul className="flex min-w-0 flex-1 flex-col gap-1.5" aria-label="Legenda de clientes por segmento">
               {segments.map((segment) => (
                 <li key={segment.key}>
                   <Link
