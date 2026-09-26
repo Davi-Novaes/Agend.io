@@ -59,6 +59,7 @@ export const metadata: Metadata = {
   title: "AgendioBR — Agendamento e gestão para o seu negócio",
   description:
     "Agenda, clientes, equipe e marca própria em um só lugar. O AgendioBR se adapta ao seu segmento — barbearia, clínica, pet shop e muito mais — sem precisar configurar nada.",
+  alternates: { canonical: SITE_URL },
 };
 
 // Revalida a cada hora — os planos raramente mudam, mas a home nunca deve
@@ -215,6 +216,14 @@ const structuredData = {
       name: "AgendioBR",
       url: SITE_URL,
       logo: `${SITE_URL}/logo.png`,
+    },
+    {
+      "@type": "FAQPage",
+      mainEntity: FAQ.map((item) => ({
+        "@type": "Question",
+        name: item.question,
+        acceptedAnswer: { "@type": "Answer", text: item.answer },
+      })),
     },
   ],
 };

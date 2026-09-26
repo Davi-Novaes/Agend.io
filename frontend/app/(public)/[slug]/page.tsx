@@ -11,6 +11,7 @@ import { DEFAULT_TENANT_THEME } from "@/lib/tenant/tenant-theme";
 import { BookingFlow } from "@/components/public/booking-flow";
 import { LoyaltyLookup } from "@/components/public/loyalty-lookup";
 import { PortalAccountMenu } from "@/components/public/portal-account-menu";
+import { SITE_URL } from "@/app/layout";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
@@ -82,9 +83,60 @@ async function loadTenant(slug: string): Promise<TenantPublicProfile | null> {
 export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
   const { slug } = await params;
   const tenant = await loadTenant(slug);
+  if (!tenant) {
+    return { title: "Estabelecimento não encontrado" };
+  }
+
+  const description = tenant.description ?? `Conheça os serviços e agende seu horário em ${tenant.name}.`;
+  // Canonical sempre pelo path, mesmo quando a visita veio pelo subdominio
+  // (barbearia-do-ze.agendiobr.com.br) -- ADR 0009: e o MESMO conteudo nos
+  // dois hosts, sem canonical o Google ve como pagina duplicada e dilui o
+  // sinal de ranking entre as duas URLs em vez de consolidar num so.
+  const canonicalUrl = `${SITE_URL}/${slug}`;
+  const image = tenant.bannerUrl ?? tenant.logoUrl;
+
   return {
-    title: tenant ? `${tenant.name} | Agendamento online` : "Estabelecimento não encontrado",
-    description: tenant ? (tenant.description ?? `Conheça os serviços e agende seu horário em ${tenant.name}.`) : undefined,
+    title: `${tenant.name} | Agendamento online`,
+    description,
+    alternates: { canonical: canonicalUrl },
+    openGraph: {
+      title: tenant.name,
+      description,
+      url: canonicalUrl,
+      siteName: tenant.name,
+      type: "website",
+      ...(image ? { images: [{ url: resolveAssetUrl(image) }] } : {}),
+    },
+  };
+}
+
+// LocalBusiness generico (nao um subtipo especifico como HairSalon/Dentist)
+// de proposito -- a plataforma atende qualquer segmento com hora marcada, e
+// LocalBusiness cobre nome/endereco/telefone/horario igual pra todos, sem
+// precisar mapear BusinessType pro subtipo schema.org certo.
+function buildLocalBusinessJsonLd(tenant: TenantPublicProfile, canonicalUrl: string) {
+  const sameAs = [tenant.instagramUrl, tenant.facebookUrl].filter((url): url is string => Boolean(url));
+
+  return {
+    "@context": "https://schema.org",
+    "@type": "LocalBusiness",
+    name: tenant.name,
+    url: canonicalUrl,
+    ...(tenant.description ? { description: tenant.description } : {}),
+    ...(tenant.logoUrl ? { image: resolveAssetUrl(tenant.logoUrl) } : {}),
+    ...(tenant.phone ? { telephone: tenant.phone } : {}),
+    ...(tenant.address ? { address: tenant.address } : {}),
+    ...(sameAs.length > 0 ? { sameAs } : {}),
+    ...(tenant.businessHours.length > 0
+      ? {
+          openingHoursSpecification: tenant.businessHours.map((entry) => ({
+            "@type": "OpeningHoursSpecification",
+            dayOfWeek: entry.dayOfWeek,
+            opens: entry.startTime,
+            closes: entry.endTime,
+          })),
+        }
+      : {}),
   };
 }
 
@@ -139,9 +191,12 @@ export default async function TenantPortalPage({ params, searchParams }: PagePro
   };
   const buttonRadiusClassName = "rounded-[var(--tenant-button-radius)]";
   const hasDiscoveryNavigation = customization.showServicesSection || customization.showTeamSection || customization.showHoursSection || units.length > 0;
+  const canonicalUrl = `${SITE_URL}/${slug}`;
+  const localBusinessJsonLd = buildLocalBusinessJsonLd(tenant, canonicalUrl);
 
   return (
     <TenantThemeProvider theme={theme}>
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(localBusinessJsonLd) }} />
       <div className={`min-h-full bg-background text-foreground ${FONT_CLASS_NAME[customization.font]}`}>
         <header className="bg-background/92 sticky top-0 z-50 border-b backdrop-blur-xl">
           <div className="mx-auto flex h-16 w-full max-w-6xl items-center gap-4 px-4 sm:px-6">
