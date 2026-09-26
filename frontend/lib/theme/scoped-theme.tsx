@@ -116,11 +116,36 @@ export function ScopedThemeProvider({
   // herdaria as variaveis escuras mesmo escolhendo "claro" so pra ela.
   const themeClassName = resolvedTheme === "dark" ? "dark" : "theme-fixed-light";
 
+  // O servidor nunca tem localStorage, entao sempre renderiza como se
+  // preference="system" e sistema=claro (ver readStoredPreference/
+  // getSystemSchemeServerSnapshot acima) -- se o cliente tiver "escuro"
+  // salvo, a classe que o React calcula no primeiro render do navegador
+  // DIVERGE da que veio do servidor. Confirmado ao vivo: React NAO corrige
+  // esse tipo de mismatch de atributo depois (nem com suppressHydrationWarning
+  // — a mensagem de erro do proprio React diz "This won't be patched up"),
+  // entao o elemento fica preso na classe errada pelo resto da vida do
+  // componente, so remontando corrige. A correcao e a MESMA tecnica que a
+  // biblioteca next-themes usa por baixo dos panos pro <html>: um <script>
+  // inline, sincrono, que roda ANTES do bundle de hidratacao do React
+  // carregar, aplicando a classe certa direto no DOM -- assim, quando o
+  // React hidrata, o valor que ele calcula ja bate com o que esta no DOM,
+  // e nao ha mismatch nenhum pra "nao corrigir".
+  const elementId = React.useId();
+
   return (
     <ScopedThemeContext.Provider value={value}>
-      <div className={cn(className, themeClassName)} suppressHydrationWarning>
+      {/* O <script> precisa vir DEPOIS da div no HTML (nao antes): o browser
+          executa um <script> inline assim que o parser passa por ele, e o
+          irmao seguinte ainda nao foi inserido no DOM nesse momento --
+          document.getElementById so acha a div se ela ja tiver sido parseada. */}
+      <div id={elementId} className={cn(className, themeClassName)} suppressHydrationWarning>
         {children}
       </div>
+      <script
+        dangerouslySetInnerHTML={{
+          __html: `(function(){try{var k=${JSON.stringify(storageKey)};var v=localStorage.getItem(k);var dark=v==="dark"||(v!=="light"&&window.matchMedia("(prefers-color-scheme: dark)").matches);var el=document.getElementById(${JSON.stringify(elementId)});if(el)el.className=${JSON.stringify(cn(className))}+" "+(dark?"dark":"theme-fixed-light");}catch(e){}})();`,
+        }}
+      />
     </ScopedThemeContext.Provider>
   );
 }
