@@ -45,7 +45,8 @@ public sealed class IdentityEndpoints : IEndpointModule
         group.MapPost("/register", async (RegisterRequest request, IDispatcher dispatcher, CancellationToken cancellationToken) =>
         {
             var command = new RegisterUserCommand(
-                request.TenantId, request.Email, request.Password, request.FullName, request.Phone, request.CpfCnpj, request.TermsAccepted);
+                request.TenantId, request.Email, request.Password, request.FullName, request.Phone, request.CpfCnpj,
+                request.TermsAccepted, request.TurnstileToken);
             var result = await dispatcher.Send(command, cancellationToken);
 
             return result.IsSuccess
@@ -86,7 +87,7 @@ public sealed class IdentityEndpoints : IEndpointModule
 
         group.MapPost("/login", async (LoginRequest request, IDispatcher dispatcher, HttpContext httpContext, CancellationToken cancellationToken) =>
         {
-            var command = new LoginCommand(request.TenantId, request.Email, request.Password);
+            var command = new LoginCommand(request.TenantId, request.Email, request.Password, request.TurnstileToken);
             var result = await dispatcher.Send(command, cancellationToken);
 
             if (result.IsFailure)
@@ -398,7 +399,9 @@ public sealed class IdentityEndpoints : IEndpointModule
 
     private sealed record UpdateMyProfileRequest(string FullName, string? Phone);
 
-    private sealed record RegisterRequest(Guid TenantId, string Email, string Password, string FullName, string Phone, string CpfCnpj, bool TermsAccepted);
+    private sealed record RegisterRequest(
+        Guid TenantId, string Email, string Password, string FullName, string Phone, string CpfCnpj, bool TermsAccepted,
+        string TurnstileToken);
 
     private sealed record ConfirmEmailRequest(string Token);
 
@@ -410,7 +413,7 @@ public sealed class IdentityEndpoints : IEndpointModule
 
     private sealed record ChangePasswordRequest(string CurrentPassword, string NewPassword);
 
-    private sealed record LoginRequest(Guid TenantId, string Email, string Password);
+    private sealed record LoginRequest(Guid TenantId, string Email, string Password, string TurnstileToken);
 
     private sealed record VerifyMfaRequest(string MfaChallengeToken, string Code);
 

@@ -32,5 +32,9 @@ public sealed class RegisterUserCommandValidator : AbstractValidator<RegisterUse
         RuleFor(c => c.TermsAccepted)
             .Equal(true)
             .WithMessage("E preciso aceitar os Termos de Uso e a Politica de Privacidade.");
+
+        // Sem NotEmpty aqui de proposito — ver comentario em LoginCommand
+        // sobre TurnstileToken: a obrigatoriedade e condicional a
+        // Turnstile:SecretKey estar configurado, verificado no pipeline, nao aqui.
     }
 }

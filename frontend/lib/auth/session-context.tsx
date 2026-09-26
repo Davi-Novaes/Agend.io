@@ -28,7 +28,7 @@ type SessionContextValue = {
   session: Session | null;
   isAuthenticating: boolean;
   isRestoringSession: boolean;
-  login: (input: { tenantId: string; email: string; password: string }) => Promise<void>;
+  login: (input: { tenantId: string; email: string; password: string; turnstileToken: string }) => Promise<void>;
   verifyMfa: (input: { mfaChallengeToken: string; code: string }) => Promise<void>;
   logout: () => void;
 };
@@ -111,7 +111,7 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
   }, [session, applyTokens]);
 
   const login = React.useCallback(
-    async (input: { tenantId: string; email: string; password: string }) => {
+    async (input: { tenantId: string; email: string; password: string; turnstileToken: string }) => {
       setIsAuthenticating(true);
       try {
         const result = await apiLogin(input);

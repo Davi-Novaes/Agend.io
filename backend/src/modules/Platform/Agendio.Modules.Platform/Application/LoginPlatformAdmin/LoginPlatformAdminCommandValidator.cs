@@ -8,5 +8,6 @@ public sealed class LoginPlatformAdminCommandValidator : AbstractValidator<Login
     {
         RuleFor(c => c.Email).NotEmpty().EmailAddress();
         RuleFor(c => c.Password).NotEmpty();
+        // Sem NotEmpty em TurnstileToken de proposito — ver LoginCommand (Identity).
     }
 }

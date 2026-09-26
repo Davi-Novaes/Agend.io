@@ -74,6 +74,12 @@ public static class InfrastructureServiceCollectionExtensions
         services.Configure<AiAssistantOptions>(configuration.GetSection(AiAssistantOptions.SectionName));
         AddAiChatClients(services);
 
+        services.Configure<TurnstileOptions>(configuration.GetSection(TurnstileOptions.SectionName));
+        services.AddHttpClient<ITurnstileVerifier, CloudflareTurnstileVerifier>(httpClient =>
+        {
+            httpClient.BaseAddress = new Uri("https://challenges.cloudflare.com/turnstile/v0/");
+        });
+
         services.AddSingleton<IFileStorage, LocalFileStorage>();
 
         AddRedis(services, configuration);
@@ -92,11 +98,13 @@ public static class InfrastructureServiceCollectionExtensions
         // TODO comando/consulta de TODO modulo, sem cada modulo precisar repetir.
         // A ORDEM de registro e a ordem de execucao (o primeiro registrado e o
         // mais externo): Logging precisa envolver tudo (inclusive falha de
-        // validacao) para registrar o desfecho; ExplicitTenant roda por ultimo,
-        // logo antes do handler, para o tenant estar ancorado quando o handler
-        // tocar o banco.
+        // validacao) para registrar o desfecho; Turnstile roda depois da
+        // validacao de forma (token vazio ja falhou ali, sem gastar a chamada
+        // HTTP pra Cloudflare) mas antes de ExplicitTenant/handler, pra
+        // recusar bot antes do custo de Argon2id ou de tocar o banco.
         services.AddTransient(typeof(IPipelineBehavior<,>), typeof(LoggingBehavior<,>));
         services.AddTransient(typeof(IPipelineBehavior<,>), typeof(ValidationBehavior<,>));
+        services.AddTransient(typeof(IPipelineBehavior<,>), typeof(TurnstileVerificationBehavior<,>));
         services.AddTransient(typeof(IPipelineBehavior<,>), typeof(ExplicitTenantBehavior<,>));
 
         return services;

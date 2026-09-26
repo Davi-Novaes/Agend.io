@@ -1,8 +1,10 @@
 using Agendio.SharedKernel.Messaging;
+using Agendio.SharedKernel.Security;
 
 namespace Agendio.Modules.Platform.Application.LoginPlatformAdmin;
 
-public sealed record LoginPlatformAdminCommand(string Email, string Password) : ICommand<LoginPlatformAdminOutcome>;
+public sealed record LoginPlatformAdminCommand(string Email, string Password, string TurnstileToken)
+    : ICommand<LoginPlatformAdminOutcome>, IRequiresTurnstileVerification;
 
 public sealed record LoginPlatformAdminResult(string AccessToken, DateTimeOffset ExpiresAtUtc, string FullName);
 
