@@ -150,7 +150,7 @@ export function AppointmentStatusChart({ stats }: { stats: AppointmentStats }) {
             </div>
           </div>
 
-          <ul className="flex w-full flex-col gap-1.5" aria-label="Legenda de status dos agendamentos">
+          <ul className="flex min-w-0 flex-1 flex-col gap-1.5" aria-label="Legenda de status dos agendamentos">
             {segments.map((segment) => (
               <li key={segment.key} className="bg-card/70 flex items-center gap-2 rounded-md border border-border/50 px-2.5 py-2 text-xs">
                 <span aria-hidden="true" className="inline-block size-2.5 shrink-0 rounded-full" style={{ backgroundColor: segment.color }} />
