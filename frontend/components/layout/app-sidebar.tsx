@@ -46,8 +46,8 @@ export function AppSidebar() {
             return null;
           }
           return (
-            <SidebarGroup key={group.label}>
-              <SidebarGroupLabel>{group.label}</SidebarGroupLabel>
+            <SidebarGroup key={group.label} className="px-2 py-1">
+              <SidebarGroupLabel className="h-7">{group.label}</SidebarGroupLabel>
               <SidebarGroupContent>
                 <SidebarMenu>
                   {items.map((item) => {

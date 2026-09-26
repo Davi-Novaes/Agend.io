@@ -24,7 +24,7 @@ public sealed class CreateUnitCommandHandler(TenancyDbContext dbContext, ITenant
             }
         }
 
-        var unitResult = Domain.Unit.Create(tenantContext.TenantId, request.Name, request.Address, request.City, request.State, request.Country);
+        var unitResult = Domain.Unit.Create(tenantContext.TenantId, request.Name, request.Address, request.City, request.State, request.Country, request.Phone, request.WhatsApp);
 
         if (unitResult.IsFailure)
         {

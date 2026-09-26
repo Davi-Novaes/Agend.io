@@ -138,7 +138,7 @@ export default function TeamSettingsPage() {
 
           <Card>
             <CardHeader>
-              <CardTitle className="text-base">Convidar alguem</CardTitle>
+              <CardTitle className="text-base">Convidar alguém</CardTitle>
             </CardHeader>
             <CardContent>
             <Form {...form}>
@@ -202,7 +202,9 @@ export default function TeamSettingsPage() {
               </div>
             )}
             <p className="text-muted-foreground mt-2 text-xs">
-              Envio automatico por e-mail chega em uma proxima etapa — por enquanto, compartilhe o link acima.
+              {inviteLink
+                ? "O envio automático por e-mail ainda não está disponível. Copie o link acima e envie para a pessoa convidada."
+                : "Ao criar o convite, um link para compartilhar será exibido aqui."}
             </p>
             </CardContent>
           </Card>

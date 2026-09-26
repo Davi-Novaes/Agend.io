@@ -1,5 +1,6 @@
 "use client";
 
+import * as React from "react";
 import { Moon, Sun, Monitor } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -22,8 +23,18 @@ const OPTIONS = [
 // next-themes global -- trocar aqui nunca afeta o tema do painel autenticado.
 export function MarketingThemeToggle() {
   const { preference, setPreference } = useScopedTheme();
+  const isHydrated = React.useSyncExternalStore(
+    () => () => undefined,
+    () => true,
+    () => false
+  );
 
-  const current = OPTIONS.find((option) => option.value === preference) ?? OPTIONS[2];
+  // O servidor sempre renderiza o icone neutro de "sistema". A preferencia
+  // salva so entra depois da hidratacao, evitando que React compare Monitor
+  // no HTML do servidor com Sun/Moon no primeiro render do navegador.
+  const current = isHydrated
+    ? (OPTIONS.find((option) => option.value === preference) ?? OPTIONS[2])
+    : OPTIONS[2];
   const Icon = current.icon;
 
   return (

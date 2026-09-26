@@ -7,7 +7,17 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { toast } from "sonner";
 import Link from "next/link";
-import { Plus, Inbox, ListFilter, Receipt, Users, AlertTriangle } from "lucide-react";
+import {
+  AlertTriangle,
+  ArrowDownCircle,
+  Inbox,
+  ListFilter,
+  Plus,
+  Receipt,
+  Scale,
+  Users,
+  Wallet,
+} from "lucide-react";
 
 import {
   listAccountsReceivable,
@@ -33,7 +43,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from "@/components/ui/table";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
@@ -51,8 +61,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { CashFlowChart, CATEGORY_LABELS } from "@/components/financeiro/cash-flow-chart";
+import { MetricCard } from "@/components/dashboard/metric-card";
 import { PeriodFilter } from "@/components/shared/period-filter";
-import { toDateOnly, startOfYear } from "@/lib/date-utils";
+import { previousPeriod, toDateOnly, startOfYear } from "@/lib/date-utils";
 
 const PAGE_SIZE = 20;
 
@@ -90,6 +101,11 @@ function formatDate(value: string): string {
   return new Date(`${value.slice(0, 10)}T00:00:00`).toLocaleDateString("pt-BR");
 }
 
+function percentDelta(current: number, previous: number): number | null {
+  if (previous === 0) return null;
+  return ((current - previous) / previous) * 100;
+}
+
 const expenseSchema = z.object({
   description: z.string().min(1, "Informe a descricao."),
   amount: z.coerce.number().positive("Informe um valor maior que zero."),
@@ -121,13 +137,15 @@ export default function FinanceiroPage() {
         <p className="text-muted-foreground text-sm">Contas a pagar, a receber, comissoes e fluxo de caixa.</p>
       </div>
 
-      <Tabs value={tab} onValueChange={setTab}>
-        <TabsList>
-          <TabsTrigger value="resumo">Resumo</TabsTrigger>
-          <TabsTrigger value="receber">Contas a Receber</TabsTrigger>
-          <TabsTrigger value="pagar">Contas a Pagar</TabsTrigger>
-          <TabsTrigger value="comissoes">Comissoes</TabsTrigger>
-        </TabsList>
+      <Tabs value={tab} onValueChange={setTab} className="min-w-0">
+        <div className="max-w-full overflow-x-auto pb-1">
+          <TabsList className="w-max">
+            <TabsTrigger value="resumo">Resumo</TabsTrigger>
+            <TabsTrigger value="receber">Contas a Receber</TabsTrigger>
+            <TabsTrigger value="pagar">Contas a Pagar</TabsTrigger>
+            <TabsTrigger value="comissoes">Comissoes</TabsTrigger>
+          </TabsList>
+        </div>
 
         <TabsContent value="resumo" className="mt-4">
           <ResumoTab accessToken={session.accessToken} onNavigateToPagar={() => setTab("pagar")} />
@@ -152,10 +170,16 @@ function ResumoTab({ accessToken, onNavigateToPagar }: { accessToken: string; on
   // historico ja acumulado ate a pessoa achar o seletor de periodo.
   const [from, setFrom] = React.useState(() => toDateOnly(startOfYear(new Date())));
   const [to, setTo] = React.useState(() => toDateOnly(new Date()));
+  const previous = previousPeriod(from, to);
 
   const summaryQuery = useQuery({
     queryKey: ["financeiro", "fluxo-de-caixa", from, to],
     queryFn: () => getCashFlowSummary({ from, to }, accessToken),
+  });
+
+  const previousSummaryQuery = useQuery({
+    queryKey: ["financeiro", "fluxo-de-caixa", previous.from, previous.to],
+    queryFn: () => getCashFlowSummary(previous, accessToken),
   });
 
   // O Resumo so soma o que ja foi PAGO (fluxo de caixa realizado) — sem isso,
@@ -168,6 +192,7 @@ function ResumoTab({ accessToken, onNavigateToPagar }: { accessToken: string; on
   });
 
   const summary = summaryQuery.data;
+  const previousSummary = previousSummaryQuery.data;
   const pendingItems = pendingPayablesQuery.data?.items ?? [];
   const pendingTotal = pendingItems.reduce((sum, item) => sum + item.amount, 0);
 
@@ -192,42 +217,35 @@ function ResumoTab({ accessToken, onNavigateToPagar }: { accessToken: string; on
       )}
 
       <div className="grid gap-4 sm:grid-cols-3">
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-muted-foreground text-sm font-normal">Entradas</CardTitle>
-          </CardHeader>
-          <CardContent>
-            {summaryQuery.isLoading ? (
-              <Skeleton className="h-8 w-32" />
-            ) : (
-              <p className="text-2xl font-semibold">{summary ? formatCurrency(summary.totalReceived) : "—"}</p>
-            )}
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-muted-foreground text-sm font-normal">Saidas</CardTitle>
-          </CardHeader>
-          <CardContent>
-            {summaryQuery.isLoading ? (
-              <Skeleton className="h-8 w-32" />
-            ) : (
-              <p className="text-2xl font-semibold">{summary ? formatCurrency(summary.totalPaid) : "—"}</p>
-            )}
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-muted-foreground text-sm font-normal">Saldo</CardTitle>
-          </CardHeader>
-          <CardContent>
-            {summaryQuery.isLoading ? (
-              <Skeleton className="h-8 w-32" />
-            ) : (
-              <p className="text-2xl font-semibold">{summary ? formatCurrency(summary.netBalance) : "—"}</p>
-            )}
-          </CardContent>
-        </Card>
+        <MetricCard
+          icon={Wallet}
+          title="Entradas"
+          value={summary ? formatCurrency(summary.totalReceived) : "—"}
+          delta={summary && previousSummary ? percentDelta(summary.totalReceived, previousSummary.totalReceived) : undefined}
+          emptyLabel={summary?.totalReceived === 0 ? "Nenhuma entrada no período" : undefined}
+          isLoading={summaryQuery.isLoading}
+          tone="success"
+          featured
+        />
+        <MetricCard
+          icon={ArrowDownCircle}
+          title="Saídas"
+          value={summary ? formatCurrency(summary.totalPaid) : "—"}
+          delta={summary && previousSummary ? percentDelta(summary.totalPaid, previousSummary.totalPaid) : undefined}
+          emptyLabel={summary?.totalPaid === 0 ? "Nenhuma saída no período" : undefined}
+          isLoading={summaryQuery.isLoading}
+          tone="destructive"
+          invertDeltaTone
+        />
+        <MetricCard
+          icon={Scale}
+          title="Saldo"
+          value={summary ? formatCurrency(summary.netBalance) : "—"}
+          delta={summary && previousSummary ? percentDelta(summary.netBalance, previousSummary.netBalance) : undefined}
+          description="Entradas menos saídas realizadas."
+          isLoading={summaryQuery.isLoading}
+          tone="primary"
+        />
       </div>
 
       {summaryQuery.isLoading ? (

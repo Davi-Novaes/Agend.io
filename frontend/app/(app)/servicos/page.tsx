@@ -6,7 +6,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { toast } from "sonner";
-import { Plus, Search, Tag } from "lucide-react";
+import { MoreHorizontal, Plus, Search, Tag } from "lucide-react";
 
 import {
   listServices,
@@ -36,6 +36,12 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 const PAGE_SIZE = 20;
 const CURRENCY = "BRL";
@@ -233,7 +239,7 @@ export default function ServicesPage() {
     <div className="flex w-full flex-1 flex-col">
       <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
         <p className="text-muted-foreground text-sm">Catalogo de servicos oferecidos.</p>
-        <Button onClick={openCreateDialog}>
+        <Button className="w-full sm:w-auto" onClick={openCreateDialog}>
           <Plus className="size-4" />
           Novo servico
         </Button>
@@ -358,18 +364,22 @@ export default function ServicesPage() {
                       </Badge>
                     </TableCell>
                     <TableCell className="text-right">
-                      <div className="flex justify-end gap-2">
-                        <Button variant="ghost" size="sm" onClick={() => openEditDialog(service)}>
-                          Editar
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => statusMutation.mutate({ id: service.id, isActive: !service.isActive })}
-                        >
-                          {service.isActive ? "Desativar" : "Ativar"}
-                        </Button>
-                      </div>
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="ghost" size="icon" aria-label={`Ações de ${service.name}`}>
+                            <MoreHorizontal className="size-4" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end" className="w-40">
+                          <DropdownMenuItem onSelect={() => openEditDialog(service)}>Editar</DropdownMenuItem>
+                          <DropdownMenuItem
+                            variant={service.isActive ? "destructive" : "default"}
+                            onSelect={() => statusMutation.mutate({ id: service.id, isActive: !service.isActive })}
+                          >
+                            {service.isActive ? "Desativar" : "Ativar"}
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
                     </TableCell>
                   </TableRow>
                 ))

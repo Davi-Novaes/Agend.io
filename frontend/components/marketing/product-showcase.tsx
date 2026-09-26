@@ -1,7 +1,28 @@
 "use client";
 
 import * as React from "react";
-import { Building2, Calendar, ChevronDown, TrendingDown, TrendingUp, UserRound, Users } from "lucide-react";
+import {
+  ArrowUpRight,
+  Building2,
+  Calendar,
+  CalendarDays,
+  ChevronDown,
+  ChevronLeft,
+  ChevronRight,
+  CircleDollarSign,
+  Clock3,
+  Download,
+  MapPin,
+  MoreHorizontal,
+  Plus,
+  Search,
+  SlidersHorizontal,
+  TrendingDown,
+  TrendingUp,
+  UserCheck,
+  UserRound,
+  Users,
+} from "lucide-react";
 import {
   Area,
   AreaChart,
@@ -154,12 +175,11 @@ function renderActiveDonutShape({ cx, cy, innerRadius, outerRadius, startAngle, 
 }
 
 const CUSTOMERS = [
-  { name: "Marina Costa", lastVisit: "Há 3 dias", count: 12 },
-  { name: "Pedro Alves", lastVisit: "Há 1 semana", count: 8 },
-  { name: "Julia Prado", lastVisit: "Ontem", count: 21 },
-  { name: "Carlos Andrade", lastVisit: "Há 2 semanas", count: 5 },
-  { name: "Beatriz Mendes", lastVisit: "Há 2 dias", count: 14 },
-  { name: "Diego Martins", lastVisit: "Há 4 dias", count: 3 },
+  { name: "Marina Costa", phone: "(11) 98842-1204", lastVisit: "Há 3 dias", count: 12, status: "Frequente" },
+  { name: "Pedro Alves", phone: "(11) 97731-4820", lastVisit: "Há 1 semana", count: 8, status: "Ativo" },
+  { name: "Julia Prado", phone: "(11) 99106-3378", lastVisit: "Ontem", count: 21, status: "VIP" },
+  { name: "Carlos Andrade", phone: "(11) 96440-9182", lastVisit: "Há 2 semanas", count: 5, status: "Ativo" },
+  { name: "Beatriz Mendes", phone: "(11) 98624-7731", lastVisit: "Há 2 dias", count: 14, status: "Frequente" },
 ];
 
 const PROFESSIONALS = [
@@ -174,9 +194,9 @@ const PROFESSIONALS_AVG_OCCUPANCY = Math.round(
 );
 
 const UNITS = [
-  { name: "Unidade Centro", professionals: 5, appointments: 312 },
-  { name: "Unidade Norte", professionals: 3, appointments: 187 },
-  { name: "Unidade Sul", professionals: 4, appointments: 245 },
+  { name: "Unidade Centro", address: "Av. Paulista, 1240", professionals: 5, appointments: 312, occupancy: 88, revenue: 18450 },
+  { name: "Unidade Norte", address: "Rua Voluntários, 385", professionals: 3, appointments: 187, occupancy: 72, revenue: 11280 },
+  { name: "Unidade Sul", address: "Av. Jabaquara, 860", professionals: 4, appointments: 245, occupancy: 81, revenue: 14790 },
 ];
 
 const REVENUE_SERIES = [
@@ -217,6 +237,42 @@ const TABS = [
 
 const PANEL_ANIMATION =
   "data-[state=active]:animate-in data-[state=active]:fade-in-0 data-[state=active]:slide-in-from-bottom-2 data-[state=active]:duration-500";
+
+function DemoPageHeader({
+  eyebrow,
+  title,
+  description,
+  action,
+}: {
+  eyebrow: string;
+  title: string;
+  description: string;
+  action?: React.ReactNode;
+}) {
+  return (
+    <div className="mb-5 flex flex-wrap items-end justify-between gap-3 border-b pb-4">
+      <div>
+        <p className="text-primary text-[10px] font-semibold tracking-[0.16em] uppercase">{eyebrow}</p>
+        <h3 className="mt-1 text-lg font-semibold tracking-tight">{title}</h3>
+        <p className="text-muted-foreground mt-1 text-xs">{description}</p>
+      </div>
+      {action}
+    </div>
+  );
+}
+
+function DemoMetric({ icon: Icon, label, value, hint }: { icon: React.ElementType; label: string; value: string; hint: string }) {
+  return (
+    <div className="border-border/60 bg-background/70 rounded-xl border p-3 shadow-sm">
+      <div className="flex items-center justify-between gap-2">
+        <p className="text-muted-foreground text-[10px] font-medium">{label}</p>
+        <Icon className="text-primary size-3.5" aria-hidden />
+      </div>
+      <p className="mt-1 text-lg font-semibold tracking-tight tabular-nums">{value}</p>
+      <p className="text-muted-foreground mt-0.5 text-[9px]">{hint}</p>
+    </div>
+  );
+}
 
 type TabValue = (typeof TABS)[number]["value"];
 
@@ -260,6 +316,8 @@ export function ProductShowcase() {
     setActiveTab(value as TabValue);
   }
 
+  const activeTabLabel = TABS.find((tab) => tab.value === activeTab)?.label ?? "Visão geral";
+
   return (
     <Tabs
       value={activeTab}
@@ -268,7 +326,7 @@ export function ProductShowcase() {
       onMouseEnter={() => setIsHovering(true)}
       onMouseLeave={() => setIsHovering(false)}
     >
-      <TabsList className="mx-auto h-auto flex-wrap gap-1 bg-transparent p-1 sm:bg-muted sm:flex-nowrap">
+      <TabsList className="border-border/60 bg-background/75 mx-auto h-auto flex-wrap gap-1 rounded-xl border p-1 shadow-sm backdrop-blur sm:flex-nowrap">
         {TABS.map(({ value, label, icon: Icon }) => (
           <TabsTrigger key={value} value={value} className="gap-1.5 border data-[state=active]:border-transparent sm:border-0">
             <Icon className="size-4" aria-hidden="true" />
@@ -277,11 +335,18 @@ export function ProductShowcase() {
         ))}
       </TabsList>
 
-      <div className="border-border/60 bg-card ring-foreground/10 relative overflow-hidden rounded-2xl border shadow-xl ring-1">
-        <div className="border-border/60 bg-muted/40 flex items-center gap-1.5 border-b px-4 py-2.5" aria-hidden>
-          <span className="bg-muted-foreground/30 size-2 rounded-full" />
-          <span className="bg-muted-foreground/30 size-2 rounded-full" />
-          <span className="bg-muted-foreground/30 size-2 rounded-full" />
+      <div className="border-border/60 bg-card ring-foreground/10 relative overflow-hidden rounded-2xl border shadow-2xl ring-1">
+        <div className="border-border/60 bg-muted/35 grid grid-cols-[1fr_auto_1fr] items-center border-b px-4 py-2.5" aria-hidden>
+          <div className="flex items-center gap-1.5">
+            <span className="bg-muted-foreground/30 size-2 rounded-full" />
+            <span className="bg-muted-foreground/30 size-2 rounded-full" />
+            <span className="bg-muted-foreground/30 size-2 rounded-full" />
+          </div>
+          <div className="flex items-center gap-2 text-[11px] font-medium">
+            <span className="bg-primary size-1.5 rounded-full shadow-[0_0_8px_var(--primary)]" />
+            AgendioBR · {activeTabLabel}
+          </div>
+          <div className="text-muted-foreground justify-self-end text-[10px]">Ambiente de demonstração</div>
         </div>
         {isAutoAdvancing && (
           <div className="bg-border/60 h-0.5 w-full" aria-hidden>
@@ -293,8 +358,26 @@ export function ProductShowcase() {
           </div>
         )}
 
-        <div className="min-h-[26rem] p-4 sm:p-6">
+        <div className="bg-background/45 min-h-[34rem] p-4 sm:p-6">
           <TabsContent value="agenda" className={PANEL_ANIMATION}>
+            <DemoPageHeader
+              eyebrow="Operação do dia"
+              title="Agenda de hoje"
+              description="Terça-feira, 26 de setembro · Unidade Centro"
+              action={
+                <div className="flex items-center gap-2">
+                  <button type="button" aria-label="Dia anterior" className="border-border/60 hover:bg-muted flex size-8 items-center justify-center rounded-lg border">
+                    <ChevronLeft className="size-4" />
+                  </button>
+                  <button type="button" aria-label="Próximo dia" className="border-border/60 hover:bg-muted flex size-8 items-center justify-center rounded-lg border">
+                    <ChevronRight className="size-4" />
+                  </button>
+                  <button type="button" className="bg-primary text-primary-foreground flex h-8 items-center gap-1.5 rounded-lg px-3 text-xs font-medium shadow-sm">
+                    <Plus className="size-3.5" aria-hidden /> Novo horário
+                  </button>
+                </div>
+              }
+            />
             <div className="overflow-x-auto">
               <div className="min-w-[36rem]">
                 <div className="grid" style={{ gridTemplateColumns: `3.5rem repeat(${AGENDA_PROFESSIONALS.length}, 1fr)` }}>
@@ -363,9 +446,34 @@ export function ProductShowcase() {
           </TabsContent>
 
           <TabsContent value="clientes" className={PANEL_ANIMATION}>
-            <ul className="flex flex-col divide-y">
+            <DemoPageHeader
+              eyebrow="Relacionamento"
+              title="Base de clientes"
+              description="Acompanhe frequência, histórico e relacionamento em um só lugar."
+              action={
+                <button type="button" className="bg-primary text-primary-foreground flex h-8 items-center gap-1.5 rounded-lg px-3 text-xs font-medium shadow-sm">
+                  <Plus className="size-3.5" aria-hidden /> Novo cliente
+                </button>
+              }
+            />
+            <div className="mb-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
+              <DemoMetric icon={Users} label="Clientes ativos" value="1.284" hint="+8% neste mês" />
+              <DemoMetric icon={UserCheck} label="Recorrentes" value="68%" hint="Voltaram nos últimos 60 dias" />
+              <DemoMetric icon={CalendarDays} label="Novos no mês" value="47" hint="12 nesta semana" />
+              <DemoMetric icon={Clock3} label="Sem retorno" value="23" hint="Há mais de 90 dias" />
+            </div>
+            <div className="mb-3 flex flex-wrap items-center gap-2">
+              <div className="border-border/60 bg-background flex h-8 min-w-52 flex-1 items-center gap-2 rounded-lg border px-2.5">
+                <Search className="text-muted-foreground size-3.5" aria-hidden />
+                <span className="text-muted-foreground text-xs">Buscar por nome ou telefone...</span>
+              </div>
+              <button type="button" className="border-border/60 bg-background flex h-8 items-center gap-1.5 rounded-lg border px-3 text-xs font-medium">
+                <SlidersHorizontal className="size-3.5" aria-hidden /> Filtros
+              </button>
+            </div>
+            <ul className="border-border/60 bg-background/70 overflow-hidden rounded-xl border divide-y">
               {CUSTOMERS.map((customer) => (
-                <li key={customer.name} className="flex items-center gap-3 py-2.5 text-sm">
+                <li key={customer.name} className="hover:bg-muted/50 flex items-center gap-3 px-3 py-2.5 text-sm transition-colors">
                   <span className="bg-primary/15 text-primary flex size-8 shrink-0 items-center justify-center rounded-full text-xs font-medium">
                     {customer.name
                       .split(" ")
@@ -375,30 +483,43 @@ export function ProductShowcase() {
                   </span>
                   <div className="min-w-0 flex-1">
                     <p className="truncate font-medium">{customer.name}</p>
-                    <p className="text-muted-foreground text-xs">Última visita: {customer.lastVisit}</p>
+                    <p className="text-muted-foreground truncate text-[10px]">{customer.phone} · Última visita: {customer.lastVisit}</p>
                   </div>
+                  <Badge variant={customer.status === "VIP" ? "default" : "outline"} className="hidden shrink-0 sm:inline-flex">
+                    {customer.status}
+                  </Badge>
                   <Badge variant="outline" className="shrink-0">
                     {customer.count} visitas
                   </Badge>
+                  <MoreHorizontal className="text-muted-foreground hidden size-4 sm:block" aria-hidden />
                 </li>
               ))}
             </ul>
           </TabsContent>
 
           <TabsContent value="profissionais" className={PANEL_ANIMATION}>
-            <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
-              <div>
-                <p className="text-sm font-semibold">Equipe</p>
-                <p className="text-muted-foreground text-xs">{PROFESSIONALS.length} profissionais ativos</p>
-              </div>
-              <Badge variant="outline">{PROFESSIONALS_AVG_OCCUPANCY}% de ocupação média</Badge>
+            <DemoPageHeader
+              eyebrow="Gestão da equipe"
+              title="Profissionais"
+              description="Desempenho, ocupação e agenda da sua equipe."
+              action={
+                <button type="button" className="bg-primary text-primary-foreground flex h-8 items-center gap-1.5 rounded-lg px-3 text-xs font-medium shadow-sm">
+                  <Plus className="size-3.5" aria-hidden /> Convidar profissional
+                </button>
+              }
+            />
+            <div className="mb-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
+              <DemoMetric icon={UserRound} label="Equipe ativa" value={`${PROFESSIONALS.length}`} hint="Todos disponíveis hoje" />
+              <DemoMetric icon={TrendingUp} label="Ocupação média" value={`${PROFESSIONALS_AVG_OCCUPANCY}%`} hint="+6% no período" />
+              <DemoMetric icon={CalendarDays} label="Atendimentos" value="99" hint="Nesta semana" />
+              <DemoMetric icon={CircleDollarSign} label="Comissões" value="R$ 4,8 mil" hint="Projeção do mês" />
             </div>
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
               {PROFESSIONALS.map((professional, index) => (
                 <div
                   key={professional.name}
                   style={{ animationDelay: `${index * 80}ms` }}
-                  className="border-border/60 animate-in fade-in-0 slide-in-from-bottom-2 fill-mode-both flex flex-col gap-3 rounded-lg border p-3 duration-500"
+                  className="border-border/60 bg-background/70 hover:border-primary/30 animate-in fade-in-0 slide-in-from-bottom-2 fill-mode-both flex flex-col gap-3 rounded-xl border p-3 shadow-sm transition-colors duration-500"
                 >
                   <div className="flex items-center gap-2">
                     <span className="bg-primary/15 text-primary flex size-8 shrink-0 items-center justify-center rounded-full text-xs font-medium">
@@ -408,6 +529,7 @@ export function ProductShowcase() {
                       <p className="truncate text-sm font-medium">{professional.name}</p>
                       <p className="text-muted-foreground text-xs">{professional.role}</p>
                     </div>
+                    <span className="bg-success ml-auto size-2 rounded-full" title="Disponível" />
                   </div>
                   <div>
                     <div className="bg-muted h-1.5 overflow-hidden rounded-full">
@@ -415,31 +537,64 @@ export function ProductShowcase() {
                     </div>
                     <p className="text-muted-foreground mt-1 text-[10px]">{professional.occupancy}% de ocupação</p>
                   </div>
-                  <p className="text-muted-foreground text-[10px]">{professional.weeklyAppointments} agendamentos essa semana</p>
+                  <div className="flex items-center justify-between text-[10px]">
+                    <span className="text-muted-foreground">{professional.weeklyAppointments} agendamentos</span>
+                    <span className="text-primary flex items-center gap-0.5 font-medium">Ver agenda <ArrowUpRight className="size-3" /></span>
+                  </div>
                 </div>
               ))}
             </div>
           </TabsContent>
 
           <TabsContent value="unidades" className={PANEL_ANIMATION}>
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <DemoPageHeader
+              eyebrow="Operação multiunidade"
+              title="Suas unidades"
+              description="Compare desempenho e mantenha cada endereço sob controle."
+              action={
+                <button type="button" className="bg-primary text-primary-foreground flex h-8 items-center gap-1.5 rounded-lg px-3 text-xs font-medium shadow-sm">
+                  <Plus className="size-3.5" aria-hidden /> Nova unidade
+                </button>
+              }
+            />
+            <div className="mb-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
+              <DemoMetric icon={Building2} label="Unidades ativas" value="3" hint="Todas operando" />
+              <DemoMetric icon={Users} label="Profissionais" value="12" hint="Distribuídos na rede" />
+              <DemoMetric icon={CalendarDays} label="Agendamentos" value="744" hint="No mês atual" />
+              <DemoMetric icon={CircleDollarSign} label="Faturamento" value="R$ 44,5 mil" hint="Consolidado da rede" />
+            </div>
+            <div className="grid grid-cols-1 gap-3 lg:grid-cols-3">
               {UNITS.map((unit) => (
-                <div key={unit.name} className="border-border/60 flex flex-col gap-3 rounded-lg border p-4">
-                  <div className="flex items-center gap-2">
+                <div key={unit.name} className="border-border/60 bg-background/70 flex flex-col gap-4 rounded-xl border p-4 shadow-sm">
+                  <div className="flex items-start gap-2.5">
                     <div className="bg-primary/15 text-primary shadow-[0_0_14px_-3px_color-mix(in_oklch,var(--primary),transparent_55%)] flex size-9 items-center justify-center rounded-lg">
                       <Building2 className="size-4.5" aria-hidden="true" />
                     </div>
-                    <p className="font-medium">{unit.name}</p>
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-2">
+                        <p className="truncate font-medium">{unit.name}</p>
+                        <Badge variant="success" className="ml-auto">Ativa</Badge>
+                      </div>
+                      <p className="text-muted-foreground mt-0.5 flex items-center gap-1 truncate text-[10px]"><MapPin className="size-3" aria-hidden /> {unit.address}</p>
+                    </div>
                   </div>
-                  <div className="grid grid-cols-2 gap-2 text-sm">
+                  <div className="grid grid-cols-3 gap-2 text-sm">
                     <div>
-                      <p className="text-muted-foreground text-xs">Profissionais</p>
+                      <p className="text-muted-foreground text-xs">Equipe</p>
                       <p className="font-semibold tabular-nums">{unit.professionals}</p>
                     </div>
                     <div>
-                      <p className="text-muted-foreground text-xs">Agendamentos/mês</p>
+                      <p className="text-muted-foreground text-xs">Agendamentos</p>
                       <p className="font-semibold tabular-nums">{unit.appointments}</p>
                     </div>
+                    <div>
+                      <p className="text-muted-foreground text-xs">Receita</p>
+                      <p className="font-semibold tabular-nums">R$ {formatCompactCurrency(unit.revenue)}</p>
+                    </div>
+                  </div>
+                  <div>
+                    <div className="mb-1.5 flex items-center justify-between text-[10px]"><span className="text-muted-foreground">Ocupação</span><span className="font-semibold">{unit.occupancy}%</span></div>
+                    <div className="bg-muted h-1.5 overflow-hidden rounded-full"><div className="bg-primary h-full rounded-full" style={{ width: `${unit.occupancy}%` }} /></div>
                   </div>
                 </div>
               ))}
@@ -447,6 +602,16 @@ export function ProductShowcase() {
           </TabsContent>
 
           <TabsContent value="relatorios" className={PANEL_ANIMATION}>
+            <DemoPageHeader
+              eyebrow="Inteligência do negócio"
+              title="Relatórios"
+              description="Indicadores claros para decidir com segurança."
+              action={
+                <button type="button" className="border-border/60 bg-background flex h-8 items-center gap-1.5 rounded-lg border px-3 text-xs font-medium shadow-sm">
+                  <Download className="size-3.5" aria-hidden /> Exportar relatório
+                </button>
+              }
+            />
             <div className="flex flex-col gap-5">
               {/* Faturamento -- card "hero" da aba: ocupa a largura toda, com
                   hierarquia valor-grande-em-cima (padrao dashboard SaaS) em vez

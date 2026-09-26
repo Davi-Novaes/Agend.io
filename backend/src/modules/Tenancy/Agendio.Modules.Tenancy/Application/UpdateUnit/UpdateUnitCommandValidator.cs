@@ -14,5 +14,7 @@ public sealed class UpdateUnitCommandValidator : AbstractValidator<UpdateUnitCom
             .Must(state => string.IsNullOrEmpty(state) || BrazilianStates.Codes.Contains(state))
             .WithMessage("Estado invalido. Informe a sigla de uma UF (ex.: SP).");
         RuleFor(c => c.Country).MaximumLength(100);
+        RuleFor(c => c.Phone).MaximumLength(30);
+        RuleFor(c => c.WhatsApp).MaximumLength(30);
     }
 }

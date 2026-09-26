@@ -1030,6 +1030,7 @@ export default function AgendaPage() {
       : view === "week"
         ? `${formatDayLabel(range.from)} - ${formatDayLabel(addDays(range.to, -1))}`
         : currentDate.toLocaleDateString("pt-BR", { month: "long", year: "numeric" });
+  const displayRangeLabel = rangeLabel.charAt(0).toLocaleUpperCase("pt-BR") + rangeLabel.slice(1);
 
   function navigate(direction: -1 | 1) {
     if (view === "day") {
@@ -1045,8 +1046,8 @@ export default function AgendaPage() {
   const hasError = resourcesQuery.isError || appointmentsQuery.isError;
 
   return (
-    // Margem negativa pra recuperar parte do padding generoso do layout
-    // (p-6 sm:p-10, calibrado pra telas de formulario): a Agenda e a tela mais
+    // Margem negativa pra recuperar parte do padding horizontal do layout,
+    // calibrado pra telas de formulario: a Agenda e a tela mais
     // densa do app — cada pixel horizontal vira largura de coluna de
     // profissional. O layout continua igual pras outras telas.
     <div className="-mx-2 flex w-[calc(100%+1rem)] flex-1 flex-col gap-4 overflow-x-hidden sm:-mx-6 sm:w-[calc(100%+3rem)]">
@@ -1067,7 +1068,7 @@ export default function AgendaPage() {
           </div>
           <div className="flex items-center gap-2">
             <CalendarDays className="text-muted-foreground size-4" aria-hidden="true" />
-            <span className="text-base font-semibold capitalize">{rangeLabel}</span>
+            <span className="text-base font-semibold">{displayRangeLabel}</span>
           </div>
         </div>
 
@@ -1177,8 +1178,8 @@ export default function AgendaPage() {
                     setSelectedResourceId(null);
                   }}
                 >
-                  <SelectTrigger size="sm" className="w-40" aria-label="Filtrar por unidade">
-                    <SelectValue placeholder="Todas as unidades" />
+                  <SelectTrigger size="sm" className="w-44" aria-label="Filtrar por local de atendimento">
+                    <SelectValue placeholder="Todos os locais" />
                   </SelectTrigger>
                   <SelectContent>
                     {(unitsQuery.data ?? []).map((unit) => (

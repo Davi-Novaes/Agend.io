@@ -4,28 +4,26 @@ using Agendio.SharedKernel.Messaging;
 using Agendio.SharedKernel.Results;
 using Microsoft.EntityFrameworkCore;
 
-namespace Agendio.Modules.Tenancy.Application.UpdateUnit;
+namespace Agendio.Modules.Tenancy.Application.SetUnitBusinessHours;
 
-public sealed class UpdateUnitCommandHandler(TenancyDbContext dbContext) : ICommandHandler<UpdateUnitCommand>
+public sealed class SetUnitBusinessHoursCommandHandler(TenancyDbContext dbContext) : ICommandHandler<SetUnitBusinessHoursCommand>
 {
-    public async Task<Result> Handle(UpdateUnitCommand request, CancellationToken cancellationToken)
+    public async Task<Result> Handle(SetUnitBusinessHoursCommand request, CancellationToken cancellationToken)
     {
         var unit = await dbContext.Units.SingleOrDefaultAsync(u => u.Id == UnitId.From(request.UnitId), cancellationToken);
-
         if (unit is null)
         {
             return Result.Failure(Error.NotFound("Unit.NotFound", "Unidade nao encontrada."));
         }
 
-        var updateResult = unit.Update(request.Name, request.Address, request.City, request.State, request.Country, request.Phone, request.WhatsApp);
-
-        if (updateResult.IsFailure)
+        var entries = request.Entries.Select(e => (e.DayOfWeek, e.StartTime, e.EndTime)).ToList();
+        var result = unit.SetBusinessHours(entries);
+        if (result.IsFailure)
         {
-            return updateResult;
+            return result;
         }
 
         await dbContext.SaveChangesAsync(cancellationToken);
-
         return Result.Success();
     }
 }

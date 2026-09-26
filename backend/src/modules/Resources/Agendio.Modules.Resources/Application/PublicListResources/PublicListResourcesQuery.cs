@@ -7,4 +7,4 @@ namespace Agendio.Modules.Resources.Application.PublicListResources;
 public sealed record PublicListResourcesQuery(Guid TenantId) : IQuery<IReadOnlyList<PublicResourceSummary>>, IHasExplicitTenant;
 
 public sealed record PublicResourceSummary(
-    Guid Id, string Name, string Type, string? Description, string? PhotoUrl, IReadOnlyCollection<string> Specialties);
+    Guid Id, string Name, string Type, string? Description, string? PhotoUrl, IReadOnlyCollection<string> Specialties, Guid? UnitId);

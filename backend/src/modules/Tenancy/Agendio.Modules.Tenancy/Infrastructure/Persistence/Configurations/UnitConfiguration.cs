@@ -25,7 +25,20 @@ public sealed class UnitConfiguration : IEntityTypeConfiguration<Unit>
         builder.Property(u => u.City).HasMaxLength(150);
         builder.Property(u => u.State).HasMaxLength(2);
         builder.Property(u => u.Country).HasMaxLength(100);
+        builder.Property(u => u.Phone).HasMaxLength(30);
+        builder.Property(u => u.WhatsApp).HasMaxLength(30);
         builder.Property(u => u.IsActive).IsRequired();
+
+        builder.OwnsMany(u => u.BusinessHours, businessHours =>
+        {
+            businessHours.ToTable("unit_business_hours");
+            businessHours.WithOwner().HasForeignKey("unit_id");
+            businessHours.Property<int>("id");
+            businessHours.HasKey("id").HasName("pk_unit_business_hours");
+            businessHours.Property(h => h.DayOfWeek).HasConversion<string>().HasMaxLength(20).IsRequired();
+            businessHours.Property(h => h.StartTime).IsRequired();
+            businessHours.Property(h => h.EndTime).IsRequired();
+        });
 
         builder.Property(u => u.CreatedBy).HasMaxLength(256);
         builder.Property(u => u.UpdatedBy).HasMaxLength(256);

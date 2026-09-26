@@ -37,16 +37,16 @@ public sealed class GetAvailableSlotsQueryHandler(
 
     public async Task<Result<IReadOnlyList<AvailableSlot>>> Handle(GetAvailableSlotsQuery request, CancellationToken cancellationToken)
     {
-        var tenant = await tenantLookup.GetAvailabilityInfoAsync(TenantId.From(request.TenantId), cancellationToken);
-        if (tenant is null)
-        {
-            return Result.Failure<IReadOnlyList<AvailableSlot>>(Error.NotFound("Availability.TenantNotFound", "Estabelecimento nao encontrado."));
-        }
-
         var resource = await resourceLookup.FindByIdAsync(request.ResourceId, cancellationToken);
         if (resource is null || !resource.IsActive)
         {
             return Result.Failure<IReadOnlyList<AvailableSlot>>(Error.NotFound("Availability.ResourceNotFound", "Recurso nao encontrado ou inativo."));
+        }
+
+        var tenant = await tenantLookup.GetAvailabilityInfoAsync(TenantId.From(request.TenantId), resource.UnitId, cancellationToken);
+        if (tenant is null)
+        {
+            return Result.Failure<IReadOnlyList<AvailableSlot>>(Error.NotFound("Availability.TenantNotFound", "Estabelecimento nao encontrado."));
         }
 
         var service = await serviceLookup.FindByIdAsync(request.ServiceId, cancellationToken);

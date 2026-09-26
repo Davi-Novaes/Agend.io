@@ -149,7 +149,7 @@ public sealed class TenantConfiguration : IEntityTypeConfiguration<Tenant>
             businessHours.ToTable("tenant_business_hours");
             businessHours.WithOwner().HasForeignKey("tenant_id");
             businessHours.Property<int>("id");
-            businessHours.HasKey("id");
+            businessHours.HasKey("id").HasName("pk_tenant_business_hours");
 
             businessHours.Property(h => h.DayOfWeek).HasConversion<string>().HasMaxLength(20).IsRequired();
             businessHours.Property(h => h.StartTime).IsRequired();

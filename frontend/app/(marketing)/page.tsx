@@ -3,26 +3,32 @@ import Link from "next/link";
 import {
   Activity,
   Apple,
+  ArrowRight,
   Bell,
   Brain,
   Calendar,
   Camera,
   Check,
+  CheckCircle2,
   CreditCard,
   Droplets,
   Dumbbell,
   HeartPulse,
+  LayoutDashboard,
   Mail,
   MessageCircle,
   Palette,
   PawPrint,
+  Rocket,
   Scale,
   Scissors,
   ShieldCheck,
   Smile,
   Sparkles,
+  Store,
   Users,
   Wallet,
+  Zap,
 } from "lucide-react";
 
 import { SiteHeader } from "@/components/marketing/site-header";
@@ -146,6 +152,20 @@ const PLAN_FEATURES = [
   "Programa de fidelidade",
 ] as const;
 
+const HERO_BENEFITS = [
+  "Agenda online 24 horas por dia",
+  "Visão clara da operação e do caixa",
+  "Página pública com a sua marca",
+] as const;
+
+const PRODUCT_AREAS = [
+  { icon: Calendar, label: "Agenda" },
+  { icon: Users, label: "Clientes" },
+  { icon: Wallet, label: "Financeiro" },
+  { icon: Store, label: "Unidades" },
+  { icon: LayoutDashboard, label: "Relatórios" },
+] as const;
+
 const FAQ = [
   {
     question: "Preciso saber programar ou contratar alguém de TI para configurar?",
@@ -209,46 +229,78 @@ export default async function MarketingHomePage() {
 
       <main className="flex-1">
         {/* Hero */}
-        <section className="relative overflow-hidden">
+        <section className="marketing-hero-light relative overflow-hidden border-b">
           <div aria-hidden className="pointer-events-none absolute inset-0">
             <div className="hero-glow hero-glow-1" />
             <div className="hero-glow hero-glow-2" />
             <div className="hero-glow hero-glow-3" />
           </div>
           <CursorSpotlight />
-          <div className="relative mx-auto flex max-w-6xl flex-col items-center gap-14 px-4 py-16 text-center sm:px-6 sm:py-24">
-            <div className="max-w-3xl">
-              <Badge variant="secondary" className="bg-accent text-accent-foreground mb-6">
-                Feito para negócios com horário marcado
+          <div className="relative mx-auto grid max-w-7xl items-center gap-12 px-4 py-14 sm:px-6 sm:py-20 lg:grid-cols-[0.9fr_1.1fr] lg:gap-12 lg:py-20 xl:py-24">
+            <ScrollReveal className="text-center lg:text-left">
+              <Badge variant="secondary" className="bg-primary/10 text-primary border-primary/15 mb-6 gap-2 border px-3 py-1.5">
+                <Sparkles className="size-3.5" aria-hidden />
+                Gestão completa, sem complicação
               </Badge>
-              <h1 className="text-4xl font-semibold tracking-tight text-balance sm:text-5xl lg:text-6xl">
-                Seu negócio organizado. Seus horários sob controle.
+              <h1 className="text-4xl leading-[1.05] font-semibold tracking-[-0.04em] text-balance sm:text-5xl xl:text-6xl">
+                Mais tempo para atender. <span className="text-primary">Mais controle para crescer.</span>
               </h1>
-              <p className="text-muted-foreground mx-auto mt-6 max-w-xl text-lg text-balance">
-                Gerencie agendamentos, profissionais, clientes e unidades em um único sistema, simples e
-                inteligente.
+              <p className="text-muted-foreground mx-auto mt-5 max-w-2xl text-lg leading-relaxed text-balance lg:mx-0">
+                O AgendioBR reúne agenda, clientes, equipe, financeiro e estoque para você administrar o negócio
+                inteiro sem planilhas e sem perder tempo entre vários sistemas.
               </p>
-              <div className="mt-8 flex flex-col items-center justify-center gap-3 sm:flex-row">
-                <Button size="lg" asChild className="shadow-md">
-                  <Link href="/onboarding">Cadastre-se</Link>
+
+              <ul className="mx-auto mt-6 grid max-w-xl gap-3 text-left sm:grid-cols-2 lg:mx-0 lg:grid-cols-1 xl:grid-cols-2">
+                {HERO_BENEFITS.map((benefit) => (
+                  <li key={benefit} className="flex items-center gap-2.5 text-sm font-medium">
+                    <span className="bg-success/12 text-success flex size-6 shrink-0 items-center justify-center rounded-full">
+                      <Check className="size-3.5" strokeWidth={2.5} aria-hidden />
+                    </span>
+                    {benefit}
+                  </li>
+                ))}
+              </ul>
+
+              <div className="mt-7 flex flex-col items-center gap-3 sm:flex-row sm:justify-center lg:justify-start">
+                <Button size="lg" asChild className="group min-w-44 shadow-lg shadow-primary/20">
+                  <Link href="/onboarding">
+                    Começar agora
+                    <ArrowRight className="transition-transform group-hover:translate-x-0.5" aria-hidden />
+                  </Link>
                 </Button>
-                <Button size="lg" variant="outline" asChild>
-                  <a href="#showcase">Conhecer o AgendioBR</a>
+                <Button size="lg" variant="outline" asChild className="min-w-44 bg-background/40 backdrop-blur">
+                  <a href="#showcase">Ver o sistema por dentro</a>
                 </Button>
               </div>
-              <p className="text-muted-foreground mt-5 text-sm">
-                Sem burocracia · Configuração rápida · Cancele quando quiser
+              <p className="text-muted-foreground mt-5 flex flex-wrap items-center justify-center gap-x-3 gap-y-1 text-xs lg:justify-start">
+                <span>Configuração guiada</span>
+                <span aria-hidden>•</span>
+                <span>Sem fidelidade</span>
+                <span aria-hidden>•</span>
+                <span>Cancele quando quiser</span>
               </p>
-            </div>
+            </ScrollReveal>
 
-            <ScrollReveal variant="scale" className="w-full">
+            <ScrollReveal variant="scale" delayMs={100} className="relative w-full">
+              <div aria-hidden className="bg-primary/15 absolute -inset-8 rounded-[3rem] blur-3xl" />
               <HeroDashboardMockup />
             </ScrollReveal>
+          </div>
+
+          <div className="relative mx-auto max-w-7xl px-4 pb-10 sm:px-6 sm:pb-14">
+            <div className="marketing-card border-border/70 bg-background/55 grid overflow-hidden rounded-2xl border shadow-sm backdrop-blur sm:grid-cols-5">
+              {PRODUCT_AREAS.map(({ icon: Icon, label }) => (
+                <div key={label} className="border-border/60 flex items-center justify-center gap-2 border-b px-4 py-3.5 last:border-b-0 sm:border-r sm:border-b-0 sm:last:border-r-0">
+                  <Icon className="text-primary size-4" strokeWidth={1.8} aria-hidden />
+                  <span className="text-sm font-medium">{label}</span>
+                </div>
+              ))}
+            </div>
           </div>
         </section>
 
         {/* Segmentos */}
-        <section id="segmentos" className="border-t py-16 sm:py-20">
+        <section id="segmentos" className="marketing-section-warm py-16 sm:py-20">
           <div className="mx-auto max-w-6xl px-4 sm:px-6">
             <ScrollReveal className="mx-auto max-w-2xl text-center">
               <h2 className="text-2xl font-semibold tracking-tight sm:text-3xl">Para o seu segmento</h2>
@@ -257,18 +309,16 @@ export default async function MarketingHomePage() {
                 &ldquo;paciente&rdquo; ou &ldquo;tutor&rdquo;.
               </p>
             </ScrollReveal>
-            <div className="mt-10 grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6">
+            <div className="mt-10 flex flex-wrap justify-center gap-3">
               {SEGMENTS.map(({ icon: Icon, label }, index) => (
                 <ScrollReveal key={label} delayMs={(index % 6) * 60}>
-                  <Card className="group/segment transition-all duration-300 hover:-translate-y-1 hover:shadow-md">
-                    <CardContent className="flex flex-col items-center gap-2 text-center">
+                  <div className="marketing-card group/segment border-border/70 bg-card/60 hover:border-primary/35 hover:bg-accent flex items-center gap-2.5 rounded-full border px-4 py-2.5 transition-all duration-300 hover:-translate-y-0.5 hover:shadow-md">
                       <Icon
-                        className="text-primary size-6 transition-transform duration-300 group-hover/segment:scale-110"
+                        className="text-primary size-4.5 transition-transform duration-300 group-hover/segment:scale-110"
                         strokeWidth={1.75}
                       />
                       <span className="text-sm font-medium">{label}</span>
-                    </CardContent>
-                  </Card>
+                  </div>
                 </ScrollReveal>
               ))}
             </div>
@@ -279,7 +329,7 @@ export default async function MarketingHomePage() {
         </section>
 
         {/* Product showcase */}
-        <section id="showcase" className="bg-muted/40 border-t py-16 sm:py-20">
+        <section id="showcase" className="marketing-section-lavender border-t py-16 sm:py-20">
           <div className="mx-auto max-w-6xl px-4 sm:px-6">
             <ScrollReveal className="mx-auto max-w-2xl text-center">
               <h2 className="text-2xl font-semibold tracking-tight sm:text-3xl">Veja o AgendioBR em ação</h2>
@@ -292,7 +342,7 @@ export default async function MarketingHomePage() {
         </section>
 
         {/* Funcionalidades */}
-        <section id="funcionalidades" className="border-t py-16 sm:py-20">
+        <section id="funcionalidades" className="marketing-section-clean border-t py-16 sm:py-20">
           <div className="mx-auto max-w-6xl px-4 sm:px-6">
             <ScrollReveal className="mx-auto max-w-2xl text-center">
               <h2 className="text-2xl font-semibold tracking-tight sm:text-3xl">Tudo que o seu negócio precisa</h2>
@@ -301,7 +351,7 @@ export default async function MarketingHomePage() {
             <div className="mt-10 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
               {FEATURES.map(({ icon: Icon, title, description }, index) => (
                 <ScrollReveal key={title} delayMs={(index % 3) * 100}>
-                  <Card className="group/feature h-full transition-all duration-300 hover:-translate-y-1 hover:shadow-lg hover:ring-primary/20">
+                  <Card className="marketing-card group/feature h-full transition-all duration-300 hover:-translate-y-1 hover:shadow-lg hover:ring-primary/20">
                     <CardHeader>
                       <div className="bg-accent text-accent-foreground mb-2 flex size-10 items-center justify-center rounded-lg transition-transform duration-300 group-hover/feature:scale-110">
                         <Icon className="size-5" strokeWidth={1.75} />
@@ -317,7 +367,7 @@ export default async function MarketingHomePage() {
         </section>
 
         {/* Como funciona */}
-        <section id="como-funciona" className="bg-muted/40 border-t py-16 sm:py-20">
+        <section id="como-funciona" className="marketing-section-sky border-t py-16 sm:py-20">
           <div className="mx-auto max-w-6xl px-4 sm:px-6">
             <ScrollReveal className="mx-auto max-w-2xl text-center">
               <h2 className="text-2xl font-semibold tracking-tight sm:text-3xl">
@@ -331,32 +381,49 @@ export default async function MarketingHomePage() {
         </section>
 
         {/* Confiança */}
-        <section className="border-t py-16 sm:py-20">
+        <section className="marketing-section-warm border-t py-16 sm:py-20">
           <div className="mx-auto max-w-6xl px-4 sm:px-6">
             <TrustStats />
           </div>
         </section>
 
         {/* Preços */}
-        <section id="precos" className="bg-muted/40 border-t py-16 sm:py-20">
+        <section id="precos" className="marketing-section-lavender border-t py-16 sm:py-20">
           <div className="mx-auto max-w-6xl px-4 sm:px-6">
             <ScrollReveal className="mx-auto max-w-2xl text-center">
+              <Badge variant="outline" className="mb-4 gap-2">
+                <Zap className="text-primary size-3.5" aria-hidden />
+                Todos os recursos em todos os planos
+              </Badge>
               <h2 className="text-2xl font-semibold tracking-tight sm:text-3xl">Preços simples, sem surpresa</h2>
-              <p className="text-muted-foreground mt-3">Sem fidelidade. Cancele quando quiser.</p>
+              <p className="text-muted-foreground mt-3">
+                Escolha apenas o tamanho da sua operação. Você não precisa pagar mais para liberar recursos essenciais.
+              </p>
+            </ScrollReveal>
+
+            <ScrollReveal delayMs={80} className="mx-auto mt-8 max-w-5xl">
+              <div className="marketing-card border-border/70 bg-background/70 grid gap-3 rounded-2xl border p-5 shadow-sm sm:grid-cols-2 lg:grid-cols-4">
+                {PLAN_FEATURES.map((feature) => (
+                  <div key={feature} className="flex items-start gap-2.5 text-sm">
+                    <CheckCircle2 className="text-success mt-0.5 size-4 shrink-0" aria-hidden />
+                    <span>{feature}</span>
+                  </div>
+                ))}
+              </div>
             </ScrollReveal>
             <div className="mx-auto mt-10 grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
               {plans.map((plan, index) => {
                 const isFree = plan.priceAmount === 0;
                 return (
                   <ScrollReveal key={plan.id} delayMs={index * 120}>
-                    <Card className={cn(plan.isFeatured && "border-primary ring-primary/20 scale-[1.02] shadow-lg ring-2")}>
+                    <Card className={cn("marketing-card h-full rounded-2xl", plan.isFeatured && "border-primary ring-primary/20 scale-[1.02] shadow-xl ring-2")}>
                       <CardHeader>
                         {plan.isFeatured && <Badge className="mb-2">Mais popular</Badge>}
                         <CardTitle className="text-lg">{plan.name}</CardTitle>
                         <CardDescription>
                           {isFree
                             ? "Para testar o sistema sem compromisso."
-                            : "14 dias de teste grátis, depois cobrança automática mensal."}
+                            : "Plano mensal, sem fidelidade. Cancele quando quiser."}
                         </CardDescription>
                         <p className="pt-2">
                           <span className="text-3xl font-semibold tracking-tight">
@@ -390,15 +457,7 @@ export default async function MarketingHomePage() {
                             Cancele quando quiser
                           </li>
                         </ul>
-                        <ul className="grid gap-2 border-t pt-4 text-sm">
-                          {PLAN_FEATURES.map((feature) => (
-                            <li key={feature} className="flex items-start gap-2">
-                              <Check className="text-primary mt-0.5 size-4 shrink-0" strokeWidth={2.5} />
-                              {feature}
-                            </li>
-                          ))}
-                        </ul>
-                        <Button variant={plan.isFeatured ? "default" : "outline"} asChild className="mt-2">
+                        <Button variant={plan.isFeatured ? "default" : "outline"} asChild className="mt-2 w-full">
                           <Link href="/onboarding">Começar com {plan.name}</Link>
                         </Button>
                       </CardContent>
@@ -448,7 +507,7 @@ export default async function MarketingHomePage() {
         </section>
 
         {/* FAQ */}
-        <section id="faq" className="border-t py-16 sm:py-20">
+        <section id="faq" className="marketing-section-sky border-t py-16 sm:py-20">
           <div className="mx-auto max-w-3xl px-4 sm:px-6">
             <ScrollReveal>
               <h2 className="text-center text-2xl font-semibold tracking-tight sm:text-3xl">
@@ -469,28 +528,44 @@ export default async function MarketingHomePage() {
         {/* CTA final -- unica outra secao com fundo nao-solido alem do Hero
             (todas as outras usam bg-background/bg-muted lisos), entao e a
             unica que tambem ganha a atmosfera de luz + spot do cursor. */}
-        <section className="relative overflow-hidden border-t py-16 sm:py-20">
+        <section className="marketing-section-cta relative overflow-hidden border-t py-16 sm:py-20">
           <div aria-hidden className="pointer-events-none absolute inset-0">
             <div className="hero-glow hero-glow-1" />
             <div className="hero-glow hero-glow-2" />
             <div className="hero-glow hero-glow-3" />
           </div>
           <CursorSpotlight />
-          <ScrollReveal variant="scale" className="relative mx-auto max-w-2xl px-4 text-center sm:px-6">
-            <h2 className="text-2xl font-semibold tracking-tight sm:text-3xl">
-              Pronto para deixar seu negócio mais organizado?
-            </h2>
-            <p className="text-muted-foreground mt-3">
-              Tenha sua agenda, clientes, profissionais e unidades organizados em um único lugar.
-            </p>
-            <Button size="lg" asChild className="mt-6 shadow-md">
-              <Link href="/onboarding">Cadastre-se</Link>
-            </Button>
+          <ScrollReveal variant="scale" className="relative mx-auto max-w-5xl px-4 sm:px-6">
+            <div className="marketing-card border-primary/20 bg-background/55 grid items-center gap-8 rounded-3xl border p-7 shadow-2xl backdrop-blur sm:p-10 lg:grid-cols-[1fr_auto]">
+              <div>
+                <div className="bg-primary/10 text-primary mb-5 flex size-11 items-center justify-center rounded-2xl">
+                  <Rocket className="size-5" aria-hidden />
+                </div>
+                <h2 className="text-2xl font-semibold tracking-tight sm:text-3xl">
+                  Seu negócio pode funcionar com muito mais clareza.
+                </h2>
+                <p className="text-muted-foreground mt-3 max-w-2xl leading-relaxed">
+                  Centralize a operação, ofereça uma experiência melhor aos clientes e tome decisões com os números
+                  certos na mão.
+                </p>
+              </div>
+              <div className="flex flex-col gap-3 lg:min-w-56">
+                <Button size="lg" asChild className="group shadow-lg shadow-primary/20">
+                  <Link href="/onboarding">
+                    Criar minha conta
+                    <ArrowRight className="transition-transform group-hover:translate-x-0.5" aria-hidden />
+                  </Link>
+                </Button>
+                <Button size="lg" variant="ghost" asChild>
+                  <Link href="/login">Já tenho uma conta</Link>
+                </Button>
+              </div>
+            </div>
           </ScrollReveal>
         </section>
       </main>
 
-      <footer className="border-t">
+      <footer className="marketing-footer border-t">
         <div className="mx-auto grid max-w-6xl gap-10 px-4 py-12 sm:px-6 md:grid-cols-[1.3fr_1fr_1fr]">
           <div className="flex flex-col gap-3">
             <Logo className="text-foreground" tagline={false} />

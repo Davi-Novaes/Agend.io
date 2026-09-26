@@ -3,7 +3,7 @@
 import * as React from "react";
 import Image from "next/image";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { ArrowLeft, ArrowRight, Check, Clock3, Scissors, UserRound } from "lucide-react";
+import { ArrowLeft, ArrowRight, Building2, Check, Clock3, MapPin, Scissors, UserRound } from "lucide-react";
 import {
   publicListServices,
   publicListResources,
@@ -14,6 +14,7 @@ import {
   ApiError,
   type PublicServiceSummary,
   type PublicResourceSummary,
+  type PublicUnitSummary,
   type AvailableSlot,
   resolveAssetUrl,
 } from "@/lib/api/client";
@@ -23,9 +24,10 @@ import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
 import { formatPhoneDisplay } from "@/lib/format/br-masks";
 
-type Step = "service" | "resource" | "datetime" | "details" | "confirmed";
+type Step = "unit" | "service" | "resource" | "datetime" | "details" | "confirmed";
 
 const STEP_LABELS: Record<Exclude<Step, "confirmed">, string> = {
+  unit: "Local",
   service: "Serviço",
   resource: "Profissional",
   datetime: "Data e horário",
@@ -56,6 +58,7 @@ export function BookingFlow({
   depositPercentage = 0,
   initialServices = [],
   initialResources = [],
+  initialUnits = [],
   initialServiceId,
   customerPortalHref,
 }: {
@@ -68,18 +71,24 @@ export function BookingFlow({
   /** Dados ja carregados no SSR evitam o estado vazio ao abrir a pagina publica. */
   initialServices?: PublicServiceSummary[];
   initialResources?: PublicResourceSummary[];
+  /** Locais ativos; a etapa aparece somente quando mais de um tem profissionais vinculados. */
+  initialUnits?: PublicUnitSummary[];
   /** Permite que um card da vitrine abra o agendamento com o servico escolhido. */
   initialServiceId?: string;
   customerPortalHref?: string;
 }) {
   const initialService = initialServices.find((service) => service.id === initialServiceId) ?? null;
-  const hasSingleInitialResource = initialResources.length === 1;
+  const initialSelectableUnits = initialUnits.filter((unit) => initialResources.some((resource) => resource.unitId === unit.id));
+  const initialUnit = initialSelectableUnits.length === 1 ? initialSelectableUnits[0] : null;
+  const initialAvailableResources = initialUnit ? initialResources.filter((resource) => resource.unitId === initialUnit.id) : initialResources;
+  const hasSingleInitialResource = initialAvailableResources.length === 1;
   const [step, setStep] = React.useState<Step>(() =>
-    initialService ? (hasSingleInitialResource ? "datetime" : "resource") : "service"
+    initialSelectableUnits.length > 1 ? "unit" : initialService ? (hasSingleInitialResource ? "datetime" : "resource") : "service"
   );
+  const [selectedUnit, setSelectedUnit] = React.useState<PublicUnitSummary | null>(initialUnit);
   const [selectedService, setSelectedService] = React.useState<PublicServiceSummary | null>(initialService);
   const [selectedResource, setSelectedResource] = React.useState<PublicResourceSummary | null>(
-    hasSingleInitialResource ? initialResources[0] : null
+    hasSingleInitialResource ? initialAvailableResources[0] : null
   );
   const [selectedDate, setSelectedDate] = React.useState(() => toDateInputValue(new Date()));
   const [selectedSlot, setSelectedSlot] = React.useState<AvailableSlot | null>(null);
@@ -106,6 +115,12 @@ export function BookingFlow({
     initialData: initialResources.length > 0 ? initialResources : undefined,
     staleTime: initialResources.length > 0 ? 60_000 : 0,
   });
+
+  const selectableUnits = initialUnits.filter((unit) => (resourcesQuery.data ?? []).some((resource) => resource.unitId === unit.id));
+  const showsUnitPicker = selectableUnits.length > 1;
+  const availableResources = selectedUnit
+    ? (resourcesQuery.data ?? []).filter((resource) => resource.unitId === selectedUnit.id)
+    : (resourcesQuery.data ?? []);
 
   const slotsQuery = useQuery({
     queryKey: ["public-availability", tenantId, selectedResource?.id, selectedService?.id, selectedDate],
@@ -175,12 +190,29 @@ export function BookingFlow({
   function selectService(service: PublicServiceSummary) {
     setSelectedService(service);
     setSelectedSlot(null);
-    const activeResources = resourcesQuery.data ?? [];
+    const activeResources = availableResources;
     if (activeResources.length <= 1) {
       setSelectedResource(activeResources[0] ?? null);
       setStep("datetime");
     } else {
       setStep("resource");
+    }
+  }
+
+  function selectUnit(unit: PublicUnitSummary) {
+    setSelectedUnit(unit);
+    setSelectedResource(null);
+    setSelectedSlot(null);
+    const unitResources = (resourcesQuery.data ?? []).filter((resource) => resource.unitId === unit.id);
+    if (selectedService) {
+      if (unitResources.length <= 1) {
+        setSelectedResource(unitResources[0] ?? null);
+        setStep("datetime");
+      } else {
+        setStep("resource");
+      }
+    } else {
+      setStep("service");
     }
   }
 
@@ -213,10 +245,10 @@ export function BookingFlow({
     scheduleMutation.mutate();
   }
 
-  const showsResourcePicker = (resourcesQuery.data?.length ?? 0) > 1;
+  const showsResourcePicker = availableResources.length > 1;
   const stepOrder: Exclude<Step, "confirmed">[] = showsResourcePicker
-    ? ["service", "resource", "datetime", "details"]
-    : ["service", "datetime", "details"];
+    ? [...(showsUnitPicker ? ["unit" as const] : []), "service", "resource", "datetime", "details"]
+    : [...(showsUnitPicker ? ["unit" as const] : []), "service", "datetime", "details"];
   const currentStepIndex = step === "confirmed" ? stepOrder.length : stepOrder.indexOf(step);
 
   return (
@@ -260,12 +292,31 @@ export function BookingFlow({
         <div className="bg-primary/5 border-primary/15 mb-6 flex flex-wrap items-center gap-x-5 gap-y-2 rounded-xl border px-4 py-3 text-sm">
           <span className="flex items-center gap-2 font-medium"><Scissors className="text-primary size-4" />{selectedService.name}</span>
           <span className="text-muted-foreground flex items-center gap-1.5"><Clock3 className="size-3.5" />{selectedService.durationMinutes} min</span>
+          {selectedUnit && <span className="text-muted-foreground flex items-center gap-1.5"><MapPin className="size-3.5" />{selectedUnit.name}</span>}
           <span className="ml-auto font-semibold">{formatPrice(selectedService.price, selectedService.currency)}</span>
         </div>
       )}
 
+      {step === "unit" && (
+        <section aria-labelledby="step-unit-heading">
+          <div className="mb-5"><h2 id="step-unit-heading" className="text-xl font-semibold tracking-tight">Onde você quer ser atendido?</h2><p className="mt-1 text-sm text-muted-foreground">Escolha o local mais conveniente para continuar.</p></div>
+          <ul className="grid gap-3 sm:grid-cols-2">
+            {selectableUnits.map((unit) => (
+              <li key={unit.id}>
+                <button type="button" onClick={() => selectUnit(unit)} className={cn("group flex h-full w-full items-start gap-3 rounded-xl border bg-background p-4 text-left shadow-xs transition-all hover:-translate-y-0.5 hover:border-primary/60 hover:bg-primary/[0.035] hover:shadow-md focus-visible:outline-2 focus-visible:outline-primary", buttonRadiusClassName)}>
+                  <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary"><Building2 className="size-5" /></span>
+                  <span className="min-w-0 flex-1"><span className="block font-semibold">{unit.name}</span><span className="mt-1 flex items-start gap-1.5 text-xs leading-relaxed text-muted-foreground"><MapPin className="mt-0.5 size-3.5 shrink-0" />{[unit.address, unit.city, unit.state].filter(Boolean).join(" · ") || "Endereço não informado"}</span></span>
+                  <ArrowRight className="mt-1 size-4 text-primary transition-transform group-hover:translate-x-0.5" />
+                </button>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
+
       {step === "service" && (
         <section aria-labelledby="step-service-heading">
+          {showsUnitPicker && <button type="button" onClick={() => setStep("unit")} className="mb-4 inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground"><ArrowLeft className="size-4" />Trocar local</button>}
           <div className="mb-5">
             <h2 id="step-service-heading" className="text-xl font-semibold tracking-tight">O que você gostaria de agendar?</h2>
             <p className="text-muted-foreground mt-1 text-sm">Escolha uma opção para ver profissionais e horários disponíveis.</p>
@@ -335,7 +386,7 @@ export function BookingFlow({
             </div>
           )}
           <ul className="grid gap-3 sm:grid-cols-2">
-            {(resourcesQuery.data ?? []).map((resource) => (
+            {availableResources.map((resource) => (
               <li key={resource.id}>
                 <button
                   type="button"
@@ -564,6 +615,7 @@ export function BookingFlow({
           <p className="text-muted-foreground text-sm capitalize">
             {selectedService.name} em {formatDate(selectedSlot.startUtc)} às {formatTime(selectedSlot.startUtc)}
           </p>
+          {selectedUnit && <p className="mt-1 flex items-center justify-center gap-1.5 text-sm text-muted-foreground"><MapPin className="size-4" />{selectedUnit.name}</p>}
           {paymentUrl ? (
             <>
               <p className="text-muted-foreground mt-4 text-sm">

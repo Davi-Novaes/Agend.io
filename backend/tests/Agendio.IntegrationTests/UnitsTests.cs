@@ -21,7 +21,7 @@ public class UnitsTests(IntegrationTestFixture fixture)
         var accessToken = await CreateTenantWithOwnerAndLoginAsync(client, cancellationToken);
 
         var createResponse = await AuthorizedRequestHelpers.PostAuthorizedAsync(
-            client, accessToken, "/api/units", new { name = "Unidade Centro", address = "Rua Principal, 123" }, cancellationToken);
+            client, accessToken, "/api/units", new { name = "Unidade Centro", address = "Rua Principal, 123", phone = "1133334444", whatsApp = "11999998888" }, cancellationToken);
         createResponse.StatusCode.ShouldBe(HttpStatusCode.Created);
 
         var createBody = await createResponse.Content.ReadFromJsonAsync<JsonElement>(cancellationToken);
@@ -31,6 +31,13 @@ public class UnitsTests(IntegrationTestFixture fixture)
         var getBody = await getResponse.Content.ReadFromJsonAsync<JsonElement>(cancellationToken);
         getBody.GetProperty("name").GetString().ShouldBe("Unidade Centro");
         getBody.GetProperty("isActive").GetBoolean().ShouldBeTrue();
+        getBody.GetProperty("phone").GetString().ShouldBe("1133334444");
+        getBody.GetProperty("whatsApp").GetString().ShouldBe("11999998888");
+
+        var hoursResponse = await AuthorizedRequestHelpers.PutAuthorizedAsync(
+            client, accessToken, $"/api/units/{unitId}/business-hours",
+            new { entries = new[] { new { dayOfWeek = "Monday", startTime = "09:00:00", endTime = "18:00:00" } } }, cancellationToken);
+        hoursResponse.StatusCode.ShouldBe(HttpStatusCode.NoContent);
 
         var updateResponse = await AuthorizedRequestHelpers.PutAuthorizedAsync(
             client, accessToken, $"/api/units/{unitId}", new { name = "Unidade Centro Renovada", address = "Nova Rua, 456" }, cancellationToken);
@@ -45,6 +52,7 @@ public class UnitsTests(IntegrationTestFixture fixture)
         listBody.GetArrayLength().ShouldBe(1);
         listBody[0].GetProperty("name").GetString().ShouldBe("Unidade Centro Renovada");
         listBody[0].GetProperty("isActive").GetBoolean().ShouldBeFalse();
+        listBody[0].GetProperty("businessHours").GetArrayLength().ShouldBe(1);
     }
 
     [Fact]
@@ -80,6 +88,10 @@ public class UnitsTests(IntegrationTestFixture fixture)
         var crossTenantList = await AuthorizedRequestHelpers.GetAuthorizedAsync(client, tenantBToken, "/api/units", cancellationToken);
         var crossTenantListBody = await crossTenantList.Content.ReadFromJsonAsync<JsonElement>(cancellationToken);
         crossTenantListBody.GetArrayLength().ShouldBe(0);
+
+        var crossTenantHours = await AuthorizedRequestHelpers.PutAuthorizedAsync(
+            client, tenantBToken, $"/api/units/{unitId}/business-hours", new { entries = Array.Empty<object>() }, cancellationToken);
+        crossTenantHours.StatusCode.ShouldBe(HttpStatusCode.NotFound);
 
         // O tenant B tentando cadastrar um recurso apontando pro UnitId do tenant A
         // deve ser rejeitado — cobre o mesmo caminho que ResourceTests.

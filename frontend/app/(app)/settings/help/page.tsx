@@ -3,6 +3,7 @@
 import * as React from "react";
 import Link from "next/link";
 import {
+  ArrowRight,
   Search,
   Users,
   Palette,
@@ -10,7 +11,11 @@ import {
   ShieldCheck,
   Bell,
   CalendarDays,
+  CalendarPlus,
+  LifeBuoy,
   MessageCircle,
+  UserPlus,
+  X,
   type LucideIcon,
 } from "lucide-react";
 
@@ -22,6 +27,43 @@ import { EmptyState } from "@/components/ui/empty-state";
 
 type FaqEntry = { question: string; answer: string };
 type FaqCategory = { id: string; title: string; icon: LucideIcon; items: FaqEntry[] };
+type VisibleFaqEntry = FaqEntry & { categoryId: string; categoryTitle: string; icon: LucideIcon };
+
+const CATEGORY_DESCRIPTIONS: Record<string, string> = {
+  "conta-equipe": "Acesso, convites e permissões",
+  "marca-unidades": "Portal público e filiais",
+  "agenda-clientes": "Horários, clientes e faltas",
+  financeiro: "Planos, comissões e pontos",
+  notificacoes: "Lembretes e mensagens",
+  seguranca: "Conta, MFA e privacidade",
+};
+
+const QUICK_ACTIONS: { title: string; description: string; href: string; icon: LucideIcon }[] = [
+  {
+    title: "Criar agendamento",
+    description: "Abra a agenda e reserve um horário.",
+    href: "/agenda?novo=1",
+    icon: CalendarPlus,
+  },
+  {
+    title: "Convidar equipe",
+    description: "Adicione uma pessoa ao estabelecimento.",
+    href: "/settings/team",
+    icon: UserPlus,
+  },
+  {
+    title: "Personalizar portal",
+    description: "Ajuste cores, logo e informações públicas.",
+    href: "/settings/branding",
+    icon: Palette,
+  },
+  {
+    title: "Configurar WhatsApp",
+    description: "Prepare lembretes automáticos.",
+    href: "/settings/whatsapp",
+    icon: MessageCircle,
+  },
+];
 
 // Categorias cobrindo as areas do produto que mais geram duvida (equipe,
 // marca, agenda/unidades, financeiro, notificacoes, seguranca) -- a versao
@@ -72,7 +114,7 @@ const CATEGORIES: FaqCategory[] = [
       {
         question: "Tenho mais de uma loja ou filial — preciso cadastrar unidades?",
         answer:
-          "Só se fizer sentido para o seu negócio. Em Empresa → Unidades você cadastra endereço, cidade, estado e país de cada loja e vincula profissionais e agendamentos a elas. Um negócio de endereço único não precisa configurar nada aqui.",
+          "Só se fizer sentido para o seu negócio. Em Empresa → Locais de atendimento você cadastra cada endereço e vincula profissionais e agendamentos a ele. Um negócio de endereço único pode usar apenas um local, sem etapas extras para o cliente.",
       },
     ],
   },
@@ -174,6 +216,7 @@ function normalize(value: string): string {
 
 export default function HelpSettingsPage() {
   const [search, setSearch] = React.useState("");
+  const [selectedCategory, setSelectedCategory] = React.useState<string | null>(null);
 
   const filteredCategories = React.useMemo(() => {
     const term = normalize(search.trim());
@@ -188,71 +231,212 @@ export default function HelpSettingsPage() {
   }, [search]);
 
   const totalResults = filteredCategories.reduce((sum, category) => sum + category.items.length, 0);
+  const visibleEntries = React.useMemo<VisibleFaqEntry[]>(() => {
+    const hasSearch = search.trim().length > 0;
+    const categories = hasSearch
+      ? filteredCategories
+      : selectedCategory
+        ? CATEGORIES.filter((category) => category.id === selectedCategory)
+        : CATEGORIES.map((category) => ({ ...category, items: category.items.slice(0, 1) }));
+
+    return categories.flatMap((category) =>
+      category.items.map((item) => ({
+        ...item,
+        categoryId: category.id,
+        categoryTitle: category.title,
+        icon: category.icon,
+      }))
+    );
+  }, [filteredCategories, search, selectedCategory]);
+
+  const selectedCategoryTitle = CATEGORIES.find((category) => category.id === selectedCategory)?.title;
+  const resultsTitle = search.trim()
+    ? "Resultados da busca"
+    : selectedCategoryTitle ?? "Perguntas mais acessadas";
+
+  function selectCategory(categoryId: string | null) {
+    setSelectedCategory(categoryId);
+    setSearch("");
+  }
 
   return (
-    <div className="flex w-full max-w-3xl flex-1 flex-col gap-6">
-      <div>
-        <h1 className="text-lg font-semibold">Ajuda e informações</h1>
-        <p className="text-muted-foreground text-sm">
-          Respostas rápidas para as dúvidas mais comuns sobre o painel, organizadas por assunto.
-        </p>
-      </div>
+    <div className="flex w-full max-w-5xl flex-1 flex-col gap-8">
+      <section className="from-primary/[0.14] via-card to-card relative overflow-hidden rounded-2xl border border-primary/20 bg-gradient-to-br p-5 shadow-sm sm:p-8">
+        <div className="bg-primary/10 pointer-events-none absolute -top-16 -right-12 size-48 rounded-full blur-3xl" />
+        <div className="relative max-w-2xl">
+          <span className="text-primary mb-3 flex items-center gap-2 text-xs font-semibold tracking-wider uppercase">
+            <LifeBuoy className="size-4" aria-hidden="true" />
+            Central de ajuda
+          </span>
+          <h2 className="text-2xl font-semibold tracking-tight sm:text-3xl">Como podemos ajudar?</h2>
+          <p className="text-muted-foreground mt-2 text-sm sm:text-base">
+            Encontre respostas e acesse rapidamente as configurações mais usadas do AgendioBR.
+          </p>
 
-      <div className="relative max-w-md">
-        <Search className="text-muted-foreground pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2" />
-        <Input
-          value={search}
-          onChange={(event) => setSearch(event.target.value)}
-          placeholder="Buscar por palavra-chave (ex.: senha, fatura, WhatsApp)"
-          className="pl-9"
-        />
-      </div>
+          <div className="relative mt-6">
+            <Search className="text-muted-foreground pointer-events-none absolute top-1/2 left-4 size-5 -translate-y-1/2" aria-hidden="true" />
+            <Input
+              value={search}
+              onChange={(event) => setSearch(event.target.value)}
+              placeholder="Busque por senha, comissão, WhatsApp..."
+              aria-label="Buscar na central de ajuda"
+              className="bg-background/90 h-12 rounded-xl pr-11 pl-12 text-base shadow-sm"
+            />
+            {search && (
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon-sm"
+                onClick={() => setSearch("")}
+                aria-label="Limpar busca"
+                className="absolute top-1/2 right-2 -translate-y-1/2"
+              >
+                <X className="size-4" />
+              </Button>
+            )}
+          </div>
+        </div>
+      </section>
 
-      {totalResults === 0 ? (
-        <Card>
-          <CardContent>
-            <EmptyState icon={Search} title="Nenhum resultado para essa busca." description="Tente outra palavra-chave ou veja todas as perguntas abaixo." />
-          </CardContent>
-        </Card>
-      ) : (
-        <div className="flex flex-col gap-4">
-          {filteredCategories.map((category) => {
-            const Icon = category.icon;
+      <section aria-labelledby="quick-actions-title">
+        <div className="mb-3 flex items-end justify-between gap-3">
+          <div>
+            <h2 id="quick-actions-title" className="text-base font-semibold">Atalhos rápidos</h2>
+            <p className="text-muted-foreground text-sm">Vá direto para as tarefas mais procuradas.</p>
+          </div>
+        </div>
+        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+          {QUICK_ACTIONS.map((action) => {
+            const Icon = action.icon;
             return (
-              <Card key={category.id}>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2 text-base">
-                    <Icon className="text-primary size-4" />
-                    {category.title}
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <Accordion type="multiple" className="grid gap-3">
-                    {category.items.map(({ question, answer }) => (
-                      <AccordionItem key={question} value={question} className="border-border rounded-lg border px-4">
-                        <AccordionTrigger>{question}</AccordionTrigger>
-                        <AccordionContent className="text-muted-foreground">{answer}</AccordionContent>
-                      </AccordionItem>
-                    ))}
-                  </Accordion>
-                </CardContent>
-              </Card>
+              <Link
+                key={action.href}
+                href={action.href}
+                className="bg-card hover:bg-card-hover group flex min-h-32 flex-col rounded-xl border border-border/80 p-4 shadow-sm transition-all hover:-translate-y-0.5 hover:border-primary/40"
+              >
+                <div className="bg-primary/12 text-primary mb-4 flex size-9 items-center justify-center rounded-lg">
+                  <Icon className="size-4" aria-hidden="true" />
+                </div>
+                <span className="flex items-center justify-between gap-2 text-sm font-semibold">
+                  {action.title}
+                  <ArrowRight className="text-muted-foreground size-4 transition-transform group-hover:translate-x-0.5" aria-hidden="true" />
+                </span>
+                <span className="text-muted-foreground mt-1 text-xs leading-relaxed">{action.description}</span>
+              </Link>
             );
           })}
         </div>
+      </section>
+
+      {!search.trim() && (
+        <section aria-labelledby="topics-title">
+          <div className="mb-3">
+            <h2 id="topics-title" className="text-base font-semibold">Explore por assunto</h2>
+            <p className="text-muted-foreground text-sm">Escolha uma área para ver todas as respostas relacionadas.</p>
+          </div>
+          <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+            {CATEGORIES.map((category) => {
+              const Icon = category.icon;
+              const isSelected = selectedCategory === category.id;
+              return (
+                <button
+                  key={category.id}
+                  type="button"
+                  onClick={() => selectCategory(isSelected ? null : category.id)}
+                  aria-pressed={isSelected}
+                  className={`flex items-center gap-3 rounded-xl border p-3 text-left transition-colors ${
+                    isSelected
+                      ? "border-primary/50 bg-primary/10"
+                      : "bg-card border-border/80 hover:border-primary/30 hover:bg-card-hover"
+                  }`}
+                >
+                  <span className="bg-primary/12 text-primary flex size-10 shrink-0 items-center justify-center rounded-lg">
+                    <Icon className="size-5" aria-hidden="true" />
+                  </span>
+                  <span className="min-w-0 flex-1">
+                    <span className="block truncate text-sm font-medium">{category.title}</span>
+                    <span className="text-muted-foreground block truncate text-xs">{CATEGORY_DESCRIPTIONS[category.id]}</span>
+                  </span>
+                  <span className="text-muted-foreground text-xs tabular-nums">{category.items.length}</span>
+                </button>
+              );
+            })}
+          </div>
+        </section>
       )}
 
-      <Card>
+      <section aria-labelledby="faq-title">
+        <div className="mb-3 flex flex-wrap items-end justify-between gap-3">
+          <div>
+            <h2 id="faq-title" className="text-base font-semibold">{resultsTitle}</h2>
+            <p className="text-muted-foreground text-sm">
+              {search.trim()
+                ? `${totalResults} ${totalResults === 1 ? "resposta encontrada" : "respostas encontradas"}.`
+                : selectedCategory
+                  ? "Selecione uma pergunta para ver a resposta."
+                  : "Um ponto de partida para as dúvidas mais comuns."}
+            </p>
+          </div>
+          {selectedCategory && !search.trim() && (
+            <Button type="button" variant="ghost" size="sm" onClick={() => selectCategory(null)}>
+              Ver assuntos principais
+            </Button>
+          )}
+        </div>
+
+        {visibleEntries.length === 0 ? (
+          <Card className="border-border/80 shadow-sm">
+            <CardContent>
+              <EmptyState
+                icon={Search}
+                title="Nenhum resultado para essa busca"
+                description="Tente uma palavra mais curta ou procure pelo nome de uma funcionalidade."
+                action={<Button variant="outline" size="sm" onClick={() => setSearch("")}>Limpar busca</Button>}
+              />
+            </CardContent>
+          </Card>
+        ) : (
+          <Card className="border-border/80 shadow-sm">
+            <CardContent className="pt-2">
+              <Accordion type="multiple" className="divide-y divide-border/70">
+                {visibleEntries.map(({ question, answer, categoryTitle, icon: Icon }) => (
+                  <AccordionItem key={question} value={question} className="border-0">
+                    <AccordionTrigger className="py-4 text-left hover:no-underline">
+                      <span className="flex min-w-0 items-start gap-3">
+                        <span className="bg-primary/10 text-primary mt-0.5 flex size-8 shrink-0 items-center justify-center rounded-lg">
+                          <Icon className="size-4" aria-hidden="true" />
+                        </span>
+                        <span>
+                          <span className="block font-medium">{question}</span>
+                          <span className="text-muted-foreground mt-0.5 block text-xs font-normal">{categoryTitle}</span>
+                        </span>
+                      </span>
+                    </AccordionTrigger>
+                    <AccordionContent className="text-muted-foreground pr-4 pb-5 pl-11 text-sm leading-relaxed">
+                      {answer}
+                    </AccordionContent>
+                  </AccordionItem>
+                ))}
+              </Accordion>
+            </CardContent>
+          </Card>
+        )}
+      </section>
+
+      <Card className="from-primary/[0.09] to-card overflow-hidden border-primary/20 bg-gradient-to-r shadow-sm">
         <CardHeader>
           <CardTitle className="flex items-center gap-2 text-base">
-            <MessageCircle className="text-primary size-4" />
-            Não encontrou o que precisava?
+            <MessageCircle className="text-primary size-5" aria-hidden="true" />
+            Ainda precisa de ajuda?
           </CardTitle>
-          <CardDescription>Envie sua dúvida ou sugestão diretamente para a nossa equipe.</CardDescription>
+          <CardDescription>Conte o que aconteceu e envie sua dúvida diretamente para nossa equipe.</CardDescription>
         </CardHeader>
         <CardContent>
-          <Button asChild variant="outline">
-            <Link href="/settings/feedback">Enviar feedback</Link>
+          <Button asChild>
+            <Link href="/settings/feedback">
+              Enviar uma mensagem
+              <ArrowRight className="size-4" aria-hidden="true" />
+            </Link>
           </Button>
         </CardContent>
       </Card>

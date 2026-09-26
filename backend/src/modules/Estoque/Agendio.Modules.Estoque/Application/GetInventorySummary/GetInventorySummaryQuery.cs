@@ -7,4 +7,9 @@ public sealed record GetInventorySummaryQuery : IQuery<InventorySummary>;
 
 public sealed record StockValueByCurrency(string Currency, decimal Total);
 
-public sealed record InventorySummary(int ActiveProductCount, int LowStockCount, IReadOnlyList<StockValueByCurrency> TotalStockValue);
+public sealed record InventorySummary(
+    int ActiveProductCount,
+    int LowStockCount,
+    int OutOfStockCount,
+    int TotalUnitsInStock,
+    IReadOnlyList<StockValueByCurrency> TotalStockValue);

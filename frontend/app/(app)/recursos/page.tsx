@@ -6,7 +6,7 @@ import { useForm, useFieldArray } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { toast } from "sonner";
-import { Armchair, Briefcase, CalendarOff, Clock, Plus, Search, Trash2 } from "lucide-react";
+import { Armchair, Clock, MoreHorizontal, Plus, Search, Trash2 } from "lucide-react";
 
 import {
   listResources,
@@ -52,6 +52,12 @@ import {
 } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 const PAGE_SIZE = 20;
 
@@ -594,29 +600,29 @@ export default function ResourcesPage() {
                       </Badge>
                     </TableCell>
                     <TableCell className="text-right">
-                      <div className="flex flex-wrap justify-end gap-2">
+                      <div className="flex items-center justify-end gap-1">
                         <Button variant="ghost" size="sm" onClick={() => openHoursDialog(resource)}>
                           <Clock className="size-4" />
                           Horarios
                         </Button>
-                        <Button variant="ghost" size="sm" onClick={() => openServicesDialog(resource)}>
-                          <Briefcase className="size-4" />
-                          Servicos
-                        </Button>
-                        <Button variant="ghost" size="sm" onClick={() => openTimeOffDialog(resource)}>
-                          <CalendarOff className="size-4" />
-                          Folgas
-                        </Button>
-                        <Button variant="ghost" size="sm" onClick={() => openEditDialog(resource)}>
-                          Editar
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => statusMutation.mutate({ id: resource.id, isActive: !resource.isActive })}
-                        >
-                          {resource.isActive ? "Desativar" : "Ativar"}
-                        </Button>
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button variant="ghost" size="icon" aria-label={`Mais ações de ${resource.name}`}>
+                              <MoreHorizontal className="size-4" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end" className="w-44">
+                            <DropdownMenuItem onSelect={() => openServicesDialog(resource)}>Serviços</DropdownMenuItem>
+                            <DropdownMenuItem onSelect={() => openTimeOffDialog(resource)}>Folgas</DropdownMenuItem>
+                            <DropdownMenuItem onSelect={() => openEditDialog(resource)}>Editar</DropdownMenuItem>
+                            <DropdownMenuItem
+                              variant={resource.isActive ? "destructive" : "default"}
+                              onSelect={() => statusMutation.mutate({ id: resource.id, isActive: !resource.isActive })}
+                            >
+                              {resource.isActive ? "Desativar" : "Ativar"}
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
                       </div>
                     </TableCell>
                   </TableRow>
@@ -724,7 +730,7 @@ export default function ResourcesPage() {
                   name="unitId"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Unidade</FormLabel>
+                      <FormLabel>Local de atendimento</FormLabel>
                       <Select value={field.value} onValueChange={field.onChange}>
                         <FormControl>
                           <SelectTrigger className="w-full">

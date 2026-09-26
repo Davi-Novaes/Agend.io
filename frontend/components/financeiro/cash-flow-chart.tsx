@@ -7,6 +7,9 @@ import {
   BarChart,
   CartesianGrid,
   Cell,
+  ComposedChart,
+  LabelList,
+  Line,
   ResponsiveContainer,
   Tooltip,
   XAxis,
@@ -78,6 +81,7 @@ function MonthlyEvolutionTooltip({
   if (!active || !payload?.length) return null;
   const received = Number(payload.find((p) => p.dataKey === "received")?.value ?? 0);
   const paid = Number(payload.find((p) => p.dataKey === "paid")?.value ?? 0);
+  const balance = Number(payload.find((p) => p.dataKey === "balance")?.value ?? received - paid);
 
   return (
     <div className="bg-popover text-popover-foreground min-w-40 rounded-lg border px-3.5 py-3 text-xs shadow-lg">
@@ -98,7 +102,7 @@ function MonthlyEvolutionTooltip({
       </p>
       <p className="text-muted-foreground mt-1.5 flex items-center justify-between gap-4 border-t pt-1.5">
         <span>Saldo</span>
-        <span className="font-medium tabular-nums">{formatCurrency(received - paid)}</span>
+        <span className="font-medium tabular-nums">{formatCurrency(balance)}</span>
       </p>
     </div>
   );
@@ -107,9 +111,11 @@ function MonthlyEvolutionTooltip({
 /** Evolucao mensal: recebido x pago, barras agrupadas (Recharts). Cores validadas (verde/vermelho) — ver skill dataviz. */
 function MonthlyEvolutionChart({ data }: { data: CashFlowMonthPoint[] }) {
   const [view, setView] = React.useState<ViewMode>("chart");
+  const gradientId = React.useId().replaceAll(":", "");
+  const chartData = data.map((point) => ({ ...point, balance: point.received - point.paid }));
 
   return (
-    <div className="rounded-xl border p-4 shadow-sm sm:p-5">
+    <div className="bg-card rounded-xl border border-border/80 p-4 shadow-sm sm:p-5">
       <div className="mb-1 flex items-center justify-between gap-2">
         <div>
           <h3 className="text-sm font-semibold">Evolucao mensal</h3>
@@ -127,6 +133,10 @@ function MonthlyEvolutionChart({ data }: { data: CashFlowMonthPoint[] }) {
           <span aria-hidden="true" className="inline-block size-2.5 rounded-full bg-[color:var(--chart-paid)]" />
           Pago
         </span>
+        <span className="flex items-center gap-1.5">
+          <span aria-hidden="true" className="inline-block h-0.5 w-4 rounded-full bg-primary" />
+          Saldo
+        </span>
       </div>
 
       {data.length === 0 ? (
@@ -138,6 +148,7 @@ function MonthlyEvolutionChart({ data }: { data: CashFlowMonthPoint[] }) {
               <TableHead>Mes</TableHead>
               <TableHead className="text-right">Recebido</TableHead>
               <TableHead className="text-right">Pago</TableHead>
+              <TableHead className="text-right">Saldo</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -146,6 +157,7 @@ function MonthlyEvolutionChart({ data }: { data: CashFlowMonthPoint[] }) {
                 <TableCell>{formatMonthLabel(point.month)}</TableCell>
                 <TableCell className="text-right tabular-nums">{formatCurrency(point.received)}</TableCell>
                 <TableCell className="text-right tabular-nums">{formatCurrency(point.paid)}</TableCell>
+                <TableCell className="text-right font-medium tabular-nums">{formatCurrency(point.received - point.paid)}</TableCell>
               </TableRow>
             ))}
           </TableBody>
@@ -154,10 +166,20 @@ function MonthlyEvolutionChart({ data }: { data: CashFlowMonthPoint[] }) {
         <div
           role="img"
           aria-label={`Grafico de barras com a evolucao mensal de recebido e pago em ${data.length} meses.`}
-          className="h-64 w-full"
+          className="bg-surface-inset h-72 w-full rounded-lg p-2 sm:p-3"
         >
           <ResponsiveContainer width="100%" height="100%">
-            <BarChart data={data} margin={{ top: 8, right: 8, left: 0, bottom: 0 }} barGap={4}>
+            <ComposedChart data={chartData} margin={{ top: 14, right: 12, left: 0, bottom: 0 }} barGap={4}>
+              <defs>
+                <linearGradient id={`${gradientId}-received`} x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stopColor="var(--chart-received)" stopOpacity={1} />
+                  <stop offset="100%" stopColor="var(--chart-received)" stopOpacity={0.55} />
+                </linearGradient>
+                <linearGradient id={`${gradientId}-paid`} x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stopColor="var(--chart-paid)" stopOpacity={0.95} />
+                  <stop offset="100%" stopColor="var(--chart-paid)" stopOpacity={0.5} />
+                </linearGradient>
+              </defs>
               <CartesianGrid vertical={false} stroke="var(--border)" strokeOpacity={0.6} strokeDasharray="3 6" />
               <XAxis
                 dataKey="month"
@@ -174,9 +196,30 @@ function MonthlyEvolutionChart({ data }: { data: CashFlowMonthPoint[] }) {
                 width={80}
               />
               <Tooltip content={<MonthlyEvolutionTooltip />} cursor={{ fill: "var(--muted)", opacity: 0.4 }} />
-              <Bar dataKey="received" name="Recebido" fill="var(--chart-received)" radius={[4, 4, 0, 0]} maxBarSize={28} />
-              <Bar dataKey="paid" name="Pago" fill="var(--chart-paid)" radius={[4, 4, 0, 0]} maxBarSize={28} />
-            </BarChart>
+              <Bar
+                dataKey="received"
+                name="Recebido"
+                fill={`url(#${gradientId}-received)`}
+                radius={[6, 6, 2, 2]}
+                maxBarSize={24}
+              />
+              <Bar
+                dataKey="paid"
+                name="Pago"
+                fill={`url(#${gradientId}-paid)`}
+                radius={[6, 6, 2, 2]}
+                maxBarSize={24}
+              />
+              <Line
+                type="monotone"
+                dataKey="balance"
+                name="Saldo"
+                stroke="var(--primary)"
+                strokeWidth={3}
+                dot={{ r: 3, fill: "var(--primary)", stroke: "var(--card)", strokeWidth: 2 }}
+                activeDot={{ r: 5, fill: "var(--primary)", stroke: "var(--card)", strokeWidth: 2 }}
+              />
+            </ComposedChart>
           </ResponsiveContainer>
         </div>
       )}
@@ -191,7 +234,7 @@ function CategoryTooltip({
   valueFormatter,
 }: {
   active?: boolean;
-  payload?: readonly { payload: CashFlowCategoryPoint }[];
+  payload?: readonly { payload: CashFlowCategoryPoint & { percentage?: number } }[];
   categoryLabel: string;
   valueFormatter: (value: number) => string;
 }) {
@@ -203,6 +246,9 @@ function CategoryTooltip({
       <p className="text-muted-foreground mt-0.5">
         {categoryLabel}: {valueFormatter(point.total)}
       </p>
+      {point.percentage !== undefined && (
+        <p className="text-muted-foreground mt-0.5">Participação: {point.percentage.toLocaleString("pt-BR", { maximumFractionDigits: 1 })}%</p>
+      )}
     </div>
   );
 }
@@ -228,16 +274,28 @@ export function CategoryBreakdownChart({
 }) {
   const [view, setView] = React.useState<ViewMode>("chart");
 
-  // Recharts layout="vertical" desenha de baixo pra cima -- inverte aqui pra
-  // a categoria de maior valor aparecer no topo (leitura natural, mesma
-  // ordem que a lista/tabela ja usava).
-  const chartData = [...data].reverse();
+  const total = data.reduce((sum, point) => sum + point.total, 0);
+  const chartData = [...data]
+    .sort((a, b) => b.total - a.total)
+    .map((point) => ({
+      ...point,
+      percentage: total > 0 ? (point.total / total) * 100 : 0,
+      displayValue: `${valueFormatter(point.total)} · ${total > 0 ? ((point.total / total) * 100).toLocaleString("pt-BR", { maximumFractionDigits: 1 }) : "0"}%`,
+    }));
   // Altura minima por linha, senao poucas categorias ficam com barras enormes
   // e muitas ficam espremidas -- ResponsiveContainer respeita essa altura fixa.
-  const chartHeight = Math.max(120, chartData.length * 40);
+  const chartHeight = Math.max(160, chartData.length * 44);
+  // Rotulos desenhados a direita da barra precisam fazer parte da margem do
+  // SVG. Uma margem fixa de 24px cortava valores monetarios em colunas mais
+  // estreitas (Financeiro/Relatorios).
+  const rightMargin = Math.min(
+    176,
+    Math.max(88, ...chartData.map((point) => point.displayValue.length * 6.5 + 12))
+  );
+  const categoryColors = ["var(--chart-1)", "var(--chart-3)", "var(--chart-4)", "var(--chart-2)", "var(--chart-5)"];
 
   return (
-    <div className="rounded-xl border p-4 shadow-sm sm:p-5">
+    <div className="bg-card rounded-xl border border-border/80 p-4 shadow-sm sm:p-5">
       <div className="mb-3 flex items-center justify-between gap-2">
         <div>
           <h3 className="text-sm font-semibold">{title}</h3>
@@ -266,10 +324,15 @@ export function CategoryBreakdownChart({
           </TableBody>
         </Table>
       ) : (
-        <div role="img" aria-label={`Grafico de barras com ${categoryLabel.toLowerCase()} por total.`} style={{ height: chartHeight }}>
+        <div
+          role="img"
+          aria-label={`Grafico de barras com ${categoryLabel.toLowerCase()} por total.`}
+          className="bg-surface-inset rounded-lg p-2 sm:p-3"
+          style={{ height: chartHeight }}
+        >
           <ResponsiveContainer width="100%" height="100%">
-            <BarChart data={chartData} layout="vertical" margin={{ top: 4, right: 24, left: 0, bottom: 4 }}>
-              <CartesianGrid horizontal={false} stroke="var(--border)" strokeOpacity={0.6} strokeDasharray="3 6" />
+            <BarChart data={chartData} layout="vertical" margin={{ top: 4, right: rightMargin, left: 0, bottom: 4 }}>
+              <CartesianGrid horizontal={false} stroke="var(--border)" strokeOpacity={0.45} strokeDasharray="3 6" />
               <XAxis type="number" hide />
               <YAxis
                 type="category"
@@ -286,18 +349,19 @@ export function CategoryBreakdownChart({
               />
               <Bar
                 dataKey="total"
-                radius={[0, 4, 4, 0]}
-                maxBarSize={22}
-                label={{
-                  position: "right",
-                  fontSize: 11,
-                  fill: "var(--muted-foreground)",
-                  formatter: (value: unknown) => valueFormatter(Number(value)),
-                }}
+                radius={[0, 7, 7, 0]}
+                maxBarSize={24}
               >
-                {chartData.map((point) => (
-                  <Cell key={point.category} fill="var(--chart-1)" />
+                {chartData.map((point, index) => (
+                  <Cell key={point.category} fill={categoryColors[index % categoryColors.length]} />
                 ))}
+                <LabelList
+                  dataKey="displayValue"
+                  position="right"
+                  fontSize={11}
+                  fontWeight={500}
+                  fill="var(--foreground)"
+                />
               </Bar>
             </BarChart>
           </ResponsiveContainer>

@@ -103,8 +103,21 @@ export type TenantPublicProfile = {
   showHoursSection: boolean;
   showContactSection: boolean;
   businessHours: WorkingHourEntry[];
+  units: PublicUnitSummary[];
   paymentRequired: boolean;
   depositPercentage: number;
+};
+
+export type PublicUnitSummary = {
+  id: string;
+  name: string;
+  address: string | null;
+  city: string | null;
+  state: string | null;
+  country: string | null;
+  phone: string | null;
+  whatsApp: string | null;
+  businessHours: WorkingHourEntry[];
 };
 
 /** Resolve um logoUrl relativo (ex.: "/uploads/tenant-logos/x.png") para a origem da API. */
@@ -1049,7 +1062,10 @@ export type UnitSummary = {
   city: string | null;
   state: string | null;
   country: string | null;
+  phone: string | null;
+  whatsApp: string | null;
   isActive: boolean;
+  businessHours: WorkingHourEntry[];
 };
 
 export type UnitInput = {
@@ -1058,6 +1074,8 @@ export type UnitInput = {
   city?: string | null;
   state?: string | null;
   country?: string | null;
+  phone?: string | null;
+  whatsApp?: string | null;
 };
 
 export function listUnits(accessToken: string): Promise<UnitSummary[]> {
@@ -1078,6 +1096,10 @@ export function updateUnit(id: string, input: UnitInput, accessToken: string): P
 
 export function setUnitActiveStatus(id: string, isActive: boolean, accessToken: string): Promise<void> {
   return request(`/api/units/${id}/status`, { method: "PATCH", body: JSON.stringify({ isActive }) }, accessToken);
+}
+
+export function setUnitBusinessHours(id: string, entries: WorkingHourEntry[], accessToken: string): Promise<void> {
+  return request(`/api/units/${id}/business-hours`, { method: "PUT", body: JSON.stringify({ entries }) }, accessToken);
 }
 
 // ---------- Scheduling (Agenda) ----------
@@ -1287,6 +1309,7 @@ export type PublicResourceSummary = {
   description: string | null;
   photoUrl: string | null;
   specialties: string[];
+  unitId: string | null;
 };
 
 export type AvailableSlot = {
@@ -1999,6 +2022,8 @@ export type StockValueByCurrency = { currency: string; total: number };
 export type InventorySummary = {
   activeProductCount: number;
   lowStockCount: number;
+  outOfStockCount: number;
+  totalUnitsInStock: number;
   totalStockValue: StockValueByCurrency[];
 };
 

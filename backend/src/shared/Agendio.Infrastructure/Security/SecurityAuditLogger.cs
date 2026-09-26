@@ -2,6 +2,7 @@ using Agendio.Infrastructure.Persistence;
 using Agendio.SharedKernel.Time;
 using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
+using System.Net;
 
 namespace Agendio.Infrastructure.Security;
 
@@ -36,9 +37,9 @@ public sealed class SecurityAuditLogger<TContext>(TContext dbContext, IClock clo
             success,
             ResolveClientIp(httpContext),
             ResolveCountryCode(httpContext),
-            ResolveHeaderValue(httpContext, "CF-Region"),
-            ResolveHeaderValue(httpContext, "CF-IPCity"),
-            httpContext?.Request.Headers.UserAgent.ToString(),
+            ResolveHeaderValue(httpContext, "CF-Region", 100),
+            ResolveHeaderValue(httpContext, "CF-IPCity", 100),
+            Truncate(httpContext?.Request.Headers.UserAgent.ToString(), 512),
             metadata,
             clock.UtcNow);
 
@@ -64,10 +65,14 @@ public sealed class SecurityAuditLogger<TContext>(TContext dbContext, IClock clo
             return null;
         }
 
-        var cfConnectingIp = httpContext.Request.Headers["CF-Connecting-IP"].ToString();
-        return string.IsNullOrWhiteSpace(cfConnectingIp)
-            ? httpContext.Connection.RemoteIpAddress?.ToString()
-            : cfConnectingIp;
+        var cfConnectingIp = httpContext.Request.Headers["CF-Connecting-IP"].ToString().Trim();
+        var candidate = string.IsNullOrWhiteSpace(cfConnectingIp)
+            ? httpContext.Connection.RemoteIpAddress
+            : IPAddress.TryParse(cfConnectingIp, out var parsed) ? parsed : null;
+
+        return candidate?.IsIPv4MappedToIPv6 == true
+            ? candidate.MapToIPv4().ToString()
+            : candidate?.ToString();
     }
 
     /// <summary>
@@ -89,9 +94,34 @@ public sealed class SecurityAuditLogger<TContext>(TContext dbContext, IClock clo
     /// habilitado (Network settings do dashboard, fora do alcance do backend) —
     /// por isso null aqui e ausencia de configuracao, nao bug de leitura.
     /// </summary>
-    private static string? ResolveHeaderValue(HttpContext? httpContext, string headerName)
+    private static string? ResolveHeaderValue(HttpContext? httpContext, string headerName, int maxLength)
     {
         var value = httpContext?.Request.Headers[headerName].ToString();
-        return string.IsNullOrWhiteSpace(value) ? null : Uri.UnescapeDataString(value);
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return null;
+        }
+
+        try
+        {
+            value = Uri.UnescapeDataString(value);
+        }
+        catch (UriFormatException)
+        {
+            // O header ainda e util sem decodificacao; nunca deixe telemetria quebrar o login.
+        }
+
+        return Truncate(value, maxLength);
+    }
+
+    private static string? Truncate(string? value, int maxLength)
+    {
+        value = value?.Trim();
+        if (string.IsNullOrEmpty(value))
+        {
+            return null;
+        }
+
+        return value.Length <= maxLength ? value : value[..maxLength];
     }
 }

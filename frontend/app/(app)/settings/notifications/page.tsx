@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { useForm } from "react-hook-form";
+import { useForm, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { toast } from "sonner";
@@ -218,6 +218,7 @@ function NoShowPolicyCard({
       noShowThresholdForDeposit: profile.noShowThresholdForDeposit,
     },
   });
+  const requireDepositAfterNoShows = useWatch({ control: form.control, name: "requireDepositAfterNoShows" });
 
   const mutation = useMutation({
     mutationFn: (values: NoShowPolicyFormValues) => updateTenantNoShowPolicy(values, accessToken),
@@ -260,7 +261,13 @@ function NoShowPolicyCard({
                 <FormItem>
                   <FormLabel>Número de faltas para exibir o aviso</FormLabel>
                   <FormControl>
-                    <Input type="number" min={1} {...field} value={field.value as number} />
+                    <Input
+                      type="number"
+                      min={1}
+                      disabled={!requireDepositAfterNoShows}
+                      {...field}
+                      value={field.value as number}
+                    />
                   </FormControl>
                   <FormMessage />
                 </FormItem>

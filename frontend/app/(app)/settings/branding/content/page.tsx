@@ -3,6 +3,7 @@
 import * as React from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
+import { BriefcaseBusiness, Clock3, Contact, TextCursorInput, Users } from "lucide-react";
 
 import { updateTenantPageCustomization, TENANT_PROFILE_QUERY_KEY, ApiError } from "@/lib/api/client";
 import { useSession } from "@/lib/auth/session-context";
@@ -30,6 +31,13 @@ export default function BrandingContentPage() {
 
   const hasSecondaryColor = draft.secondaryColorHex.trim() !== "";
   const secondaryPassesAa = !hasSecondaryColor || meetsAaContrast(FOREGROUND_HEX, draft.secondaryColorHex);
+  const sectionOptions = [
+    { label: "Sobre o negócio", description: "Apresentação exibida perto do topo", icon: TextCursorInput, checked: draft.showAboutSection, key: "showAboutSection" as const },
+    { label: "Serviços", description: "Catálogo de serviços disponíveis", icon: BriefcaseBusiness, checked: draft.showServicesSection, key: "showServicesSection" as const },
+    { label: "Equipe", description: "Profissionais disponíveis para agendamento", icon: Users, checked: draft.showTeamSection, key: "showTeamSection" as const },
+    { label: "Horário de funcionamento", description: "Dias e horários em que você atende", icon: Clock3, checked: draft.showHoursSection, key: "showHoursSection" as const },
+    { label: "Contato e redes sociais", description: "Telefone, endereço e seus perfis", icon: Contact, checked: draft.showContactSection, key: "showContactSection" as const },
+  ];
 
   async function handleSave() {
     setIsSaving(true);
@@ -115,27 +123,19 @@ export default function BrandingContentPage() {
           <CardTitle className="text-base">O que aparece na página pública</CardTitle>
           <CardDescription>Mostre ou esconda seções inteiras — o conteúdo continua vindo dos seus cadastros reais.</CardDescription>
         </CardHeader>
-        <CardContent className="grid gap-3">
-          <div className="flex items-center justify-between gap-4">
-            <span className="text-sm">Sobre (descrição no topo)</span>
-            <Switch checked={draft.showAboutSection} onCheckedChange={(value) => update({ showAboutSection: value })} aria-label="Mostrar seção Sobre" />
-          </div>
-          <div className="flex items-center justify-between gap-4">
-            <span className="text-sm">Serviços</span>
-            <Switch checked={draft.showServicesSection} onCheckedChange={(value) => update({ showServicesSection: value })} aria-label="Mostrar seção Serviços" />
-          </div>
-          <div className="flex items-center justify-between gap-4">
-            <span className="text-sm">Equipe</span>
-            <Switch checked={draft.showTeamSection} onCheckedChange={(value) => update({ showTeamSection: value })} aria-label="Mostrar seção Equipe" />
-          </div>
-          <div className="flex items-center justify-between gap-4">
-            <span className="text-sm">Horário de funcionamento</span>
-            <Switch checked={draft.showHoursSection} onCheckedChange={(value) => update({ showHoursSection: value })} aria-label="Mostrar seção Horário" />
-          </div>
-          <div className="flex items-center justify-between gap-4">
-            <span className="text-sm">Contato e redes sociais</span>
-            <Switch checked={draft.showContactSection} onCheckedChange={(value) => update({ showContactSection: value })} aria-label="Mostrar seção Contato" />
-          </div>
+        <CardContent className="grid gap-2.5">
+          {sectionOptions.map((section) => {
+            const Icon = section.icon;
+            return (
+              <div key={section.key} className="flex items-center justify-between gap-4 rounded-xl border bg-muted/20 p-3.5 transition-colors hover:bg-muted/35">
+                <div className="flex min-w-0 items-center gap-3">
+                  <span className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary"><Icon className="size-4" /></span>
+                  <span className="min-w-0"><span className="block text-sm font-medium">{section.label}</span><span className="block truncate text-xs text-muted-foreground">{section.description}</span></span>
+                </div>
+                <Switch checked={section.checked} onCheckedChange={(value) => update({ [section.key]: value })} aria-label={`Mostrar seção ${section.label}`} />
+              </div>
+            );
+          })}
         </CardContent>
       </Card>
 

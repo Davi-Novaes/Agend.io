@@ -3,6 +3,7 @@
 import * as React from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
+import { ImageIcon, Palette, Type, Upload } from "lucide-react";
 
 import {
   updateTenantBranding,
@@ -191,24 +192,25 @@ export default function BrandingAppearancePage() {
   return (
     <div className="flex flex-col gap-6">
       <Card>
-        <CardHeader>
-          <CardTitle className="text-base">Logo</CardTitle>
-          <CardDescription>Aparece no painel e no portal público do seu estabelecimento.</CardDescription>
+        <CardHeader className="flex flex-row items-start gap-3">
+          <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary"><ImageIcon className="size-5" /></span>
+          <div className="space-y-1"><CardTitle className="text-base">Logo</CardTitle><CardDescription>A identidade que aparece no painel e na página pública.</CardDescription></div>
         </CardHeader>
         <CardContent>
-          <div className="flex items-center gap-4">
-            <div className="bg-muted flex size-16 shrink-0 items-center justify-center overflow-hidden rounded-lg border">
-              {draft.logoPreviewUrl ? (
+          <div className="flex items-center gap-4 rounded-xl border border-dashed bg-muted/15 p-4">
+            <div className="bg-background relative flex size-20 shrink-0 flex-col items-center justify-center overflow-hidden rounded-xl border shadow-sm">
+              <ImageIcon className="size-5 text-muted-foreground" />
+              <span className="mt-1 text-[10px] text-muted-foreground">Sem prévia</span>
+              {draft.logoPreviewUrl && (
                 // eslint-disable-next-line @next/next/no-img-element -- preview de upload local/URL dinamica da API.
-                <img src={draft.logoPreviewUrl} alt="Logo do estabelecimento" className="size-full object-contain" />
-              ) : (
-                <span className="text-muted-foreground text-xs">Sem logo</span>
+                <img key={draft.logoPreviewUrl} src={draft.logoPreviewUrl} alt="Logo do estabelecimento" className="absolute inset-0 size-full bg-background object-contain" onError={(event) => { event.currentTarget.style.display = "none"; }} />
               )}
             </div>
             <div className="flex flex-col gap-2">
               <input ref={logoInputRef} type="file" accept="image/png,image/jpeg,image/webp" onChange={handleLogoFileChange} className="hidden" />
               <div className="flex gap-2">
                 <Button type="button" variant="outline" onClick={() => logoInputRef.current?.click()}>
+                  <Upload className="size-4" />
                   Escolher arquivo
                 </Button>
                 {selectedLogoFile && (
@@ -224,24 +226,25 @@ export default function BrandingAppearancePage() {
       </Card>
 
       <Card>
-        <CardHeader>
-          <CardTitle className="text-base">Banner</CardTitle>
-          <CardDescription>Imagem de capa exibida no topo da página pública do seu estabelecimento.</CardDescription>
+        <CardHeader className="flex flex-row items-start gap-3">
+          <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary"><ImageIcon className="size-5" /></span>
+          <div className="space-y-1"><CardTitle className="text-base">Banner</CardTitle><CardDescription>A imagem de capa que recebe seus clientes.</CardDescription></div>
         </CardHeader>
         <CardContent>
           <div className="flex flex-col gap-4">
-            <div className="bg-muted flex h-32 w-full items-center justify-center overflow-hidden rounded-lg border sm:h-40">
-              {draft.bannerPreviewUrl ? (
+            <div className="bg-muted/30 relative flex h-36 w-full flex-col items-center justify-center overflow-hidden rounded-xl border border-dashed sm:h-44">
+              <ImageIcon className="size-6 text-muted-foreground" />
+              <span className="mt-2 text-xs text-muted-foreground">Envie uma imagem horizontal para a capa</span>
+              {draft.bannerPreviewUrl && (
                 // eslint-disable-next-line @next/next/no-img-element -- preview de upload local/URL dinamica da API.
-                <img src={draft.bannerPreviewUrl} alt="Banner do estabelecimento" className="size-full object-cover" />
-              ) : (
-                <span className="text-muted-foreground text-xs">Sem banner</span>
+                <img key={draft.bannerPreviewUrl} src={draft.bannerPreviewUrl} alt="Banner do estabelecimento" className="absolute inset-0 size-full bg-muted object-cover" onError={(event) => { event.currentTarget.style.display = "none"; }} />
               )}
             </div>
             <div className="flex flex-col gap-2">
               <input ref={bannerInputRef} type="file" accept="image/png,image/jpeg,image/webp" onChange={handleBannerFileChange} className="hidden" />
               <div className="flex gap-2">
                 <Button type="button" variant="outline" onClick={() => bannerInputRef.current?.click()}>
+                  <Upload className="size-4" />
                   Escolher arquivo
                 </Button>
                 {selectedBannerFile && (
@@ -257,9 +260,9 @@ export default function BrandingAppearancePage() {
       </Card>
 
       <Card>
-        <CardHeader>
-          <CardTitle className="text-base">Cores</CardTitle>
-          <CardDescription>Cor principal (botões e destaques) e cor de apoio (badges e acentos), opcional.</CardDescription>
+        <CardHeader className="flex flex-row items-start gap-3">
+          <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary"><Palette className="size-5" /></span>
+          <div className="space-y-1"><CardTitle className="text-base">Paleta de cores</CardTitle><CardDescription>Defina as cores dos botões, destaques e detalhes.</CardDescription></div>
         </CardHeader>
         <CardContent className="grid gap-6">
           <div className="grid gap-3">
@@ -334,9 +337,9 @@ export default function BrandingAppearancePage() {
       </Card>
 
       <Card>
-        <CardHeader>
-          <CardTitle className="text-base">Tipografia e botões</CardTitle>
-          <CardDescription>Fonte e formato dos botões usados na sua página pública.</CardDescription>
+        <CardHeader className="flex flex-row items-start gap-3">
+          <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary"><Type className="size-5" /></span>
+          <div className="space-y-1"><CardTitle className="text-base">Tipografia e botões</CardTitle><CardDescription>Escolha a personalidade visual dos textos e ações.</CardDescription></div>
         </CardHeader>
         <CardContent className="grid gap-4">
           <div className="grid gap-4 sm:grid-cols-2">

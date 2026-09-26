@@ -6,7 +6,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { toast } from "sonner";
-import { Megaphone, Send } from "lucide-react";
+import { CalendarClock, Megaphone, Send, Users } from "lucide-react";
 
 import { sendCampaign, listCampaigns, ApiError, type CampaignChannel, type CustomerSegment } from "@/lib/api/client";
 import { useSession } from "@/lib/auth/session-context";
@@ -14,6 +14,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from "@/components/ui/table";
 import { Skeleton } from "@/components/ui/skeleton";
 import { EmptyState } from "@/components/ui/empty-state";
@@ -101,6 +102,9 @@ export default function MarketingPage() {
   });
 
   const totalPages = Math.max(1, Math.ceil((listQuery.data?.totalCount ?? 0) / PAGE_SIZE));
+  const campaigns = listQuery.data?.items ?? [];
+  const visibleRecipients = campaigns.reduce((total, campaign) => total + campaign.recipientCount, 0);
+  const latestCampaign = campaigns[0];
 
   function openCreateDialog() {
     form.reset(emptyCampaignForm);
@@ -117,11 +121,55 @@ export default function MarketingPage() {
     <div className="flex w-full flex-1 flex-col">
       <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
         <p className="text-muted-foreground text-sm">Campanhas por e-mail ou WhatsApp para os clientes ativos.</p>
-        <Button onClick={openCreateDialog}>
+        <Button className="w-full sm:w-auto" onClick={openCreateDialog}>
           <Send className="size-4" />
           Nova campanha
         </Button>
       </div>
+
+      {listQuery.isLoading ? (
+        <div className="mb-4 grid gap-3 sm:grid-cols-3">
+          {Array.from({ length: 3 }).map((_, index) => (
+            <Skeleton key={index} className="h-24 w-full" />
+          ))}
+        </div>
+      ) : campaigns.length > 0 ? (
+        <div className="mb-4 grid gap-3 sm:grid-cols-3">
+          <Card size="sm">
+            <CardContent className="flex items-center gap-3">
+              <span className="bg-primary/10 text-primary flex size-9 shrink-0 items-center justify-center rounded-lg">
+                <Megaphone className="size-4" aria-hidden="true" />
+              </span>
+              <div>
+                <p className="text-muted-foreground text-xs">Campanhas enviadas</p>
+                <p className="text-xl font-semibold tabular-nums">{listQuery.data?.totalCount ?? 0}</p>
+              </div>
+            </CardContent>
+          </Card>
+          <Card size="sm">
+            <CardContent className="flex items-center gap-3">
+              <span className="bg-info/10 text-info flex size-9 shrink-0 items-center justify-center rounded-lg">
+                <Users className="size-4" aria-hidden="true" />
+              </span>
+              <div>
+                <p className="text-muted-foreground text-xs">Destinatários nesta página</p>
+                <p className="text-xl font-semibold tabular-nums">{visibleRecipients}</p>
+              </div>
+            </CardContent>
+          </Card>
+          <Card size="sm">
+            <CardContent className="flex items-center gap-3">
+              <span className="bg-success/10 text-success flex size-9 shrink-0 items-center justify-center rounded-lg">
+                <CalendarClock className="size-4" aria-hidden="true" />
+              </span>
+              <div className="min-w-0">
+                <p className="text-muted-foreground text-xs">Último envio</p>
+                <p className="truncate text-sm font-semibold">{formatDateTime(latestCampaign.sentAtUtc)}</p>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      ) : null}
 
       <Card>
         <CardContent className="flex flex-col gap-4">
@@ -169,7 +217,15 @@ export default function MarketingPage() {
                     <TableCell>{CHANNEL_LABEL[campaign.channel]}</TableCell>
                     <TableCell>{campaign.targetSegment ? SEGMENT_LABEL[campaign.targetSegment] : "Todos"}</TableCell>
                     <TableCell>{formatDateTime(campaign.sentAtUtc)}</TableCell>
-                    <TableCell className="text-right tabular-nums">{campaign.recipientCount}</TableCell>
+                    <TableCell className="text-right tabular-nums">
+                      {campaign.recipientCount > 0 ? (
+                        campaign.recipientCount
+                      ) : (
+                        <Badge variant="warning" title="Nenhum cliente elegível para o canal e público selecionados">
+                          Nenhum
+                        </Badge>
+                      )}
+                    </TableCell>
                   </TableRow>
                 ))
               )}

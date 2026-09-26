@@ -9,6 +9,10 @@ public sealed record GetPublicTenantProfileQuery(string Slug) : IQuery<PublicTen
 
 public sealed record PublicBusinessHoursEntry(DayOfWeek DayOfWeek, TimeOnly StartTime, TimeOnly EndTime);
 
+public sealed record PublicUnitSummary(
+    Guid Id, string Name, string? Address, string? City, string? State, string? Country,
+    string? Phone, string? WhatsApp, IReadOnlyList<PublicBusinessHoursEntry> BusinessHours);
+
 public sealed record PublicTenantProfile(
     Guid Id,
     string Name,
@@ -38,5 +42,6 @@ public sealed record PublicTenantProfile(
     bool ShowHoursSection,
     bool ShowContactSection,
     IReadOnlyList<PublicBusinessHoursEntry> BusinessHours,
+    IReadOnlyList<PublicUnitSummary> Units,
     bool PaymentRequired,
     int DepositPercentage);

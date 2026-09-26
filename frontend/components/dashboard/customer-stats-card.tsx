@@ -66,7 +66,7 @@ export function CustomerStatsCard({
   const retentionRate = retentionBase > 0 ? Math.round(((recurringCount ?? 0) / retentionBase) * 100) : null;
 
   return (
-    <Card className="border-border/70 ring-0 shadow-none">
+    <Card className="bg-card border-border/80 ring-0 shadow-sm">
       <CardContent className="@container">
         <div className="mb-3 flex items-center justify-between gap-2">
           <h3 className="text-sm font-semibold">Clientes</h3>
@@ -90,9 +90,9 @@ export function CustomerStatsCard({
         ) : total === 0 ? (
           <EmptyState icon={UserPlus} title="Nenhum cliente cadastrado ainda" />
         ) : (
-          <div className="bg-surface-inset flex flex-col items-center gap-4 rounded-lg p-3 @sm:flex-row">
+          <div className="bg-surface-inset flex flex-col items-center gap-5 rounded-lg p-4 @sm:flex-row">
             <div
-              className="relative size-40 shrink-0"
+              className="relative size-44 shrink-0 rounded-full ring-1 ring-border/60"
               role="img"
               aria-label={`${total} clientes: ${segments.map((segment) => `${segment.label} ${percentOf(segment.count)}%`).join(", ")}.`}
             >
@@ -104,9 +104,10 @@ export function CustomerStatsCard({
                     nameKey="label"
                     cx="50%"
                     cy="50%"
-                    innerRadius={52}
-                    outerRadius={78}
-                    paddingAngle={2}
+                    innerRadius={56}
+                    outerRadius={82}
+                    paddingAngle={3}
+                    cornerRadius={5}
                     stroke="none"
                     isAnimationActive={false}
                   >
@@ -128,24 +129,23 @@ export function CustomerStatsCard({
                 </PieChart>
               </ResponsiveContainer>
               <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center">
-                <span className="text-2xl font-semibold tabular-nums">{total}</span>
+                <span className="text-3xl font-semibold tabular-nums">{total}</span>
                 <span className="text-muted-foreground text-[11px]">clientes</span>
               </div>
             </div>
 
-            <ul className="flex w-full flex-col gap-1" aria-label="Legenda de clientes por segmento">
+            <ul className="flex w-full flex-col gap-1.5" aria-label="Legenda de clientes por segmento">
               {segments.map((segment) => (
                 <li key={segment.key}>
                   <Link
                     href={segment.href}
-                    className="hover:bg-card-hover flex items-center gap-2 rounded-md px-1.5 py-1.5 text-xs transition-colors"
+                    className="bg-card/70 hover:bg-card-hover flex items-center gap-2 rounded-md border border-border/50 px-2.5 py-2 text-xs transition-colors"
                   >
                     <span aria-hidden="true" className="inline-block size-2.5 shrink-0 rounded-full" style={{ backgroundColor: segment.color }} />
                     <segment.icon className="text-muted-foreground size-3.5 shrink-0" aria-hidden="true" />
                     <span className="min-w-0 flex-1 truncate">{segment.label}</span>
-                    <span className="shrink-0 tabular-nums">
-                      {segment.count} ({percentOf(segment.count)}%)
-                    </span>
+                    <span className="shrink-0 font-medium tabular-nums">{segment.count}</span>
+                    <span className="text-muted-foreground w-9 shrink-0 text-right tabular-nums">{percentOf(segment.count)}%</span>
                   </Link>
                 </li>
               ))}

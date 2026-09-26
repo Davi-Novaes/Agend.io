@@ -18,6 +18,12 @@ public sealed class GetUnitByIdQueryHandler(TenancyDbContext dbContext) : IQuery
             return Result.Failure<UnitDetails>(Error.NotFound("Unit.NotFound", "Unidade nao encontrada."));
         }
 
-        return Result.Success(new UnitDetails(unit.Id.Value, unit.Name, unit.Address, unit.City, unit.State, unit.Country, unit.IsActive));
+        var businessHours = unit.BusinessHours
+            .Select(h => new UnitBusinessHoursDetails(h.DayOfWeek, h.StartTime, h.EndTime))
+            .ToList();
+
+        return Result.Success(new UnitDetails(
+            unit.Id.Value, unit.Name, unit.Address, unit.City, unit.State, unit.Country,
+            unit.Phone, unit.WhatsApp, unit.IsActive, businessHours));
     }
 }

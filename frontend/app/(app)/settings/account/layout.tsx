@@ -31,7 +31,6 @@ export default function AccountLayout({ children }: { children: React.ReactNode 
   return (
     <div className="flex w-full flex-1 flex-col gap-6">
       <div>
-        <h1 className="text-lg font-semibold">Minha conta</h1>
         <p className="text-muted-foreground text-sm">Seus dados pessoais e, se você for o administrador, os da empresa e do plano.</p>
       </div>
 

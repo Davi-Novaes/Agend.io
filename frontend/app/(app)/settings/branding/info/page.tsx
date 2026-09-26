@@ -6,7 +6,7 @@ import { useForm, useFieldArray } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { toast } from "sonner";
-import { Plus, Trash2 } from "lucide-react";
+import { CalendarOff, Clock3, ContactRound, Plus, Trash2 } from "lucide-react";
 
 import {
   getTenantProfile,
@@ -218,15 +218,13 @@ function InfoForms({
   return (
     <div className="flex flex-col gap-6">
       <Card>
-        <CardHeader>
-          <CardTitle className="text-base">Contato e redes sociais</CardTitle>
-          <CardDescription>
-            Aparece no portal público do seu estabelecimento. Dados cadastrais (CNPJ/CPF, razão social) ficam em{" "}
-            <Link href="/settings/account/company" className="underline underline-offset-2">
-              Minha conta → Empresa
-            </Link>
-            .
-          </CardDescription>
+        <CardHeader className="flex flex-row items-start gap-3">
+          <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary"><ContactRound className="size-5" /></span>
+          <div className="space-y-1"><CardTitle className="text-base">Contato e redes sociais</CardTitle>
+            <CardDescription>
+              Aparece no portal público. Dados cadastrais ficam em{" "}<Link href="/settings/account/company" className="font-medium text-foreground underline underline-offset-2">Minha conta → Empresa</Link>.
+            </CardDescription>
+          </div>
         </CardHeader>
         <CardContent>
           <Form {...profileForm}>
@@ -341,16 +339,16 @@ function InfoForms({
       </Card>
 
       <Card>
-        <CardHeader>
-          <CardTitle className="text-base">Horário de funcionamento</CardTitle>
-          <CardDescription>Usado no portal público para mostrar quando o estabelecimento está aberto.</CardDescription>
+        <CardHeader className="flex flex-row items-start gap-3">
+          <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary"><Clock3 className="size-5" /></span>
+          <div className="space-y-1"><CardTitle className="text-base">Horário de funcionamento</CardTitle><CardDescription>Mostre aos clientes quando o estabelecimento está aberto.</CardDescription></div>
         </CardHeader>
         <CardContent>
           <Form {...hoursForm}>
             <form onSubmit={hoursForm.handleSubmit((values) => businessHoursMutation.mutate(values))} className="flex flex-col gap-3">
               {hoursFieldArray.fields.length === 0 && <p className="text-muted-foreground text-sm">Nenhum horário cadastrado ainda.</p>}
               {hoursFieldArray.fields.map((field, index) => (
-                <div key={field.id} className="flex items-end gap-2">
+                <div key={field.id} className="grid items-end gap-2 rounded-xl border bg-muted/15 p-3 sm:grid-cols-[minmax(0,1fr)_110px_110px_auto]">
                   <FormField
                     control={hoursForm.control}
                     name={`entries.${index}.dayOfWeek`}
@@ -427,9 +425,9 @@ function InfoForms({
       </Card>
 
       <Card>
-        <CardHeader>
-          <CardTitle className="text-base">Datas fechadas e intervalo entre horários</CardTitle>
-          <CardDescription>Feriados e eventos em que o estabelecimento não atende, e um intervalo mínimo de descanso entre agendamentos.</CardDescription>
+        <CardHeader className="flex flex-row items-start gap-3">
+          <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary"><CalendarOff className="size-5" /></span>
+          <div className="space-y-1"><CardTitle className="text-base">Exceções e intervalo</CardTitle><CardDescription>Configure feriados, pausas e o respiro necessário entre agendamentos.</CardDescription></div>
         </CardHeader>
         <CardContent>
           <Form {...schedulingSettingsForm}>
