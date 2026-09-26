@@ -182,6 +182,7 @@ export function login(input: {
   tenantId: string;
   email: string;
   password: string;
+  turnstileToken: string;
 }): Promise<LoginResult> {
   return request<LoginResult>("/api/auth/login", {
     method: "POST",
@@ -286,6 +287,7 @@ export function registerUser(input: {
   phone: string;
   cpfCnpj: string;
   termsAccepted: boolean;
+  turnstileToken: string;
 }): Promise<{ id: string; onboardingToken: string; onboardingTokenExpiresAtUtc: string }> {
   return request("/api/auth/register", {
     method: "POST",
@@ -1387,7 +1389,7 @@ export type PlatformMfaChallenge = {
 // desafio de MFA pendente — ver LoginPlatformAdminCommandHandler.
 export type PlatformLoginResult = PlatformAuthTokens | PlatformMfaChallenge;
 
-export function platformLogin(input: { email: string; password: string }): Promise<PlatformLoginResult> {
+export function platformLogin(input: { email: string; password: string; turnstileToken: string }): Promise<PlatformLoginResult> {
   return request<PlatformLoginResult>("/api/platform/auth/login", {
     method: "POST",
     body: JSON.stringify(input),

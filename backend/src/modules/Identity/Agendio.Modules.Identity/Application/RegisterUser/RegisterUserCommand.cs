@@ -1,5 +1,6 @@
 using Agendio.SharedKernel.Messaging;
 using Agendio.SharedKernel.Multitenancy;
+using Agendio.SharedKernel.Security;
 
 namespace Agendio.Modules.Identity.Application.RegisterUser;
 
@@ -9,8 +10,9 @@ namespace Agendio.Modules.Identity.Application.RegisterUser;
 /// responsavel pelo estabelecimento — obrigatorios (ver RegisterUserCommandValidator).
 /// </summary>
 public sealed record RegisterUserCommand(
-    Guid TenantId, string Email, string Password, string FullName, string Phone, string CpfCnpj, bool TermsAccepted)
-    : ICommand<RegisterUserResult>, IHasExplicitTenant;
+    Guid TenantId, string Email, string Password, string FullName, string Phone, string CpfCnpj, bool TermsAccepted,
+    string TurnstileToken)
+    : ICommand<RegisterUserResult>, IHasExplicitTenant, IRequiresTurnstileVerification;
 
 /// <summary>
 /// OnboardingToken prova posse do TenantId recem-criado para o resto do

@@ -25,7 +25,7 @@ export class PlatformMfaRequiredError extends Error {
 type PlatformSessionContextValue = {
   session: PlatformSession | null;
   isAuthenticating: boolean;
-  login: (input: { email: string; password: string }) => Promise<void>;
+  login: (input: { email: string; password: string; turnstileToken: string }) => Promise<void>;
   verifyMfa: (input: { mfaChallengeToken: string; code: string }) => Promise<void>;
   logout: () => void;
 };
@@ -45,7 +45,7 @@ export function PlatformSessionProvider({ children }: { children: React.ReactNod
   }, []);
 
   const login = React.useCallback(
-    async (input: { email: string; password: string }) => {
+    async (input: { email: string; password: string; turnstileToken: string }) => {
       setIsAuthenticating(true);
       try {
         const result = await apiPlatformLogin(input);

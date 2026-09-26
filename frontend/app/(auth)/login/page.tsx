@@ -13,6 +13,7 @@ import { getTenantBySlug, resendConfirmationEmail, ApiError } from "@/lib/api/cl
 import { useSession, MfaRequiredError } from "@/lib/auth/session-context";
 import { Logo } from "@/components/logo";
 import { LoginShowcase } from "@/components/auth/login-showcase";
+import { TurnstileWidget } from "@/components/auth/turnstile-widget";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
@@ -75,6 +76,16 @@ export default function LoginPage() {
   const [lockedUntil, setLockedUntil] = React.useState<Date | null>(null);
   const [remainingSeconds, setRemainingSeconds] = React.useState(0);
   const [showPassword, setShowPassword] = React.useState(false);
+  const [turnstileToken, setTurnstileToken] = React.useState<string | null>(null);
+  // O token do Turnstile e de uso unico -- consumido pela API da Cloudflare
+  // assim que o login e tentado, com sucesso ou nao. Incrementar a key forca
+  // o widget a remontar e gerar um token novo pra proxima tentativa.
+  const [turnstileNonce, setTurnstileNonce] = React.useState(0);
+
+  function resetTurnstile() {
+    setTurnstileToken(null);
+    setTurnstileNonce((n) => n + 1);
+  }
 
   React.useEffect(() => {
     if (!lockedUntil) return;
@@ -114,13 +125,19 @@ export default function LoginPage() {
         return;
       }
 
-      await login({ tenantId: tenant.id, email: values.email, password: values.password });
+      if (!turnstileToken) {
+        return;
+      }
+
+      await login({ tenantId: tenant.id, email: values.email, password: values.password, turnstileToken });
       router.push("/painel");
     } catch (error) {
       if (error instanceof MfaRequiredError) {
         setMfaChallengeToken(error.mfaChallengeToken);
         return;
       }
+
+      resetTurnstile();
 
       if (error instanceof ApiError && error.status === 404) {
         form.setError("tenantSlug", {
@@ -422,9 +439,10 @@ export default function LoginPage() {
                       </FormItem>
                     )}
                   />
+                  <TurnstileWidget key={turnstileNonce} onVerify={setTurnstileToken} onExpire={() => setTurnstileToken(null)} />
                   <Button
                     type="submit"
-                    disabled={isAuthenticating}
+                    disabled={isAuthenticating || !turnstileToken}
                     className="mt-2 h-11 text-[15px] font-semibold shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:shadow-lg hover:shadow-primary/25"
                   >
                     {isAuthenticating && <Loader2 className="size-4 animate-spin" aria-hidden />}

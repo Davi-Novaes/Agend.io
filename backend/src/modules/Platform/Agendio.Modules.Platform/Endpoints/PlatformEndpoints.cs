@@ -35,7 +35,7 @@ public sealed class PlatformEndpoints : IEndpointModule
 
         group.MapPost("/auth/login", async (LoginRequest request, IDispatcher dispatcher, CancellationToken cancellationToken) =>
         {
-            var result = await dispatcher.Send(new LoginPlatformAdminCommand(request.Email, request.Password), cancellationToken);
+            var result = await dispatcher.Send(new LoginPlatformAdminCommand(request.Email, request.Password, request.TurnstileToken), cancellationToken);
             if (result.IsFailure)
             {
                 return result.Error.ToProblemResult();
@@ -183,7 +183,7 @@ public sealed class PlatformEndpoints : IEndpointModule
     private static Guid GetAdminId(HttpContext httpContext) =>
         Guid.Parse(httpContext.User.FindFirst(ClaimTypes.NameIdentifier)!.Value);
 
-    private sealed record LoginRequest(string Email, string Password);
+    private sealed record LoginRequest(string Email, string Password, string TurnstileToken);
 
     private sealed record VerifyMfaRequest(string MfaChallengeToken, string Code);
 

@@ -95,6 +95,10 @@ services:
       Feedback__NotificationEmail: ${FEEDBACK_NOTIFICATION_EMAIL:-contato@agendiobr.com.br}
       AiAssistant__Provider: Anthropic
       AiAssistant__ApiKey: ${AI_ASSISTANT_API_KEY:-}
+      # Chave de teste publica da Cloudflare (documentada, sempre aprova) como
+      # fallback -- ate TURNSTILE_SECRET_KEY ser preenchido com a chave real
+      # da conta, o widget aparece mas nao bloqueia ninguem de verdade.
+      Turnstile__SecretKey: ${TURNSTILE_SECRET_KEY:-1x0000000000000000000000000000000AA}
     volumes:
       - agendio_uploads:/app/uploads
     networks: [agendio]
@@ -127,6 +131,8 @@ services:
       args:
         NEXT_PUBLIC_API_URL: ${PUBLIC_ORIGIN}
         NEXT_PUBLIC_ROOT_DOMAIN: ${ROOT_DOMAIN:-agendiobr.com.br}
+        # Chave de teste publica da Cloudflare como fallback (ver Turnstile__SecretKey acima).
+        NEXT_PUBLIC_TURNSTILE_SITE_KEY: ${TURNSTILE_SITE_KEY:-1x00000000000000000000AA}
     container_name: agendio-frontend
     restart: unless-stopped
     depends_on: [backend]

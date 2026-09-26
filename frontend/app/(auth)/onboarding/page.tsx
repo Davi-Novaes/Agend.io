@@ -22,6 +22,7 @@ import {
 } from "@/lib/api/client";
 import { Logo } from "@/components/logo";
 import { CursorSpotlight } from "@/components/cursor-spotlight";
+import { TurnstileWidget } from "@/components/auth/turnstile-widget";
 import { strongPasswordSchema } from "@/lib/validation/password";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -113,6 +114,8 @@ export default function OnboardingPage() {
   const [step, setStep] = React.useState(0);
   const [slugTouched, setSlugTouched] = React.useState(false);
   const [isSubmitting, setIsSubmitting] = React.useState(false);
+  const [turnstileToken, setTurnstileToken] = React.useState<string | null>(null);
+  const [turnstileNonce, setTurnstileNonce] = React.useState(0);
   const [isResending, setIsResending] = React.useState(false);
   // Presente so apos o cadastro concluir — troca o formulario pela tela de
   // "confirme seu e-mail" em vez de logar automaticamente (login agora exige
@@ -192,6 +195,10 @@ export default function OnboardingPage() {
   }
 
   async function onSubmit(values: OnboardingFormValues) {
+    if (!turnstileToken) {
+      return;
+    }
+
     setIsSubmitting(true);
     try {
       const tenant = await createTenant({
@@ -209,10 +216,14 @@ export default function OnboardingPage() {
         phone: values.ownerPhone,
         cpfCnpj: values.ownerCpfCnpj,
         termsAccepted: values.termsAccepted,
+        turnstileToken,
       });
 
       setAccountCreated({ tenantId: tenant.id, email: values.ownerEmail, onboardingToken: registered.onboardingToken });
     } catch (error) {
+      setTurnstileToken(null);
+      setTurnstileNonce((n) => n + 1);
+
       if (error instanceof ApiError && error.status === 409) {
         form.setError("slug", { message: "Este identificador ja esta em uso." });
         setStep(0);
@@ -651,6 +662,7 @@ export default function OnboardingPage() {
                     </FormItem>
                   )}
                 />
+                <TurnstileWidget key={turnstileNonce} onVerify={setTurnstileToken} onExpire={() => setTurnstileToken(null)} />
               </>
             )}
 
@@ -659,7 +671,7 @@ export default function OnboardingPage() {
                 Voltar
               </Button>
               {isLastStep ? (
-                <Button key="submit" type="submit" disabled={isSubmitting}>
+                <Button key="submit" type="submit" disabled={isSubmitting || !turnstileToken}>
                   {isSubmitting ? "Criando..." : "Criar estabelecimento"}
                 </Button>
               ) : (

@@ -10,6 +10,7 @@ import { toast } from "sonner";
 import { ApiError } from "@/lib/api/client";
 import { usePlatformSession, PlatformMfaRequiredError } from "@/lib/auth/platform-session-context";
 import { Logo } from "@/components/logo";
+import { TurnstileWidget } from "@/components/auth/turnstile-widget";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -34,6 +35,13 @@ export default function PlatformAdminLoginPage() {
   // Presente so durante a segunda etapa (MFA habilitado para este admin) —
   // mesmo padrao da tela de login do tenant.
   const [mfaChallengeToken, setMfaChallengeToken] = React.useState<string | null>(null);
+  const [turnstileToken, setTurnstileToken] = React.useState<string | null>(null);
+  const [turnstileNonce, setTurnstileNonce] = React.useState(0);
+
+  function resetTurnstile() {
+    setTurnstileToken(null);
+    setTurnstileNonce((n) => n + 1);
+  }
 
   const form = useForm<LoginFormValues>({
     resolver: zodResolver(loginSchema),
@@ -46,14 +54,20 @@ export default function PlatformAdminLoginPage() {
   });
 
   async function onSubmit(values: LoginFormValues) {
+    if (!turnstileToken) {
+      return;
+    }
+
     try {
-      await login(values);
+      await login({ ...values, turnstileToken });
       router.push("/admin");
     } catch (error) {
       if (error instanceof PlatformMfaRequiredError) {
         setMfaChallengeToken(error.mfaChallengeToken);
         return;
       }
+
+      resetTurnstile();
 
       const message =
         error instanceof ApiError ? error.message : "Nao foi possivel entrar. Tente novamente.";
@@ -152,7 +166,8 @@ export default function PlatformAdminLoginPage() {
                     </FormItem>
                   )}
                 />
-                <Button type="submit" disabled={isAuthenticating} className="mt-2 h-10">
+                <TurnstileWidget key={turnstileNonce} onVerify={setTurnstileToken} onExpire={() => setTurnstileToken(null)} />
+                <Button type="submit" disabled={isAuthenticating || !turnstileToken} className="mt-2 h-10">
                   {isAuthenticating ? "Entrando..." : "Entrar"}
                 </Button>
               </form>
