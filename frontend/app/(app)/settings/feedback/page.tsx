@@ -41,7 +41,6 @@ export default function FeedbackSettingsPage() {
   return (
     <div className="flex w-full max-w-2xl flex-1 flex-col gap-6">
       <div>
-        <h1 className="text-lg font-semibold">Feedback</h1>
         <p className="text-muted-foreground text-sm">Sugestões, elogios ou problemas que você encontrou no sistema.</p>
       </div>
 

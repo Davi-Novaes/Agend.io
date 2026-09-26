@@ -8,6 +8,7 @@ using Agendio.Modules.Tenancy.Application.GetUnitById;
 using Agendio.Modules.Tenancy.Application.ListUnits;
 using Agendio.Modules.Tenancy.Application.SetTenantBusinessHours;
 using Agendio.Modules.Tenancy.Application.SetUnitActiveStatus;
+using Agendio.Modules.Tenancy.Application.SetUnitBusinessHours;
 using Agendio.Modules.Tenancy.Application.UpdateTenantBanner;
 using Agendio.Modules.Tenancy.Application.UpdateTenantBranding;
 using Agendio.Modules.Tenancy.Application.UpdateTenantCompanyInfo;
@@ -302,7 +303,7 @@ public sealed class TenancyEndpoints : IEndpointModule
 
         units.MapPost("/", async (CreateUnitRequest request, IDispatcher dispatcher, CancellationToken cancellationToken) =>
         {
-            var command = new CreateUnitCommand(request.Name, request.Address, request.City, request.State, request.Country);
+            var command = new CreateUnitCommand(request.Name, request.Address, request.City, request.State, request.Country, request.Phone, request.WhatsApp);
             var result = await dispatcher.Send(command, cancellationToken);
 
             return result.IsSuccess
@@ -314,7 +315,7 @@ public sealed class TenancyEndpoints : IEndpointModule
 
         units.MapPut("/{id:guid}", async (Guid id, UpdateUnitRequest request, IDispatcher dispatcher, CancellationToken cancellationToken) =>
         {
-            var command = new UpdateUnitCommand(id, request.Name, request.Address, request.City, request.State, request.Country);
+            var command = new UpdateUnitCommand(id, request.Name, request.Address, request.City, request.State, request.Country, request.Phone, request.WhatsApp);
             var result = await dispatcher.Send(command, cancellationToken);
 
             return result.IsSuccess ? Results.NoContent() : result.Error.ToProblemResult();
@@ -329,11 +330,24 @@ public sealed class TenancyEndpoints : IEndpointModule
         })
         .WithName("SetUnitActiveStatus")
         .WithSummary("Ativa ou desativa uma unidade.");
+
+        units.MapPut("/{id:guid}/business-hours", async (Guid id, SetUnitBusinessHoursRequest request, IDispatcher dispatcher, CancellationToken cancellationToken) =>
+        {
+            var entries = request.Entries.Select(e => new UnitBusinessHoursEntryDto(e.DayOfWeek, e.StartTime, e.EndTime)).ToList();
+            var result = await dispatcher.Send(new SetUnitBusinessHoursCommand(id, entries), cancellationToken);
+            return result.IsSuccess ? Results.NoContent() : result.Error.ToProblemResult();
+        })
+        .WithName("SetUnitBusinessHours")
+        .WithSummary("Substitui os horarios de funcionamento de uma unidade.");
     }
 
-    private sealed record CreateUnitRequest(string Name, string? Address, string? City, string? State, string? Country);
+    private sealed record CreateUnitRequest(string Name, string? Address, string? City, string? State, string? Country, string? Phone, string? WhatsApp);
 
-    private sealed record UpdateUnitRequest(string Name, string? Address, string? City, string? State, string? Country);
+    private sealed record UpdateUnitRequest(string Name, string? Address, string? City, string? State, string? Country, string? Phone, string? WhatsApp);
+
+    private sealed record SetUnitBusinessHoursRequest(IReadOnlyList<UnitBusinessHoursEntryRequest> Entries);
+
+    private sealed record UnitBusinessHoursEntryRequest(DayOfWeek DayOfWeek, TimeOnly StartTime, TimeOnly EndTime);
 
     private sealed record SetUnitStatusRequest(bool IsActive);
 

@@ -22,13 +22,14 @@ export function ServiceRevenueChart({ data }: { data: ServiceRevenuePoint[] }) {
 
   const sorted = React.useMemo(() => [...data].sort((a, b) => b[metric] - a[metric]), [data, metric]);
   const max = Math.max(1, ...sorted.map((point) => point[metric]));
+  const colors = ["var(--chart-1)", "var(--chart-3)", "var(--chart-4)", "var(--chart-2)", "var(--chart-5)"];
 
   function formatMetric(point: ServiceRevenuePoint): string {
     return metric === "total" ? formatCurrency(point.total) : `${point.count} atendimento${point.count === 1 ? "" : "s"}`;
   }
 
   return (
-    <Card className="border-border/70 ring-0 shadow-none">
+    <Card className="bg-card border-border/80 ring-0 shadow-sm">
     <CardContent>
       <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
         <div>
@@ -101,17 +102,28 @@ export function ServiceRevenueChart({ data }: { data: ServiceRevenuePoint[] }) {
           </TableBody>
         </Table>
       ) : (
-        <ul className="bg-surface-inset flex flex-col gap-2.5 rounded-lg p-3" aria-label="Servicos mais vendidos">
-          {sorted.map((point) => (
-            <li key={point.serviceName} className="flex items-center gap-3">
-              <span className="w-28 shrink-0 truncate text-xs">{point.serviceName}</span>
-              <div className="bg-muted h-4 flex-1 overflow-hidden rounded-sm">
-                <div
-                  className="h-full rounded-sm"
-                  style={{ width: `${Math.max(3, (point[metric] / max) * 100)}%`, backgroundColor: "var(--chart-1)" }}
-                />
+        <ul className="bg-surface-inset flex flex-col gap-3 rounded-lg p-3 sm:p-4" aria-label="Servicos mais vendidos">
+          {sorted.map((point, index) => (
+            <li key={point.serviceName} className="grid grid-cols-[1.75rem_minmax(0,1fr)] items-center gap-3">
+              <span className="bg-card text-muted-foreground flex size-7 items-center justify-center rounded-md border text-xs font-semibold tabular-nums">
+                {index + 1}
+              </span>
+              <div className="min-w-0">
+                <div className="mb-1.5 flex items-center justify-between gap-3 text-xs">
+                  <span className="truncate font-medium">{point.serviceName}</span>
+                  <span className="shrink-0 font-medium tabular-nums">{formatMetric(point)}</span>
+                </div>
+                <div className="bg-muted h-2.5 overflow-hidden rounded-full">
+                  <div
+                    className="h-full rounded-full shadow-[0_0_10px_-2px_currentColor] transition-[width] duration-500"
+                    style={{
+                      width: `${Math.max(3, (point[metric] / max) * 100)}%`,
+                      backgroundColor: colors[index % colors.length],
+                      color: colors[index % colors.length],
+                    }}
+                  />
+                </div>
               </div>
-              <span className="w-24 shrink-0 text-right text-xs tabular-nums">{formatMetric(point)}</span>
             </li>
           ))}
         </ul>

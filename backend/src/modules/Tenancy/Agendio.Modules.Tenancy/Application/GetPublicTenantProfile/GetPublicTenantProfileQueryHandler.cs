@@ -28,6 +28,14 @@ public sealed class GetPublicTenantProfileQueryHandler(TenancyDbContext dbContex
         var businessHours = tenant.BusinessHours
             .Select(h => new PublicBusinessHoursEntry(h.DayOfWeek, h.StartTime, h.EndTime))
             .ToList();
+        var units = await dbContext.Units.AsNoTracking()
+            .Where(unit => unit.IsActive)
+            .OrderBy(unit => unit.Name)
+            .Select(unit => new PublicUnitSummary(
+                unit.Id.Value, unit.Name, unit.Address, unit.City, unit.State, unit.Country,
+                unit.Phone, unit.WhatsApp,
+                unit.BusinessHours.Select(h => new PublicBusinessHoursEntry(h.DayOfWeek, h.StartTime, h.EndTime)).ToList()))
+            .ToListAsync(cancellationToken);
 
         var profile = new PublicTenantProfile(
             tenant.Id.Value,
@@ -58,6 +66,7 @@ public sealed class GetPublicTenantProfileQueryHandler(TenancyDbContext dbContex
             tenant.ShowHoursSection,
             tenant.ShowContactSection,
             businessHours,
+            units,
             tenant.PaymentRequirement == PaymentRequirement.Deposit,
             tenant.DepositPercentage);
 

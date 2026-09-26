@@ -6,7 +6,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { toast } from "sonner";
-import { Plus, Search, Upload, Users } from "lucide-react";
+import { MoreHorizontal, Plus, Search, Upload, Users } from "lucide-react";
 
 import {
   listCustomers,
@@ -39,6 +39,12 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 const PAGE_SIZE = 20;
 
@@ -248,7 +254,7 @@ export default function CustomersPage() {
     <div className="flex w-full flex-1 flex-col">
       <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
         <p className="text-muted-foreground text-sm">Cadastro de clientes do seu estabelecimento.</p>
-        <div className="flex gap-2">
+        <div className="flex w-full gap-2 sm:w-auto">
           <input
             ref={importInputRef}
             type="file"
@@ -261,11 +267,16 @@ export default function CustomersPage() {
               }
             }}
           />
-          <Button variant="outline" onClick={() => importInputRef.current?.click()} disabled={importMutation.isPending}>
+          <Button
+            className="flex-1 sm:flex-none"
+            variant="outline"
+            onClick={() => importInputRef.current?.click()}
+            disabled={importMutation.isPending}
+          >
             <Upload className="size-4" />
             {importMutation.isPending ? "Importando..." : "Importar CSV"}
           </Button>
-          <Button onClick={openCreateDialog}>
+          <Button className="flex-1 sm:flex-none" onClick={openCreateDialog}>
             <Plus className="size-4" />
             Novo cliente
           </Button>
@@ -278,7 +289,7 @@ export default function CustomersPage() {
 
       <Card>
         <CardContent className="flex flex-col gap-4">
-          <div className="flex gap-2">
+          <div className="flex flex-col gap-2 sm:flex-row">
             <Input
               placeholder="Buscar por nome..."
               value={searchInput}
@@ -308,7 +319,7 @@ export default function CustomersPage() {
                 setPage(1);
               }}
             >
-              <SelectTrigger className="w-40" aria-label="Filtrar por segmento">
+              <SelectTrigger className="w-full sm:w-48" aria-label="Filtrar por segmento">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -398,21 +409,25 @@ export default function CustomersPage() {
                       <Badge variant={SEGMENT_VARIANT[customer.segment]}>{SEGMENT_LABEL[customer.segment]}</Badge>
                     </TableCell>
                     <TableCell className="text-right">
-                      <div className="flex justify-end gap-2">
-                        <Button variant="ghost" size="sm" onClick={() => setViewingCustomerId(customer.id)}>
-                          Ver perfil
-                        </Button>
-                        <Button variant="ghost" size="sm" onClick={() => openEditDialog(customer)}>
-                          Editar
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => statusMutation.mutate({ id: customer.id, isActive: !customer.isActive })}
-                        >
-                          {customer.isActive ? "Desativar" : "Ativar"}
-                        </Button>
-                      </div>
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="ghost" size="icon" aria-label={`Ações de ${customer.fullName}`}>
+                            <MoreHorizontal className="size-4" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end" className="w-40">
+                          <DropdownMenuItem onSelect={() => setViewingCustomerId(customer.id)}>
+                            Ver perfil
+                          </DropdownMenuItem>
+                          <DropdownMenuItem onSelect={() => openEditDialog(customer)}>Editar</DropdownMenuItem>
+                          <DropdownMenuItem
+                            variant={customer.isActive ? "destructive" : "default"}
+                            onSelect={() => statusMutation.mutate({ id: customer.id, isActive: !customer.isActive })}
+                          >
+                            {customer.isActive ? "Desativar" : "Ativar"}
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
                     </TableCell>
                   </TableRow>
                 ))

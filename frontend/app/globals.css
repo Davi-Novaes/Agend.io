@@ -295,6 +295,60 @@
 }
 
 @layer components {
+  /* A landing no tema claro precisa de separacao visual entre blocos. As
+     cores ficam escopadas ao marketing para nao alterar o painel interno e
+     so entram quando o tema local nao esta em dark. */
+  .marketing-shell:not(.dark) .marketing-hero-light {
+    background:
+      radial-gradient(circle at 68% 18%, oklch(0.73 0.09 280 / 0.09), transparent 38%),
+      linear-gradient(180deg, oklch(0.992 0.002 270), oklch(0.965 0.007 275));
+  }
+
+  .marketing-shell:not(.dark) .marketing-section-lavender {
+    background:
+      radial-gradient(circle at 88% 10%, oklch(0.75 0.06 280 / 0.06), transparent 30%),
+      linear-gradient(135deg, oklch(0.965 0.01 280), oklch(0.945 0.014 275));
+  }
+
+  .marketing-shell:not(.dark) .marketing-section-sky {
+    background:
+      radial-gradient(circle at 8% 85%, oklch(0.78 0.04 245 / 0.05), transparent 32%),
+      linear-gradient(145deg, oklch(0.975 0.006 250), oklch(0.955 0.01 255));
+  }
+
+  .marketing-shell:not(.dark) .marketing-section-warm {
+    background:
+      linear-gradient(140deg, oklch(0.985 0.006 85), oklch(0.965 0.008 290));
+  }
+
+  .marketing-shell:not(.dark) .marketing-section-clean {
+    background:
+      radial-gradient(circle at 18% 12%, oklch(0.76 0.05 275 / 0.045), transparent 26%),
+      linear-gradient(180deg, oklch(0.995 0.002 270), oklch(0.975 0.006 270));
+  }
+
+  .marketing-shell:not(.dark) .marketing-section-cta {
+    background:
+      radial-gradient(circle at 18% 40%, oklch(0.72 0.08 275 / 0.09), transparent 34%),
+      linear-gradient(135deg, oklch(0.955 0.016 280), oklch(0.97 0.008 260));
+  }
+
+  .marketing-shell:not(.dark) .marketing-card {
+    border-color: oklch(0.86 0.012 275);
+    background-color: oklch(0.997 0.002 270 / 0.94);
+    box-shadow:
+      0 1px 2px oklch(0.3 0.02 275 / 0.05),
+      0 14px 34px -24px oklch(0.3 0.04 275 / 0.24);
+  }
+
+  .marketing-shell:not(.dark) .marketing-footer {
+    background: linear-gradient(180deg, oklch(0.96 0.008 275), oklch(0.935 0.01 275));
+  }
+
+  .marketing-shell:not(.dark) .hero-glow {
+    opacity: 0.08;
+  }
+
   /* Atmosfera de luz do hero -- 3 camadas grandes e muito difusas (nao um
      "spot" pequeno atras do titulo), cada uma cobrindo boa parte da secao e
      se movendo devagar em direcoes diferentes pra dar profundidade. Em modo

@@ -509,6 +509,11 @@ namespace Agendio.Modules.Tenancy.Infrastructure.Persistence.Migrations
                         .HasColumnType("character varying(200)")
                         .HasColumnName("name");
 
+                    b.Property<string>("Phone")
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)")
+                        .HasColumnName("phone");
+
                     b.Property<string>("State")
                         .HasMaxLength(2)
                         .HasColumnType("character varying(2)")
@@ -527,6 +532,11 @@ namespace Agendio.Modules.Tenancy.Infrastructure.Persistence.Migrations
                         .HasColumnType("character varying(256)")
                         .HasColumnName("updated_by");
 
+                    b.Property<string>("WhatsApp")
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)")
+                        .HasColumnName("whats_app");
+
                     b.HasKey("Id")
                         .HasName("pk_units");
 
@@ -538,6 +548,41 @@ namespace Agendio.Modules.Tenancy.Infrastructure.Persistence.Migrations
 
             modelBuilder.Entity("Agendio.Modules.Tenancy.Domain.Tenant", b =>
                 {
+                    b.OwnsMany("Agendio.Modules.Tenancy.Domain.ClosedDate", "ClosedDates", b1 =>
+                        {
+                            b1.Property<int>("id")
+                                .ValueGeneratedOnAdd()
+                                .HasColumnType("integer")
+                                .HasColumnName("id");
+
+                            NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b1.Property<int>("id"));
+
+                            b1.Property<DateOnly>("Date")
+                                .HasColumnType("date")
+                                .HasColumnName("date");
+
+                            b1.Property<string>("Reason")
+                                .HasMaxLength(200)
+                                .HasColumnType("character varying(200)")
+                                .HasColumnName("reason");
+
+                            b1.Property<Guid>("tenant_id")
+                                .HasColumnType("uuid")
+                                .HasColumnName("tenant_id");
+
+                            b1.HasKey("id")
+                                .HasName("pk_tenant_closed_dates");
+
+                            b1.HasIndex("tenant_id")
+                                .HasDatabaseName("ix_tenant_closed_dates_tenant_id");
+
+                            b1.ToTable("tenant_closed_dates", "tenancy");
+
+                            b1.WithOwner()
+                                .HasForeignKey("tenant_id")
+                                .HasConstraintName("fk_tenant_closed_dates_tenants_tenant_id");
+                        });
+
                     b.OwnsMany("Agendio.Modules.Tenancy.Domain.BusinessHoursEntry", "BusinessHours", b1 =>
                         {
                             b1.Property<int>("id")
@@ -578,7 +623,14 @@ namespace Agendio.Modules.Tenancy.Infrastructure.Persistence.Migrations
                                 .HasConstraintName("fk_tenant_business_hours_tenants_tenant_id");
                         });
 
-                    b.OwnsMany("Agendio.Modules.Tenancy.Domain.ClosedDate", "ClosedDates", b1 =>
+                    b.Navigation("BusinessHours");
+
+                    b.Navigation("ClosedDates");
+                });
+
+            modelBuilder.Entity("Agendio.Modules.Tenancy.Domain.Unit", b =>
+                {
+                    b.OwnsMany("Agendio.Modules.Tenancy.Domain.BusinessHoursEntry", "BusinessHours", b1 =>
                         {
                             b1.Property<int>("id")
                                 .ValueGeneratedOnAdd()
@@ -587,35 +639,38 @@ namespace Agendio.Modules.Tenancy.Infrastructure.Persistence.Migrations
 
                             NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b1.Property<int>("id"));
 
-                            b1.Property<DateOnly>("Date")
-                                .HasColumnType("date")
-                                .HasColumnName("date");
+                            b1.Property<string>("DayOfWeek")
+                                .IsRequired()
+                                .HasMaxLength(20)
+                                .HasColumnType("character varying(20)")
+                                .HasColumnName("day_of_week");
 
-                            b1.Property<string>("Reason")
-                                .HasMaxLength(200)
-                                .HasColumnType("character varying(200)")
-                                .HasColumnName("reason");
+                            b1.Property<TimeOnly>("EndTime")
+                                .HasColumnType("time without time zone")
+                                .HasColumnName("end_time");
 
-                            b1.Property<Guid>("tenant_id")
+                            b1.Property<TimeOnly>("StartTime")
+                                .HasColumnType("time without time zone")
+                                .HasColumnName("start_time");
+
+                            b1.Property<Guid>("unit_id")
                                 .HasColumnType("uuid")
-                                .HasColumnName("tenant_id");
+                                .HasColumnName("unit_id");
 
                             b1.HasKey("id")
-                                .HasName("pk_tenant_closed_dates");
+                                .HasName("pk_unit_business_hours");
 
-                            b1.HasIndex("tenant_id")
-                                .HasDatabaseName("ix_tenant_closed_dates_tenant_id");
+                            b1.HasIndex("unit_id")
+                                .HasDatabaseName("ix_unit_business_hours_unit_id");
 
-                            b1.ToTable("tenant_closed_dates", "tenancy");
+                            b1.ToTable("unit_business_hours", "tenancy");
 
                             b1.WithOwner()
-                                .HasForeignKey("tenant_id")
-                                .HasConstraintName("fk_tenant_closed_dates_tenants_tenant_id");
+                                .HasForeignKey("unit_id")
+                                .HasConstraintName("fk_unit_business_hours_units_unit_id");
                         });
 
                     b.Navigation("BusinessHours");
-
-                    b.Navigation("ClosedDates");
                 });
 #pragma warning restore 612, 618
         }

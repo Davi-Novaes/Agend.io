@@ -4,7 +4,7 @@ import * as React from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
-import { Eye } from "lucide-react";
+import { Eye, FileText, Globe2, Info, LayoutDashboard, Palette, Sparkles } from "lucide-react";
 
 import { cn } from "@/lib/utils";
 import { useSession } from "@/lib/auth/session-context";
@@ -17,11 +17,11 @@ import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 
 const BRANDING_TABS = [
-  { href: "/settings/branding", label: "Visão geral" },
-  { href: "/settings/branding/appearance", label: "Aparência" },
-  { href: "/settings/branding/content", label: "Conteúdo" },
-  { href: "/settings/branding/info", label: "Informações" },
-  { href: "/settings/branding/public", label: "Página pública" },
+  { href: "/settings/branding", label: "Visão geral", icon: LayoutDashboard },
+  { href: "/settings/branding/appearance", label: "Aparência", icon: Palette },
+  { href: "/settings/branding/content", label: "Conteúdo", icon: FileText },
+  { href: "/settings/branding/info", label: "Informações", icon: Info },
+  { href: "/settings/branding/public", label: "Página pública", icon: Globe2 },
 ];
 
 // Marca funciona como um mini-builder do portal publico: sub-navegacao
@@ -50,10 +50,21 @@ export default function BrandingLayout({ children }: { children: React.ReactNode
   });
 
   return (
-    <div className="flex w-full flex-1 flex-col gap-6">
-      <div>
-        <h1 className="text-lg font-semibold">Marca</h1>
-        <p className="text-muted-foreground text-sm">Personalize a identidade visual e o conteúdo do seu portal público.</p>
+    <div className="flex w-full flex-1 flex-col gap-5">
+      <div className="relative overflow-hidden rounded-2xl border bg-gradient-to-br from-primary/12 via-card to-card p-5 sm:p-6">
+        <div aria-hidden className="absolute -right-10 -top-12 size-40 rounded-full bg-primary/10 blur-3xl" />
+        <div className="relative flex items-start gap-4">
+          <div className="flex size-11 shrink-0 items-center justify-center rounded-xl bg-primary text-primary-foreground shadow-lg shadow-primary/20">
+            <Sparkles className="size-5" />
+          </div>
+          <div>
+            <p className="text-xs font-semibold tracking-[0.18em] text-primary uppercase">Identidade da empresa</p>
+            <h2 className="mt-1 text-xl font-semibold tracking-tight">Sua marca, do seu jeito</h2>
+            <p className="mt-1 max-w-2xl text-sm leading-relaxed text-muted-foreground">
+              Ajuste aparência, textos e informações enquanto acompanha o resultado na prévia ao lado.
+            </p>
+          </div>
+        </div>
       </div>
 
       {!isOwner && (
@@ -62,20 +73,24 @@ export default function BrandingLayout({ children }: { children: React.ReactNode
 
       <nav
         aria-label="Sub-navegação de Marca"
-        className="bg-muted text-muted-foreground -mx-1 flex w-fit max-w-full items-center gap-0.5 overflow-x-auto rounded-lg p-[3px]"
+        className="flex w-full max-w-full items-center gap-1 overflow-x-auto rounded-xl border bg-card/70 p-1 shadow-sm backdrop-blur"
       >
         {BRANDING_TABS.map((tab) => {
           const isActive = pathname === tab.href;
+          const Icon = tab.icon;
           return (
             <Link
               key={tab.href}
               href={tab.href}
               aria-current={isActive ? "page" : undefined}
               className={cn(
-                "inline-flex shrink-0 items-center gap-1.5 rounded-md border border-transparent px-2.5 py-1 text-sm font-medium whitespace-nowrap transition-colors",
-                isActive ? "bg-background text-foreground shadow-sm" : "hover:text-foreground"
+                "inline-flex shrink-0 items-center gap-2 rounded-lg border border-transparent px-3 py-2 text-sm font-medium whitespace-nowrap transition-all",
+                isActive
+                  ? "border-border bg-background text-foreground shadow-sm"
+                  : "text-muted-foreground hover:bg-muted/60 hover:text-foreground"
               )}
             >
+              <Icon className={cn("size-4", isActive && "text-primary")} aria-hidden="true" />
               {tab.label}
             </Link>
           );
@@ -110,13 +125,13 @@ export default function BrandingLayout({ children }: { children: React.ReactNode
               </SheetContent>
             </Sheet>
           </div>
-          <div className="grid items-start gap-6 lg:grid-cols-[1fr_360px]">
+          <div className="grid items-start gap-6 xl:grid-cols-[minmax(0,1fr)_390px]">
             <div className="min-w-0">
               <fieldset disabled={!isOwner} className="contents">
                 {children}
               </fieldset>
             </div>
-            <div className="sticky top-6 hidden lg:block">
+            <div className="sticky top-6 hidden xl:block">
               <LivePreviewPanel />
             </div>
           </div>

@@ -198,7 +198,7 @@ public class EstoqueTests(IntegrationTestFixture fixture)
     }
 
     [Fact]
-    public async Task Inventory_Summary_Should_Count_Active_Low_Stock_And_Total_Value()
+    public async Task Inventory_Summary_Should_Count_Active_Low_Stock_Units_And_Total_Value()
     {
         var cancellationToken = TestContext.Current.CancellationToken;
         var client = fixture.CreateClient();
@@ -222,12 +222,20 @@ public class EstoqueTests(IntegrationTestFixture fixture)
             new { name = "Produto C", sku = (string?)null, description = (string?)null, quantityInStock = 5, minimumStock = 1, salePrice = (decimal?)null, currency = (string?)null },
             cancellationToken)).StatusCode.ShouldBe(HttpStatusCode.Created);
 
+        // Ativo e zerado: entra tanto em LowStockCount quanto em OutOfStockCount.
+        (await AuthorizedRequestHelpers.PostAuthorizedAsync(
+            client, accessToken, "/api/estoque/produtos",
+            new { name = "Produto D", sku = (string?)null, description = (string?)null, quantityInStock = 0, minimumStock = 2, salePrice = (decimal?)null, currency = (string?)null },
+            cancellationToken)).StatusCode.ShouldBe(HttpStatusCode.Created);
+
         var response = await AuthorizedRequestHelpers.GetAuthorizedAsync(client, accessToken, "/api/estoque/resumo", cancellationToken);
         response.StatusCode.ShouldBe(HttpStatusCode.OK);
 
         var summary = await response.Content.ReadFromJsonAsync<JsonElement>(cancellationToken);
-        summary.GetProperty("activeProductCount").GetInt32().ShouldBe(3);
-        summary.GetProperty("lowStockCount").GetInt32().ShouldBe(1);
+        summary.GetProperty("activeProductCount").GetInt32().ShouldBe(4);
+        summary.GetProperty("lowStockCount").GetInt32().ShouldBe(2);
+        summary.GetProperty("outOfStockCount").GetInt32().ShouldBe(1);
+        summary.GetProperty("totalUnitsInStock").GetInt32().ShouldBe(16);
 
         var totalStockValue = summary.GetProperty("totalStockValue");
         totalStockValue.GetArrayLength().ShouldBe(1);

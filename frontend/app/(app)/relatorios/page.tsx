@@ -19,6 +19,14 @@ function formatCurrency(value: number): string {
   return value.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 }
 
+const REPORT_SECTIONS = [
+  { id: "financeiro", label: "Financeiro" },
+  { id: "comissoes", label: "Comissões" },
+  { id: "agenda", label: "Agenda" },
+  { id: "avaliacoes", label: "Avaliações" },
+  { id: "estoque", label: "Estoque" },
+];
+
 export default function RelatoriosPage() {
   const { session } = useSession();
   // Mesmo raciocinio do painel (ver painel/page.tsx): ano todo por padrao,
@@ -40,6 +48,21 @@ export default function RelatoriosPage() {
       <div className="mb-8">
         <PeriodFilter from={from} to={to} onFromChange={setFrom} onToChange={setTo} />
       </div>
+
+      <nav
+        aria-label="Seções do relatório"
+        className="border-border/70 bg-background/90 sticky top-14 z-10 -mx-1 mb-8 flex max-w-full gap-1 overflow-x-auto border-y px-1 py-2 backdrop-blur"
+      >
+        {REPORT_SECTIONS.map((section) => (
+          <a
+            key={section.id}
+            href={`#${section.id}`}
+            className="text-muted-foreground hover:bg-accent hover:text-accent-foreground shrink-0 rounded-md px-3 py-1.5 text-sm font-medium transition-colors"
+          >
+            {section.label}
+          </a>
+        ))}
+      </nav>
 
       <div className="flex flex-col gap-10">
         <FinanceiroSection from={from} to={to} accessToken={session.accessToken} />
@@ -88,7 +111,7 @@ function FinanceiroSection({ from, to, accessToken }: { from: string; to: string
   const averageTicket = summary && stats && stats.completedCount > 0 ? summary.totalReceived / stats.completedCount : 0;
 
   return (
-    <section className="flex flex-col gap-4">
+    <section id="financeiro" className="flex scroll-mt-28 flex-col gap-4">
       <SectionHeading title="Financeiro" description="Entradas, saidas e saldo no periodo selecionado." />
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <KpiCard label="Entradas" value={summary ? formatCurrency(summary.totalReceived) : "—"} isLoading={query.isLoading} />
@@ -117,7 +140,7 @@ function ComissoesSection({ from, to, accessToken }: { from: string; to: string;
   const grandTotal = pendingTotal + paidTotal;
 
   return (
-    <section className="flex flex-col gap-4">
+    <section id="comissoes" className="flex scroll-mt-28 flex-col gap-4">
       <SectionHeading title="Comissoes" description="Comissao por profissional no periodo, pendente e paga." />
       <div className="grid gap-4 sm:grid-cols-3">
         <KpiCard label="Total no periodo" value={entries ? formatCurrency(grandTotal) : "—"} isLoading={query.isLoading} />
@@ -146,7 +169,7 @@ function AgendaSection({ from, to, accessToken }: { from: string; to: string; ac
   const stats = query.data;
 
   return (
-    <section className="flex flex-col gap-4">
+    <section id="agenda" className="flex scroll-mt-28 flex-col gap-4">
       <SectionHeading title="Agenda" description="Conclusao, no-show e faturamento dos agendamentos no periodo." />
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <KpiCard label="Concluidos" value={stats ? stats.completedCount : "—"} isLoading={query.isLoading} />
@@ -190,7 +213,7 @@ function AvaliacoesSection({ from, to, accessToken }: { from: string; to: string
   const summary = query.data;
 
   return (
-    <section className="flex flex-col gap-4">
+    <section id="avaliacoes" className="flex scroll-mt-28 flex-col gap-4">
       <SectionHeading title="Avaliacoes" description="Nota media, evolucao e comentarios recentes dos clientes no periodo." />
       <div className="grid gap-4 sm:grid-cols-2">
         <Card>
@@ -274,7 +297,7 @@ function EstoqueSection({ accessToken }: { accessToken: string }) {
       : summary.totalStockValue.map((entry) => `${formatCurrency(entry.total)} (${entry.currency})`).join(", ");
 
   return (
-    <section className="flex flex-col gap-4">
+    <section id="estoque" className="flex scroll-mt-28 flex-col gap-4">
       <SectionHeading title="Estoque" description="Situacao atual dos produtos, sem recorte por periodo." />
       <div className="grid gap-4 sm:grid-cols-3">
         <KpiCard label="Produtos ativos" value={summary ? summary.activeProductCount : "—"} isLoading={query.isLoading} />

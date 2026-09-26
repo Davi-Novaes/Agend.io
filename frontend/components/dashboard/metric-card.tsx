@@ -30,6 +30,7 @@ export function MetricCard({
   value,
   delta,
   deltaLabel = "vs. periodo anterior",
+  invertDeltaTone = false,
   description,
   /** Mensagem quando o KPI nao tem nenhum dado ainda (ex.: R$ 0,00 num tenant novo) —
       substitui o delta/descricao por algo orientado a acao em vez de deixar o card
@@ -45,6 +46,8 @@ export function MetricCard({
   /** Omitir quando o periodo anterior nao tiver base de comparacao (ex.: tenant novo, sem historico). */
   delta?: number | null;
   deltaLabel?: string;
+  /** Use quando crescer e ruim (ex.: despesas): a seta continua mostrando a direcao real, mas a cor reflete o impacto. */
+  invertDeltaTone?: boolean;
   /** Legenda curta abaixo do valor — usado por KPIs cujo calculo nao e obvio (ex.: Resultado). */
   description?: string;
   emptyLabel?: string;
@@ -57,6 +60,7 @@ export function MetricCard({
 }) {
   const hasDelta = !isLoading && delta !== null && delta !== undefined && Number.isFinite(delta);
   const isPositive = hasDelta && delta >= 0;
+  const isFavorable = hasDelta && (invertDeltaTone ? delta <= 0 : delta >= 0);
   // emptyLabel so vem preenchido quando quem chama ja confirmou que o valor
   // bruto e zero (ver painel/page.tsx) -- aqui so decide entre ele e o delta,
   // nunca infere "vazio" sozinho (senao mostraria a mensagem errada sempre
@@ -87,7 +91,7 @@ export function MetricCard({
         {showEmptyLabel && <p className="text-muted-foreground text-xs">{emptyLabel}</p>}
         {hasDelta && (
           <div className="flex items-center gap-1.5">
-            <Badge variant={isPositive ? "success" : "destructive"}>
+            <Badge variant={isFavorable ? "success" : "destructive"}>
               {isPositive ? (
                 <TrendingUp data-icon="inline-start" aria-hidden="true" />
               ) : (

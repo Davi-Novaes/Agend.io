@@ -2,4 +2,4 @@ using Agendio.SharedKernel.Messaging;
 
 namespace Agendio.Modules.Tenancy.Application.UpdateUnit;
 
-public sealed record UpdateUnitCommand(Guid UnitId, string Name, string? Address, string? City, string? State, string? Country) : ICommand;
+public sealed record UpdateUnitCommand(Guid UnitId, string Name, string? Address, string? City, string? State, string? Country, string? Phone, string? WhatsApp) : ICommand;

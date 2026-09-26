@@ -47,14 +47,29 @@ function RevenueTooltip({
 /** Tendencia ao longo do tempo, serie unica: area chart, hue sequencial (chart-1, validado pela skill dataviz). */
 export function RevenueChart({ data }: { data: CashFlowMonthPoint[] }) {
   const [view, setView] = React.useState<ViewMode>("chart");
+  const gradientId = React.useId().replaceAll(":", "");
+  const total = data.reduce((sum, point) => sum + point.received, 0);
+  const peak = data.reduce<CashFlowMonthPoint | null>(
+    (current, point) => (!current || point.received > current.received ? point : current),
+    null
+  );
 
   return (
-    <Card className="border-border/70 ring-0 shadow-none">
+    <Card className="bg-card border-border/80 ring-0 shadow-sm">
     <CardContent>
-      <div className="mb-3 flex items-center justify-between gap-2">
+      <div className="mb-3 flex flex-wrap items-start justify-between gap-3">
         <div>
           <h3 className="text-sm font-semibold">Faturamento ao longo do tempo</h3>
           <p className="text-muted-foreground text-xs">Valores recebidos por mes, no periodo selecionado</p>
+          {data.length > 0 && (
+            <p className="mt-2 text-xs">
+              <span className="text-muted-foreground">Total </span>
+              <span className="font-semibold tabular-nums">{formatCurrency(total)}</span>
+              {peak && (
+                <span className="text-muted-foreground"> · melhor mês: {formatMonthLabel(peak.month)}</span>
+              )}
+            </p>
+          )}
         </div>
         <div role="group" aria-label="Alternar visualizacao" className="flex gap-1">
           <Button
@@ -114,17 +129,18 @@ export function RevenueChart({ data }: { data: CashFlowMonthPoint[] }) {
           // Superficie propria (--surface-inset), mais escura que o card ao
           // redor -- o grafico "afunda" dentro do card em vez de flutuar
           // solto sobre a mesma cor de fundo.
-          className="bg-surface-inset h-56 w-full rounded-lg p-3"
+          className="bg-surface-inset h-64 w-full rounded-lg p-3"
         >
           <ResponsiveContainer width="100%" height="100%">
             <AreaChart data={data} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
               <defs>
-                <linearGradient id="revenue-chart-fill" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stopColor="var(--chart-1)" stopOpacity={0.35} />
-                  <stop offset="100%" stopColor="var(--chart-1)" stopOpacity={0.03} />
+                <linearGradient id={`${gradientId}-fill`} x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stopColor="var(--primary)" stopOpacity={0.48} />
+                  <stop offset="70%" stopColor="var(--chart-1)" stopOpacity={0.12} />
+                  <stop offset="100%" stopColor="var(--chart-1)" stopOpacity={0.01} />
                 </linearGradient>
               </defs>
-              <CartesianGrid vertical={false} stroke="var(--border)" />
+              <CartesianGrid vertical={false} stroke="var(--border)" strokeOpacity={0.55} strokeDasharray="3 6" />
               <XAxis
                 dataKey="month"
                 tickFormatter={(value: string) => formatMonthLabel(value)}
@@ -143,9 +159,11 @@ export function RevenueChart({ data }: { data: CashFlowMonthPoint[] }) {
               <Area
                 type="monotone"
                 dataKey="received"
-                stroke="var(--chart-1)"
-                strokeWidth={2}
-                fill="url(#revenue-chart-fill)"
+                stroke="var(--primary)"
+                strokeWidth={3}
+                fill={`url(#${gradientId}-fill)`}
+                dot={{ r: 3, fill: "var(--primary)", stroke: "var(--card)", strokeWidth: 2 }}
+                activeDot={{ r: 5, fill: "var(--primary)", stroke: "var(--card)", strokeWidth: 2 }}
                 isAnimationActive={false}
               />
             </AreaChart>

@@ -23,7 +23,7 @@ internal static class AppointmentAvailabilityGuard
         DateTimeOffset startAtUtc,
         CancellationToken cancellationToken)
     {
-        var tenant = await tenantLookup.GetAvailabilityInfoAsync(tenantId, cancellationToken);
+        var tenant = await tenantLookup.GetAvailabilityInfoAsync(tenantId, cancellationToken: cancellationToken);
         if (tenant is null)
         {
             return Result.Failure(Error.NotFound("Appointment.TenantNotFound", "Estabelecimento nao encontrado."));

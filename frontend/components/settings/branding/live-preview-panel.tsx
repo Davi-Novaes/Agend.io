@@ -1,6 +1,6 @@
 "use client";
 
-import { Sparkles } from "lucide-react";
+import { ExternalLink, Sparkles } from "lucide-react";
 
 import type { PublicPageButtonStyle, PublicPageFont } from "@/lib/api/client";
 import { useBrandingDraft } from "@/components/settings/branding/branding-draft-context";
@@ -54,13 +54,13 @@ export function LivePreviewPanel({ compact = false }: { compact?: boolean }) {
     <div className="flex flex-col gap-2" style={{ fontFamily }}>
       <LivePreviewFonts />
       <div className="text-muted-foreground flex items-center justify-between text-xs">
-        <span className="font-medium">Pré-visualização</span>
+        <span className="flex items-center gap-1.5 font-medium"><span className="size-1.5 rounded-full bg-primary" />Prévia ao vivo</span>
         <Badge variant={draft.publicPageEnabled ? "success" : "secondary"}>
           {draft.publicPageEnabled ? "Publicada" : "Despublicada"}
         </Badge>
       </div>
 
-      <div className="overflow-hidden rounded-xl border shadow-sm">
+      <div className="overflow-hidden rounded-2xl border bg-background shadow-xl shadow-black/5 ring-1 ring-white/5">
         {/* Hero — mesmo tratamento da pagina publica de verdade
             (app/(public)/[slug]/page.tsx): banner em opacidade cheia com um
             degrade escuro por cima so pra legibilidade do texto, nunca a cor
@@ -74,17 +74,16 @@ export function LivePreviewPanel({ compact = false }: { compact?: boolean }) {
           {draft.bannerPreviewUrl && (
             <>
               {/* eslint-disable-next-line @next/next/no-img-element -- previa local/blob, nao asset estatico do build. */}
-              <img src={draft.bannerPreviewUrl} alt="" className="absolute inset-0 size-full object-cover" />
+              <img key={draft.bannerPreviewUrl} src={draft.bannerPreviewUrl} alt="" className="absolute inset-0 size-full object-cover" onError={(event) => { event.currentTarget.style.display = "none"; }} />
               <div aria-hidden className="absolute inset-0 bg-gradient-to-t from-black/75 via-black/35 to-black/10" />
             </>
           )}
           <div className="relative flex flex-col items-center gap-3">
-            <div className="flex size-14 items-center justify-center overflow-hidden rounded-xl bg-white shadow">
-              {draft.logoPreviewUrl ? (
+            <div className="relative flex size-14 items-center justify-center overflow-hidden rounded-xl bg-white shadow">
+              <Sparkles className="size-6" style={{ color: primary }} />
+              {draft.logoPreviewUrl && (
                 // eslint-disable-next-line @next/next/no-img-element -- previa local/blob, nao asset estatico do build.
-                <img src={draft.logoPreviewUrl} alt="" className="size-full object-contain" />
-              ) : (
-                <Sparkles className="size-6" style={{ color: primary }} />
+                <img key={draft.logoPreviewUrl} src={draft.logoPreviewUrl} alt="" className="absolute inset-0 size-full bg-white object-contain" onError={(event) => { event.currentTarget.style.display = "none"; }} />
               )}
             </div>
             <div>
@@ -122,8 +121,8 @@ export function LivePreviewPanel({ compact = false }: { compact?: boolean }) {
         )}
 
         {!compact && draft.showContactSection && (
-          <div className="text-muted-foreground border-t p-4 text-center text-xs">
-            {draft.name} · página pública
+          <div className="text-muted-foreground flex items-center justify-center gap-1.5 border-t p-4 text-center text-xs">
+            {draft.name} · página pública <ExternalLink className="size-3" />
           </div>
         )}
       </div>

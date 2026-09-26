@@ -4,7 +4,7 @@ import * as React from "react";
 import Link from "next/link";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { UserRoundX } from "lucide-react";
+import { ChevronDown, ChevronUp, UserRoundX } from "lucide-react";
 
 import {
   getCustomerRecoveryCandidates,
@@ -35,6 +35,7 @@ export function CustomerRecoveryCard() {
   const [messagingCandidate, setMessagingCandidate] = React.useState<CustomerRecoveryCandidate | null>(null);
   const [subject, setSubject] = React.useState("");
   const [body, setBody] = React.useState("");
+  const [showAll, setShowAll] = React.useState(false);
 
   const recoveryQuery = useQuery({
     queryKey: CUSTOMER_RECOVERY_QUERY_KEY,
@@ -85,7 +86,7 @@ export function CustomerRecoveryCard() {
           </CardDescription>
         </CardHeader>
         <CardContent className="flex flex-col gap-3">
-          {recoveryQuery.data.map((candidate) => (
+          {(showAll ? recoveryQuery.data : recoveryQuery.data.slice(0, 3)).map((candidate) => (
             <div
               key={candidate.customerId}
               className="flex flex-col gap-2 rounded-lg border border-border p-3 sm:flex-row sm:items-center sm:justify-between"
@@ -95,7 +96,7 @@ export function CustomerRecoveryCard() {
                 <span className="font-medium text-warning">{candidate.daysOverdue} dias</span> alem do intervalo habitual
                 (costuma voltar a cada ~{candidate.averageIntervalDays} dias).
               </p>
-              <div className="flex shrink-0 gap-2">
+              <div className="flex shrink-0 flex-wrap gap-2">
                 <Button
                   variant="outline"
                   size="sm"
@@ -111,6 +112,12 @@ export function CustomerRecoveryCard() {
               </div>
             </div>
           ))}
+          {recoveryQuery.data.length > 3 && (
+            <Button variant="ghost" size="sm" className="self-start" onClick={() => setShowAll((current) => !current)}>
+              {showAll ? <ChevronUp className="size-4" /> : <ChevronDown className="size-4" />}
+              {showAll ? "Mostrar menos" : `Ver todos (${recoveryQuery.data.length})`}
+            </Button>
+          )}
         </CardContent>
       </Card>
 

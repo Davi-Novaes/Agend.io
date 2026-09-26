@@ -6,7 +6,22 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { toast } from "sonner";
-import { Inbox, Info, ListFilter, Package, Plus } from "lucide-react";
+import {
+  AlertTriangle,
+  ArrowDownToLine,
+  ArrowUpFromLine,
+  Boxes,
+  CircleDollarSign,
+  Inbox,
+  Info,
+  ListFilter,
+  MoreHorizontal,
+  Package,
+  PackageCheck,
+  Plus,
+  Search,
+  SlidersHorizontal,
+} from "lucide-react";
 
 import {
   listProducts,
@@ -16,6 +31,7 @@ import {
   setProductActiveStatus,
   registerStockMovement,
   listStockMovements,
+  getInventorySummary,
   ApiError,
   type ProductSummary,
   type StockMovementType,
@@ -35,12 +51,18 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 const PAGE_SIZE = 20;
 
 const TYPE_LABELS: Record<StockMovementType, string> = {
   Entry: "Entrada",
-  Exit: "Saida",
+  Exit: "Saída",
 };
 
 const REASON_LABELS: Record<StockMovementReason, string> = {
@@ -65,13 +87,26 @@ function toNullable(value: string): string | null {
   return value.trim() === "" ? null : value.trim();
 }
 
+function stockLevel(product: ProductSummary): { label: string; percentage: number; barClass: string; badgeClass: string } {
+  const target = Math.max(product.minimumStock * 2, 1);
+  const percentage = Math.min(100, Math.round((product.quantityInStock / target) * 100));
+
+  if (product.quantityInStock === 0) {
+    return { label: "Esgotado", percentage: 0, barClass: "bg-destructive", badgeClass: "text-destructive" };
+  }
+  if (product.isLowStock) {
+    return { label: "Baixo", percentage, barClass: "bg-amber-500", badgeClass: "text-amber-600" };
+  }
+  return { label: "Saudável", percentage, barClass: "bg-emerald-500", badgeClass: "text-emerald-600" };
+}
+
 const productSchema = z.object({
   name: z.string().min(1, "Informe o nome."),
   sku: z.string(),
   category: z.string(),
   description: z.string(),
-  quantityInStock: z.coerce.number().int("Use um numero inteiro.").min(0, "Nao pode ser negativo."),
-  minimumStock: z.coerce.number().int("Use um numero inteiro.").min(0, "Nao pode ser negativo."),
+  quantityInStock: z.coerce.number().int("Use um número inteiro.").min(0, "Não pode ser negativo."),
+  minimumStock: z.coerce.number().int("Use um número inteiro.").min(0, "Não pode ser negativo."),
   costPrice: z.string(),
   salePrice: z.string(),
 });
@@ -106,21 +141,33 @@ export default function EstoquePage() {
   }
 
   return (
-    <div className="flex w-full flex-1 flex-col">
-      <div className="mb-6">
-        <p className="text-muted-foreground text-sm">Produtos revendidos e movimentacoes de entrada e saida.</p>
-      </div>
+    <div className="flex w-full flex-1 flex-col gap-6">
+      <section className="relative overflow-hidden rounded-2xl border bg-gradient-to-br from-primary/12 via-card to-card p-5 sm:p-6">
+        <div aria-hidden className="absolute -right-10 -top-16 size-52 rounded-full bg-primary/10 blur-3xl" />
+        <div className="relative flex items-start gap-4">
+          <span className="flex size-11 shrink-0 items-center justify-center rounded-xl bg-primary text-primary-foreground shadow-lg shadow-primary/20">
+            <Boxes className="size-5" />
+          </span>
+          <div>
+            <p className="text-xs font-semibold tracking-[0.18em] text-primary uppercase">Controle de produtos</p>
+            <h2 className="mt-1 text-xl font-semibold tracking-tight">Estoque sob controle, sem surpresas</h2>
+            <p className="mt-1 max-w-2xl text-sm leading-relaxed text-muted-foreground">
+              Acompanhe saldos, identifique reposições e registre cada entrada ou saída em um só lugar.
+            </p>
+          </div>
+        </div>
+      </section>
 
-      <Tabs defaultValue="produtos">
-        <TabsList>
+      <Tabs defaultValue="produtos" className="space-y-4">
+        <TabsList className="h-auto w-fit rounded-xl p-1">
           <TabsTrigger value="produtos">Produtos</TabsTrigger>
-          <TabsTrigger value="movimentacoes">Movimentacoes</TabsTrigger>
+          <TabsTrigger value="movimentacoes">Movimentações</TabsTrigger>
         </TabsList>
 
-        <TabsContent value="produtos" className="mt-4">
+        <TabsContent value="produtos" className="mt-0">
           <ProdutosTab accessToken={session.accessToken} />
         </TabsContent>
-        <TabsContent value="movimentacoes" className="mt-4">
+        <TabsContent value="movimentacoes" className="mt-0">
           <MovimentacoesTab accessToken={session.accessToken} />
         </TabsContent>
       </Tabs>
@@ -134,16 +181,36 @@ function ProdutosTab({ accessToken }: { accessToken: string }) {
   const [searchInput, setSearchInput] = React.useState("");
   const [search, setSearch] = React.useState("");
   const [lowStockOnly, setLowStockOnly] = React.useState(false);
+  const [statusFilter, setStatusFilter] = React.useState<"all" | "active" | "inactive">("all");
   const [dialogOpen, setDialogOpen] = React.useState(false);
   const [editingProduct, setEditingProduct] = React.useState<ProductSummary | null>(null);
   const [movementDialogOpen, setMovementDialogOpen] = React.useState(false);
   const [movementProduct, setMovementProduct] = React.useState<ProductSummary | null>(null);
 
   const listQuery = useQuery({
-    queryKey: ["estoque", "produtos", { page, search, lowStockOnly }],
-    queryFn: () => listProducts({ page, pageSize: PAGE_SIZE, search: search || undefined, lowStockOnly }, accessToken),
+    queryKey: ["estoque", "produtos", { page, search, lowStockOnly, statusFilter }],
+    queryFn: () => listProducts({
+      page,
+      pageSize: PAGE_SIZE,
+      search: search || undefined,
+      lowStockOnly,
+      isActive: statusFilter === "all" ? undefined : statusFilter === "active",
+    }, accessToken),
     placeholderData: (previous) => previous,
   });
+
+  const summaryQuery = useQuery({
+    queryKey: ["estoque", "resumo"],
+    queryFn: () => getInventorySummary(accessToken),
+  });
+
+  React.useEffect(() => {
+    const timer = window.setTimeout(() => {
+      setPage(1);
+      setSearch(searchInput.trim());
+    }, 300);
+    return () => window.clearTimeout(timer);
+  }, [searchInput]);
 
   const form = useForm<ProductFormInput, unknown, ProductFormValues>({
     resolver: zodResolver(productSchema),
@@ -158,6 +225,7 @@ function ProdutosTab({ accessToken }: { accessToken: string }) {
   const invalidateAll = () => {
     queryClient.invalidateQueries({ queryKey: ["estoque", "produtos"] });
     queryClient.invalidateQueries({ queryKey: ["estoque", "movimentacoes"] });
+    queryClient.invalidateQueries({ queryKey: ["estoque", "resumo"] });
   };
 
   const createMutation = useMutation({
@@ -180,7 +248,7 @@ function ProdutosTab({ accessToken }: { accessToken: string }) {
       invalidateAll();
       setDialogOpen(false);
     },
-    onError: (error) => toast.error(error instanceof ApiError ? error.message : "Nao foi possivel cadastrar o produto."),
+    onError: (error) => toast.error(error instanceof ApiError ? error.message : "Não foi possível cadastrar o produto."),
   });
 
   const updateMutation = useMutation({
@@ -207,13 +275,13 @@ function ProdutosTab({ accessToken }: { accessToken: string }) {
       invalidateAll();
       setDialogOpen(false);
     },
-    onError: (error) => toast.error(error instanceof ApiError ? error.message : "Nao foi possivel atualizar o produto."),
+    onError: (error) => toast.error(error instanceof ApiError ? error.message : "Não foi possível atualizar o produto."),
   });
 
   const statusMutation = useMutation({
     mutationFn: ({ id, isActive }: { id: string; isActive: boolean }) => setProductActiveStatus(id, isActive, accessToken),
     onSuccess: invalidateAll,
-    onError: (error) => toast.error(error instanceof ApiError ? error.message : "Nao foi possivel atualizar o status."),
+    onError: (error) => toast.error(error instanceof ApiError ? error.message : "Não foi possível atualizar o status."),
   });
 
   const movementMutation = useMutation({
@@ -228,14 +296,26 @@ function ProdutosTab({ accessToken }: { accessToken: string }) {
       );
     },
     onSuccess: () => {
-      toast.success("Movimentacao registrada.");
+      toast.success("Movimentação registrada.");
       invalidateAll();
       setMovementDialogOpen(false);
     },
-    onError: (error) => toast.error(error instanceof ApiError ? error.message : "Nao foi possivel registrar a movimentacao."),
+    onError: (error) => toast.error(error instanceof ApiError ? error.message : "Não foi possível registrar a movimentação."),
   });
 
   const totalPages = Math.max(1, Math.ceil((listQuery.data?.totalCount ?? 0) / PAGE_SIZE));
+  const summary = summaryQuery.data;
+  const totalStockValue = summary?.totalStockValue.reduce((total, point) => total + point.total, 0) ?? 0;
+  const healthyProductCount = summary
+    ? Math.max(0, summary.activeProductCount - summary.lowStockCount)
+    : 0;
+  const totalUnits = summary?.totalUnitsInStock
+    ?? listQuery.data?.items.reduce((total, product) => total + product.quantityInStock, 0)
+    ?? 0;
+  const outOfStockCount = summary?.outOfStockCount
+    ?? listQuery.data?.items.filter((product) => product.quantityInStock === 0).length
+    ?? 0;
+  const hasProductFilters = Boolean(search || lowStockOnly || statusFilter !== "all");
 
   function openCreateDialog() {
     setEditingProduct(null);
@@ -259,7 +339,7 @@ function ProdutosTab({ accessToken }: { accessToken: string }) {
       });
       setDialogOpen(true);
     } catch (error) {
-      toast.error(error instanceof ApiError ? error.message : "Nao foi possivel carregar o produto.");
+      toast.error(error instanceof ApiError ? error.message : "Não foi possível carregar o produto.");
     }
   }
 
@@ -270,63 +350,73 @@ function ProdutosTab({ accessToken }: { accessToken: string }) {
   }
 
   return (
-    <div className="flex flex-col gap-4">
-      <Card>
-        <CardContent className="flex flex-col gap-4">
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <div className="flex flex-wrap items-center gap-2">
-              <Input
-                placeholder="Buscar por nome..."
-                value={searchInput}
-                onChange={(event) => setSearchInput(event.target.value)}
-                onKeyDown={(event) => {
-                  if (event.key === "Enter") {
-                    setPage(1);
-                    setSearch(searchInput);
-                  }
-                }}
-                className="w-56"
-              />
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                onClick={() => {
-                  setPage(1);
-                  setSearch(searchInput);
-                }}
-              >
-                Buscar
-              </Button>
-              <Button
-                type="button"
-                variant={lowStockOnly ? "secondary" : "outline"}
-                size="sm"
-                aria-pressed={lowStockOnly}
-                onClick={() => {
-                  setPage(1);
-                  setLowStockOnly((current) => !current);
-                }}
-              >
-                Estoque baixo
-              </Button>
-            </div>
-            <Button onClick={openCreateDialog}>
-              <Plus className="size-4" />
-              Novo produto
-            </Button>
+    <div className="flex flex-col gap-5">
+      <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4" aria-label="Resumo do estoque">
+        {[
+          { label: "Produtos ativos", value: summary?.activeProductCount ?? 0, hint: `${healthyProductCount} com saldo saudável`, icon: PackageCheck, color: "text-primary bg-primary/10" },
+          { label: "Unidades em estoque", value: totalUnits, hint: "Somando todos os produtos", icon: Boxes, color: "text-sky-600 bg-sky-500/10" },
+          { label: "Valor para venda", value: formatCurrency(totalStockValue), hint: "Valor potencial do estoque", icon: CircleDollarSign, color: "text-emerald-600 bg-emerald-500/10" },
+          { label: "Precisam de atenção", value: summary?.lowStockCount ?? 0, hint: `${outOfStockCount} sem estoque`, icon: AlertTriangle, color: "text-amber-600 bg-amber-500/10" },
+        ].map((metric) => {
+          const Icon = metric.icon;
+          return (
+            <Card key={metric.label}>
+              <CardContent className="flex items-center gap-3 p-4">
+                <span className={`flex size-10 shrink-0 items-center justify-center rounded-xl ${metric.color}`}><Icon className="size-5" /></span>
+                <div className="min-w-0">
+                  {summaryQuery.isLoading ? <Skeleton className="mb-1 h-7 w-20" /> : <p className="truncate text-2xl font-semibold tracking-tight tabular-nums">{metric.value}</p>}
+                  <p className="text-xs font-medium text-muted-foreground">{metric.label}</p>
+                  <p className="mt-0.5 truncate text-[11px] text-muted-foreground/75">{metric.hint}</p>
+                </div>
+              </CardContent>
+            </Card>
+          );
+        })}
+      </section>
+
+      {(summary?.lowStockCount ?? 0) > 0 && (
+        <section className="flex flex-col justify-between gap-3 rounded-xl border border-amber-500/25 bg-amber-500/8 p-4 sm:flex-row sm:items-center" role="status">
+          <div className="flex items-start gap-3">
+            <span className="mt-0.5 flex size-9 shrink-0 items-center justify-center rounded-lg bg-amber-500/15 text-amber-600"><AlertTriangle className="size-4" /></span>
+            <div><p className="text-sm font-semibold">Reposição recomendada</p><p className="text-xs text-muted-foreground">{summary?.lowStockCount} {summary?.lowStockCount === 1 ? "produto atingiu" : "produtos atingiram"} o estoque mínimo.</p></div>
+          </div>
+          <Button type="button" size="sm" variant="outline" onClick={() => { setLowStockOnly(true); setStatusFilter("active"); setPage(1); }}>Ver produtos</Button>
+        </section>
+      )}
+
+      <Card className="overflow-hidden">
+        <CardContent className="flex flex-col gap-4 p-0">
+          <div className="flex flex-col justify-between gap-3 border-b p-4 sm:flex-row sm:items-center sm:p-5">
+            <div><h3 className="font-semibold">Produtos cadastrados</h3><p className="text-xs text-muted-foreground">Consulte saldos, preços e faça movimentações rápidas.</p></div>
+            <Button onClick={openCreateDialog}><Plus className="size-4" />Novo produto</Button>
           </div>
 
-          <Table>
+          <div className="flex flex-col gap-3 px-4 sm:flex-row sm:items-center sm:px-5">
+            <div className="relative min-w-0 flex-1 sm:max-w-sm">
+              <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+              <Input placeholder="Buscar por nome, SKU ou categoria" value={searchInput} onChange={(event) => setSearchInput(event.target.value)} className="pl-9" aria-label="Buscar produtos" />
+            </div>
+            <Select value={statusFilter} onValueChange={(value) => { setStatusFilter(value as typeof statusFilter); setPage(1); }}>
+              <SelectTrigger className="w-full sm:w-40" aria-label="Filtrar por status"><SlidersHorizontal className="size-4" /><SelectValue /></SelectTrigger>
+              <SelectContent><SelectItem value="all">Todos os status</SelectItem><SelectItem value="active">Ativos</SelectItem><SelectItem value="inactive">Inativos</SelectItem></SelectContent>
+            </Select>
+            <Button type="button" variant={lowStockOnly ? "secondary" : "outline"} aria-pressed={lowStockOnly} onClick={() => { setPage(1); setLowStockOnly((current) => !current); }}>
+              <AlertTriangle className="size-4" />Estoque baixo
+            </Button>
+            {hasProductFilters && <Button type="button" variant="ghost" onClick={() => { setSearchInput(""); setSearch(""); setLowStockOnly(false); setStatusFilter("all"); setPage(1); }}>Limpar</Button>}
+          </div>
+
+          <div className="overflow-x-auto px-4 pb-1 sm:px-5">
+          <Table className="min-w-[860px]">
             <TableHeader>
               <TableRow>
                 <TableHead>Nome</TableHead>
                 <TableHead>SKU</TableHead>
                 <TableHead>Categoria</TableHead>
-                <TableHead className="text-right">Quantidade</TableHead>
-                <TableHead className="text-right">Preco</TableHead>
+                <TableHead>Saldo atual</TableHead>
+                <TableHead className="text-right">Venda / margem</TableHead>
                 <TableHead>Status</TableHead>
-                <TableHead className="text-right">Acoes</TableHead>
+                <TableHead className="text-right">Ações</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -345,7 +435,7 @@ function ProdutosTab({ accessToken }: { accessToken: string }) {
               ) : listQuery.data?.items.length === 0 ? (
                 <TableRow>
                   <TableCell colSpan={7} className="p-0">
-                    {search || lowStockOnly ? (
+                    {hasProductFilters ? (
                       <EmptyState
                         icon={ListFilter}
                         title="Nenhum produto encontrado para este filtro"
@@ -358,6 +448,7 @@ function ProdutosTab({ accessToken }: { accessToken: string }) {
                               setSearchInput("");
                               setSearch("");
                               setLowStockOnly(false);
+                              setStatusFilter("all");
                               setPage(1);
                             }}
                           >
@@ -381,60 +472,71 @@ function ProdutosTab({ accessToken }: { accessToken: string }) {
                   </TableCell>
                 </TableRow>
               ) : (
-                listQuery.data?.items.map((product) => (
-                  <TableRow key={product.id}>
-                    <TableCell className="font-medium">{product.name}</TableCell>
-                    <TableCell>{product.sku ?? "—"}</TableCell>
-                    <TableCell>{product.category ?? "—"}</TableCell>
-                    <TableCell className="text-right tabular-nums">
-                      <div className="flex items-center justify-end gap-2">
-                        {product.isLowStock && (
-                          <Badge variant="destructive" title={`Estoque minimo: ${product.minimumStock}`}>
-                            Baixo
-                          </Badge>
-                        )}
-                        {product.quantityInStock}
+                listQuery.data?.items.map((product) => {
+                  const level = stockLevel(product);
+                  const margin = product.costPrice !== null && product.salePrice !== null && product.costPrice > 0
+                    ? Math.round(((product.salePrice - product.costPrice) / product.costPrice) * 100)
+                    : null;
+                  return (
+                  <TableRow key={product.id} className="group">
+                    <TableCell><div className="flex items-center gap-3"><span className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary"><Package className="size-4" /></span><span className="font-medium">{product.name}</span></div></TableCell>
+                    <TableCell className="font-mono text-xs text-muted-foreground">{product.sku ?? "—"}</TableCell>
+                    <TableCell><Badge variant="outline" className="font-normal">{product.category ?? "Sem categoria"}</Badge></TableCell>
+                    <TableCell>
+                      <div className="min-w-32 space-y-1.5">
+                        <div className="flex items-center justify-between gap-3 text-xs"><span className="font-semibold tabular-nums">{product.quantityInStock} un.</span><span className={level.badgeClass}>{level.label}</span></div>
+                        <div className="h-1.5 overflow-hidden rounded-full bg-muted" role="progressbar" aria-label={`Nível de estoque de ${product.name}`} aria-valuenow={level.percentage} aria-valuemin={0} aria-valuemax={100}><div className={`h-full rounded-full transition-[width] ${level.barClass}`} style={{ width: `${level.percentage}%` }} /></div>
+                        <p className="text-[10px] text-muted-foreground">Mínimo: {product.minimumStock}</p>
                       </div>
                     </TableCell>
                     <TableCell className="text-right tabular-nums">
-                      {product.salePrice !== null ? formatCurrency(product.salePrice) : "—"}
+                      <p className="font-medium">{product.salePrice !== null ? formatCurrency(product.salePrice) : "—"}</p>
+                      {margin !== null && <p className={`text-[10px] ${margin >= 0 ? "text-emerald-600" : "text-destructive"}`}>{margin}% sobre o custo</p>}
                     </TableCell>
                     <TableCell>
                       <Badge variant={product.isActive ? "default" : "outline"}>{product.isActive ? "Ativo" : "Inativo"}</Badge>
                     </TableCell>
                     <TableCell className="text-right">
-                      <div className="flex justify-end gap-2">
-                        <Button variant="ghost" size="sm" onClick={() => openMovementDialog(product)}>
-                          Movimentar
+                      <div className="flex items-center justify-end gap-1">
+                        <Button variant="outline" size="sm" onClick={() => openMovementDialog(product)}>
+                          <ArrowDownToLine className="size-3.5" />Movimentar
                         </Button>
-                        <Button variant="ghost" size="sm" onClick={() => openEditDialog(product)}>
-                          Editar
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => statusMutation.mutate({ id: product.id, isActive: !product.isActive })}
-                        >
-                          {product.isActive ? "Desativar" : "Ativar"}
-                        </Button>
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button variant="ghost" size="icon" aria-label={`Mais ações de ${product.name}`}>
+                              <MoreHorizontal className="size-4" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end" className="w-40">
+                            <DropdownMenuItem onSelect={() => openEditDialog(product)}>Editar</DropdownMenuItem>
+                            <DropdownMenuItem
+                              variant={product.isActive ? "destructive" : "default"}
+                              onSelect={() => statusMutation.mutate({ id: product.id, isActive: !product.isActive })}
+                            >
+                              {product.isActive ? "Desativar" : "Ativar"}
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
                       </div>
                     </TableCell>
                   </TableRow>
-                ))
+                  );
+                })
               )}
             </TableBody>
           </Table>
+          </div>
 
-          <div className="flex items-center justify-between text-sm">
+          <div className="flex items-center justify-between border-t px-4 pb-4 pt-3 text-sm sm:px-5">
             <span className="text-muted-foreground" aria-live="polite">
-              Pagina {listQuery.data?.page ?? page} de {totalPages}
+              Página {listQuery.data?.page ?? page} de {totalPages} · {listQuery.data?.totalCount ?? 0} produtos
             </span>
             <div className="flex gap-2">
               <Button variant="outline" size="sm" disabled={page <= 1} onClick={() => setPage((current) => current - 1)}>
                 Anterior
               </Button>
               <Button variant="outline" size="sm" disabled={page >= totalPages} onClick={() => setPage((current) => current + 1)}>
-                Proxima
+                Próxima
               </Button>
             </div>
           </div>
@@ -480,7 +582,7 @@ function ProdutosTab({ accessToken }: { accessToken: string }) {
                             <span className="sr-only">O que e SKU?</span>
                           </TooltipTrigger>
                           <TooltipContent>
-                            Codigo unico usado para identificar este produto no seu estoque (ex.: SHP-001).
+                            Código único usado para identificar este produto no seu estoque (ex.: SHP-001).
                           </TooltipContent>
                         </Tooltip>
                       </FormLabel>
@@ -509,7 +611,7 @@ function ProdutosTab({ accessToken }: { accessToken: string }) {
                   name="costPrice"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Preco de custo</FormLabel>
+                      <FormLabel>Preço de custo</FormLabel>
                       <FormControl>
                         <Input type="number" min={0} step={0.01} {...field} />
                       </FormControl>
@@ -522,7 +624,7 @@ function ProdutosTab({ accessToken }: { accessToken: string }) {
                   name="salePrice"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Preco de venda</FormLabel>
+                      <FormLabel>Preço de venda</FormLabel>
                       <FormControl>
                         <Input type="number" min={0} step={0.01} {...field} />
                       </FormControl>
@@ -604,7 +706,7 @@ function ProdutosTab({ accessToken }: { accessToken: string }) {
                       </FormControl>
                       <SelectContent>
                         <SelectItem value="Entry">Entrada</SelectItem>
-                        <SelectItem value="Exit">Saida</SelectItem>
+                        <SelectItem value="Exit">Saída</SelectItem>
                       </SelectContent>
                     </Select>
                   </FormItem>
@@ -651,7 +753,7 @@ function ProdutosTab({ accessToken }: { accessToken: string }) {
                 name="notes"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Observacoes (opcional)</FormLabel>
+                    <FormLabel>Observações (opcional)</FormLabel>
                     <FormControl>
                       <Textarea rows={2} {...field} />
                     </FormControl>
@@ -676,6 +778,8 @@ function MovimentacoesTab({ accessToken }: { accessToken: string }) {
   const [productId, setProductId] = React.useState<string>("all");
   const [type, setType] = React.useState<StockMovementType | "all">("all");
   const [reason, setReason] = React.useState<StockMovementReason | "all">("all");
+  const [from, setFrom] = React.useState("");
+  const [to, setTo] = React.useState("");
 
   const productsQuery = useQuery({
     queryKey: ["estoque", "produtos", "all-for-filter"],
@@ -683,7 +787,7 @@ function MovimentacoesTab({ accessToken }: { accessToken: string }) {
   });
 
   const movementsQuery = useQuery({
-    queryKey: ["estoque", "movimentacoes", { page, productId, type, reason }],
+    queryKey: ["estoque", "movimentacoes", { page, productId, type, reason, from, to }],
     queryFn: () =>
       listStockMovements(
         {
@@ -692,6 +796,8 @@ function MovimentacoesTab({ accessToken }: { accessToken: string }) {
           productId: productId === "all" ? undefined : productId,
           type: type === "all" ? undefined : type,
           reason: reason === "all" ? undefined : reason,
+          from: from || undefined,
+          to: to || undefined,
         },
         accessToken
       ),
@@ -700,15 +806,20 @@ function MovimentacoesTab({ accessToken }: { accessToken: string }) {
 
   const totalPages = Math.max(1, Math.ceil((movementsQuery.data?.totalCount ?? 0) / PAGE_SIZE));
 
-  const hasFilter = productId !== "all" || type !== "all" || reason !== "all";
+  const hasFilter = productId !== "all" || type !== "all" || reason !== "all" || Boolean(from || to);
 
   return (
     <div className="flex flex-col gap-4">
-      <Card>
-        <CardContent className="flex flex-col gap-4">
-          <div className="flex flex-wrap gap-2">
+      <Card className="overflow-hidden">
+        <CardContent className="flex flex-col gap-4 p-0">
+          <div className="flex flex-col justify-between gap-2 border-b p-4 sm:flex-row sm:items-center sm:p-5">
+            <div><h3 className="font-semibold">Histórico de movimentações</h3><p className="text-xs text-muted-foreground">Rastreie cada entrada, saída e ajuste realizado no estoque.</p></div>
+            <Badge variant="secondary">{movementsQuery.data?.totalCount ?? 0} registros</Badge>
+          </div>
+
+          <div className="grid gap-2 px-4 sm:grid-cols-2 lg:grid-cols-5 sm:px-5" aria-label="Filtros de movimentações">
             <Select value={productId} onValueChange={(value) => { setProductId(value); setPage(1); }}>
-              <SelectTrigger className="w-48">
+              <SelectTrigger className="w-full" aria-label="Filtrar por produto">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -721,17 +832,17 @@ function MovimentacoesTab({ accessToken }: { accessToken: string }) {
               </SelectContent>
             </Select>
             <Select value={type} onValueChange={(value) => { setType(value as StockMovementType | "all"); setPage(1); }}>
-              <SelectTrigger className="w-36">
+              <SelectTrigger className="w-full" aria-label="Filtrar por tipo">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">Todos os tipos</SelectItem>
                 <SelectItem value="Entry">Entrada</SelectItem>
-                <SelectItem value="Exit">Saida</SelectItem>
+                <SelectItem value="Exit">Saída</SelectItem>
               </SelectContent>
             </Select>
             <Select value={reason} onValueChange={(value) => { setReason(value as StockMovementReason | "all"); setPage(1); }}>
-              <SelectTrigger className="w-40">
+              <SelectTrigger className="w-full" aria-label="Filtrar por motivo">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -743,9 +854,13 @@ function MovimentacoesTab({ accessToken }: { accessToken: string }) {
                 ))}
               </SelectContent>
             </Select>
+            <Input type="date" value={from} max={to || undefined} onChange={(event) => { setFrom(event.target.value); setPage(1); }} aria-label="Data inicial" />
+            <Input type="date" value={to} min={from || undefined} onChange={(event) => { setTo(event.target.value); setPage(1); }} aria-label="Data final" />
           </div>
 
-          <Table>
+          {hasFilter && <div className="px-4 sm:px-5"><Button variant="ghost" size="sm" onClick={() => { setProductId("all"); setType("all"); setReason("all"); setFrom(""); setTo(""); setPage(1); }}>Limpar filtros</Button></div>}
+
+          <div className="overflow-x-auto px-4 sm:px-5"><Table className="min-w-[760px]">
             <TableHeader>
               <TableRow>
                 <TableHead>Data</TableHead>
@@ -753,7 +868,7 @@ function MovimentacoesTab({ accessToken }: { accessToken: string }) {
                 <TableHead>Tipo</TableHead>
                 <TableHead className="text-right">Quantidade</TableHead>
                 <TableHead>Motivo</TableHead>
-                <TableHead>Observacoes</TableHead>
+                <TableHead>Observações</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -773,11 +888,11 @@ function MovimentacoesTab({ accessToken }: { accessToken: string }) {
                   <TableCell colSpan={6} className="p-0">
                     <EmptyState
                       icon={hasFilter ? ListFilter : Inbox}
-                      title={hasFilter ? "Nenhuma movimentacao encontrada para este filtro" : "Nenhuma movimentacao registrada ainda"}
+                      title={hasFilter ? "Nenhuma movimentação encontrada para este filtro" : "Nenhuma movimentação registrada ainda"}
                       description={
                         hasFilter
                           ? "Tente ajustar o produto, tipo ou motivo selecionado."
-                          : "Movimentacoes aparecem aqui quando voce registra entrada ou saida de um produto."
+                          : "As movimentações aparecem aqui quando você registra a entrada ou saída de um produto."
                       }
                       action={
                         hasFilter ? (
@@ -788,6 +903,8 @@ function MovimentacoesTab({ accessToken }: { accessToken: string }) {
                               setProductId("all");
                               setType("all");
                               setReason("all");
+                              setFrom("");
+                              setTo("");
                               setPage(1);
                             }}
                           >
@@ -801,30 +918,30 @@ function MovimentacoesTab({ accessToken }: { accessToken: string }) {
               ) : (
                 movementsQuery.data?.items.map((movement) => (
                   <TableRow key={movement.id}>
-                    <TableCell>{formatDateTime(movement.occurredAtUtc)}</TableCell>
-                    <TableCell className="font-medium">{movement.productName}</TableCell>
+                    <TableCell className="text-xs text-muted-foreground">{formatDateTime(movement.occurredAtUtc)}</TableCell>
+                    <TableCell><div className="flex items-center gap-2.5"><span className={`flex size-8 shrink-0 items-center justify-center rounded-lg ${movement.type === "Entry" ? "bg-emerald-500/10 text-emerald-600" : "bg-rose-500/10 text-rose-600"}`}>{movement.type === "Entry" ? <ArrowDownToLine className="size-4" /> : <ArrowUpFromLine className="size-4" />}</span><span className="font-medium">{movement.productName}</span></div></TableCell>
                     <TableCell>
-                      <Badge variant={movement.type === "Entry" ? "default" : "outline"}>{TYPE_LABELS[movement.type]}</Badge>
+                      <Badge variant={movement.type === "Entry" ? "success" : "destructive"}>{TYPE_LABELS[movement.type]}</Badge>
                     </TableCell>
-                    <TableCell className="text-right tabular-nums">{movement.quantity}</TableCell>
+                    <TableCell className={`text-right font-semibold tabular-nums ${movement.type === "Entry" ? "text-emerald-600" : "text-rose-600"}`}>{movement.type === "Entry" ? "+" : "−"}{movement.quantity}</TableCell>
                     <TableCell>{REASON_LABELS[movement.reason]}</TableCell>
                     <TableCell className="text-muted-foreground">{movement.notes ?? "—"}</TableCell>
                   </TableRow>
                 ))
               )}
             </TableBody>
-          </Table>
+          </Table></div>
 
-          <div className="flex items-center justify-between text-sm">
+          <div className="flex items-center justify-between border-t px-4 pb-4 pt-3 text-sm sm:px-5">
             <span className="text-muted-foreground" aria-live="polite">
-              Pagina {movementsQuery.data?.page ?? page} de {totalPages}
+              Página {movementsQuery.data?.page ?? page} de {totalPages}
             </span>
             <div className="flex gap-2">
               <Button variant="outline" size="sm" disabled={page <= 1} onClick={() => setPage((current) => current - 1)}>
                 Anterior
               </Button>
               <Button variant="outline" size="sm" disabled={page >= totalPages} onClick={() => setPage((current) => current + 1)}>
-                Proxima
+                Próxima
               </Button>
             </div>
           </div>

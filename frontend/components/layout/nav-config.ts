@@ -98,7 +98,7 @@ export const NAV_GROUPS: NavGroup[] = [
       // abaixo), pedido explicito do usuario (2026-09-05): membro comum nao
       // deve ver nem essas duas abas nem os dados delas (backend tambem
       // passou a rejeitar a leitura com 403 pra quem nao e Owner).
-      { href: "/settings/units", label: "Unidades", icon: Building2, ownerOnly: true },
+      { href: "/settings/units", label: "Locais de atendimento", icon: Building2, ownerOnly: true },
       { href: "/settings/branding", label: "Marca", icon: Palette, matchPrefix: true },
       { href: "/settings/team", label: "Equipe", icon: UserCog },
     ],

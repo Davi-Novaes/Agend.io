@@ -222,7 +222,11 @@ export default function DashboardPage() {
         />
       )}
 
-      {/* 1. Indicadores principais */}
+      {/* 1. Operacao do dia: vem antes do historico financeiro porque e a
+          informacao que orienta a proxima acao de quem acabou de entrar. */}
+      <TodayAgendaCard appointments={todayAppointments} isLoading={todayAppointmentsQuery.isLoading} />
+
+      {/* 2. Indicadores principais */}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <MetricCard
           icon={Wallet}
@@ -266,9 +270,6 @@ export default function DashboardPage() {
           tone="info"
         />
       </div>
-
-      {/* 2. Agenda de hoje -- protagonismo proprio, largura total */}
-      <TodayAgendaCard appointments={todayAppointments} isLoading={todayAppointmentsQuery.isLoading} />
 
       {/* 3. Faturamento / indicadores financeiros */}
       {cashFlow ? (

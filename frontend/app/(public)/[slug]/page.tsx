@@ -3,7 +3,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Inter, Lora, Merriweather, Montserrat, Playfair_Display, Poppins } from "next/font/google";
-import { ArrowRight, CalendarCheck, Camera, CheckCircle2, Clock3, ExternalLink, MapPin, MessageCircle, Phone, ShieldCheck, Sparkles, Star, User } from "lucide-react";
+import { ArrowRight, Building2, CalendarCheck, Camera, CheckCircle2, Clock3, ExternalLink, MapPin, MessageCircle, Phone, ShieldCheck, Sparkles, Star, User } from "lucide-react";
 
 import { getTenantBySlug, publicListServices, publicListResources, resolveAssetUrl, ApiError, type TenantPublicProfile, type PublicServiceSummary, type PublicResourceSummary, type PublicPageFont, type PublicPageButtonStyle, type WorkingHourEntry } from "@/lib/api/client";
 import { TenantThemeProvider } from "@/lib/tenant/tenant-theme-provider";
@@ -130,6 +130,7 @@ export default async function TenantPortalPage({ params, searchParams }: PagePro
     showContactSection: tenant.showContactSection,
   };
   const orderedBusinessHours = [...tenant.businessHours].sort((a, b) => DAY_ORDER.indexOf(a.dayOfWeek) - DAY_ORDER.indexOf(b.dayOfWeek));
+  const units = tenant.units ?? [];
   const hasContactInfo = Boolean(tenant.address || tenant.phone || tenant.whatsApp || tenant.instagramUrl || tenant.facebookUrl);
   const theme = {
     ...(tenant.primaryColorHex ? { primary: tenant.primaryColorHex, primaryForeground: "#ffffff" } : DEFAULT_TENANT_THEME),
@@ -137,7 +138,7 @@ export default async function TenantPortalPage({ params, searchParams }: PagePro
     buttonRadius: BUTTON_RADIUS[customization.buttonStyle],
   };
   const buttonRadiusClassName = "rounded-[var(--tenant-button-radius)]";
-  const hasDiscoveryNavigation = customization.showServicesSection || customization.showTeamSection || customization.showHoursSection;
+  const hasDiscoveryNavigation = customization.showServicesSection || customization.showTeamSection || customization.showHoursSection || units.length > 0;
 
   return (
     <TenantThemeProvider theme={theme}>
@@ -156,6 +157,7 @@ export default async function TenantPortalPage({ params, searchParams }: PagePro
               <nav className="ml-auto hidden items-center gap-6 text-sm md:flex" aria-label="Navegação da página">
                 {customization.showServicesSection && services.length > 0 && <Link href="#servicos" className="text-muted-foreground hover:text-foreground">Serviços</Link>}
                 {customization.showTeamSection && resources.length > 0 && <Link href="#equipe" className="text-muted-foreground hover:text-foreground">Equipe</Link>}
+                {units.length > 0 && <Link href="#locais" className="text-muted-foreground hover:text-foreground">Locais</Link>}
                 {customization.showHoursSection && orderedBusinessHours.length > 0 && <Link href="#horarios" className="text-muted-foreground hover:text-foreground">Horários</Link>}
               </nav>
             )}
@@ -251,6 +253,30 @@ export default async function TenantPortalPage({ params, searchParams }: PagePro
               </section>
             )}
 
+            {units.length > 0 && (
+              <section id="locais" aria-labelledby="locais-heading" className="scroll-mt-24">
+                <SectionHeading eyebrow="Onde atendemos" title="Escolha o local mais conveniente" description="Confira os endereços e canais de contato de cada unidade." />
+                <div className="mt-10 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                  {units.map((unit) => {
+                    const hours = unit.businessHours.length > 0 ? unit.businessHours : tenant.businessHours;
+                    return (
+                      <Card key={unit.id} className="overflow-hidden transition-all hover:-translate-y-1 hover:border-primary/30 hover:shadow-xl">
+                        <CardContent className="flex h-full flex-col p-0">
+                          <div className="flex items-center gap-3 border-b bg-primary/5 p-5"><span className="flex size-10 items-center justify-center rounded-xl bg-primary text-primary-foreground"><Building2 className="size-5" /></span><div><h3 className="font-semibold">{unit.name}</h3><p className="text-xs text-muted-foreground">Local de atendimento</p></div></div>
+                          <div className="flex flex-1 flex-col gap-3 p-5 text-sm">
+                            {(unit.address || unit.city) ? <p className="flex items-start gap-2"><MapPin className="mt-0.5 size-4 shrink-0 text-primary" /><span>{[unit.address, unit.city, unit.state].filter(Boolean).join(" · ")}</span></p> : <p className="text-muted-foreground">Endereço disponível durante o agendamento.</p>}
+                            {unit.phone && <a href={`tel:${unit.phone}`} className="flex items-center gap-2 text-muted-foreground hover:text-foreground"><Phone className="size-4" />{unit.phone}</a>}
+                            {unit.whatsApp && <a href={whatsAppLink(unit.whatsApp)} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 text-muted-foreground hover:text-foreground"><MessageCircle className="size-4" />WhatsApp</a>}
+                            {hours.length > 0 && <p className="mt-auto flex items-center gap-2 border-t pt-3 text-xs text-muted-foreground"><Clock3 className="size-3.5" />Horários próprios disponíveis</p>}
+                          </div>
+                        </CardContent>
+                      </Card>
+                    );
+                  })}
+                </div>
+              </section>
+            )}
+
             {customization.showHoursSection && orderedBusinessHours.length > 0 && (
               <section id="horarios" aria-labelledby="horarios-heading" className="scroll-mt-24">
                 <div className="grid items-center gap-10 lg:grid-cols-[0.9fr_1.1fr]">
@@ -265,7 +291,7 @@ export default async function TenantPortalPage({ params, searchParams }: PagePro
             <div aria-hidden className="absolute inset-0 opacity-30 [background-image:radial-gradient(circle_at_center,var(--primary)_1px,transparent_1px)] [background-size:28px_28px]" />
             <div className="relative mx-auto max-w-5xl">
               <SectionHeading eyebrow="Agendamento online" title="Reserve seu momento" description={tenant.bookingInstructionsText || "Escolha o serviço, o profissional e o melhor horário. Leva só alguns minutos."} />
-              <Card className="mt-10 border-primary/15 shadow-2xl"><CardContent className="p-5 sm:p-8 lg:p-10"><BookingFlow key={servico ?? "new-booking"} tenantId={tenant.id} buttonRadiusClassName={buttonRadiusClassName} paymentRequired={tenant.paymentRequired} depositPercentage={tenant.depositPercentage} initialServices={services} initialResources={resources} initialServiceId={servico} customerPortalHref={`/${slug}/minha-conta`} /></CardContent></Card>
+              <Card className="mt-10 border-primary/15 shadow-2xl"><CardContent className="p-5 sm:p-8 lg:p-10"><BookingFlow key={servico ?? "new-booking"} tenantId={tenant.id} buttonRadiusClassName={buttonRadiusClassName} paymentRequired={tenant.paymentRequired} depositPercentage={tenant.depositPercentage} initialServices={services} initialResources={resources} initialUnits={units} initialServiceId={servico} customerPortalHref={`/${slug}/minha-conta`} /></CardContent></Card>
             </div>
           </section>
 

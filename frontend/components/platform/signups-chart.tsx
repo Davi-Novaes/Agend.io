@@ -39,20 +39,28 @@ function SignupsTooltip({
 /** Tendencia ao longo do tempo, serie unica: mesmo hue sequencial (chart-1) do RevenueChart do painel do tenant. */
 export function SignupsChart({ data }: { data: SignupMonthPoint[] }) {
   const [view, setView] = React.useState<ViewMode>("chart");
+  const gradientId = React.useId().replaceAll(":", "");
   const total = data.reduce((sum, point) => sum + point.count, 0);
+  const average = data.length > 0 ? total / data.length : 0;
 
   return (
-    <div className="rounded-lg border p-4">
-      <div className="mb-3 flex items-center justify-between gap-2">
+    <div className="bg-card rounded-xl border border-border/80 p-4 shadow-sm sm:p-5">
+      <div className="mb-3 flex flex-wrap items-start justify-between gap-3">
         <div>
           <h3 className="text-sm font-semibold">Novos estabelecimentos</h3>
           <p className="text-muted-foreground text-xs">Cadastros por mes, ultimos 6 meses</p>
+          {total > 0 && (
+            <p className="mt-2 text-xs">
+              <span className="font-semibold tabular-nums">{total} no período</span>
+              <span className="text-muted-foreground"> · média de {average.toLocaleString("pt-BR", { maximumFractionDigits: 1 })}/mês</span>
+            </p>
+          )}
         </div>
         <div role="group" aria-label="Alternar visualizacao" className="flex gap-1">
           <Button
             type="button"
             size="sm"
-            variant={view === "chart" ? "secondary" : "ghost"}
+            variant={view === "chart" ? "default" : "ghost"}
             aria-pressed={view === "chart"}
             onClick={() => setView("chart")}
           >
@@ -61,7 +69,7 @@ export function SignupsChart({ data }: { data: SignupMonthPoint[] }) {
           <Button
             type="button"
             size="sm"
-            variant={view === "table" ? "secondary" : "ghost"}
+            variant={view === "table" ? "default" : "ghost"}
             aria-pressed={view === "table"}
             onClick={() => setView("table")}
           >
@@ -93,11 +101,17 @@ export function SignupsChart({ data }: { data: SignupMonthPoint[] }) {
         <div
           role="img"
           aria-label={`Grafico de barras com novos estabelecimentos por mes, total de ${total} nos ultimos ${data.length} meses.`}
-          className="h-56 w-full"
+          className="bg-surface-inset h-64 w-full rounded-lg p-3"
         >
           <ResponsiveContainer width="100%" height="100%">
-            <BarChart data={data} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
-              <CartesianGrid vertical={false} stroke="var(--border)" />
+            <BarChart data={data} margin={{ top: 12, right: 8, left: 0, bottom: 0 }}>
+              <defs>
+                <linearGradient id={`${gradientId}-fill`} x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stopColor="var(--primary)" stopOpacity={1} />
+                  <stop offset="100%" stopColor="var(--chart-1)" stopOpacity={0.55} />
+                </linearGradient>
+              </defs>
+              <CartesianGrid vertical={false} stroke="var(--border)" strokeOpacity={0.55} strokeDasharray="3 6" />
               <XAxis
                 dataKey="month"
                 tickFormatter={(value: string) => formatMonthLabel(value)}
@@ -113,7 +127,7 @@ export function SignupsChart({ data }: { data: SignupMonthPoint[] }) {
                 width={32}
               />
               <Tooltip content={(props) => <SignupsTooltip active={props.active} payload={props.payload} label={props.label} />} />
-              <Bar dataKey="count" fill="var(--chart-1)" radius={[4, 4, 0, 0]} />
+              <Bar dataKey="count" fill={`url(#${gradientId}-fill)`} radius={[7, 7, 2, 2]} maxBarSize={42} />
             </BarChart>
           </ResponsiveContainer>
         </div>

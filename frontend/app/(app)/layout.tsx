@@ -125,7 +125,9 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
       <SidebarInset className="isolate">
         <AppBackground />
         <AppHeader />
-        <div className="flex-1 p-6 sm:p-10">{children}</div>
+        <div className="mx-auto flex w-full max-w-[1440px] flex-1 px-4 pt-5 pb-24 sm:px-6 sm:pt-8 md:pb-10 lg:px-8">
+          {children}
+        </div>
       </SidebarInset>
       <AssistantWidget />
     </SidebarProvider>

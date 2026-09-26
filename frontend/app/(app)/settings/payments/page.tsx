@@ -1,7 +1,7 @@
 "use client";
 
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { useForm } from "react-hook-form";
+import { useForm, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { toast } from "sonner";
@@ -88,6 +88,7 @@ function PaymentSettingsCard({
       depositPercentage: profile.depositPercentage,
     },
   });
+  const paymentRequired = useWatch({ control: form.control, name: "paymentRequired" });
 
   const mutation = useMutation({
     mutationFn: (values: SettingsFormValues) => updateTenantPaymentSettings(values, accessToken),
@@ -129,7 +130,14 @@ function PaymentSettingsCard({
                 <FormItem>
                   <FormLabel>Percentual do sinal</FormLabel>
                   <FormControl>
-                    <Input type="number" min={1} max={100} {...field} value={field.value as number} />
+                    <Input
+                      type="number"
+                      min={1}
+                      max={100}
+                      disabled={!paymentRequired}
+                      {...field}
+                      value={field.value as number}
+                    />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -137,7 +145,7 @@ function PaymentSettingsCard({
             />
 
             <Button type="submit" disabled={mutation.isPending} className="mt-2 w-fit">
-              {mutation.isPending ? "Salvando..." : "Salvar pagamento"}
+              {mutation.isPending ? "Salvando..." : "Salvar configurações"}
             </Button>
           </fieldset>
           </form>

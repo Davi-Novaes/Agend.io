@@ -21,6 +21,8 @@ public sealed class GetInventorySummaryQueryHandler(EstoqueDbContext dbContext) 
             .ToListAsync(cancellationToken);
 
         var lowStockCount = products.Count(p => p.QuantityInStock <= p.MinimumStock);
+        var outOfStockCount = products.Count(p => p.QuantityInStock == 0);
+        var totalUnitsInStock = products.Sum(p => p.QuantityInStock);
 
         var totalStockValue = products
             .Where(p => p.Amount is not null)
@@ -29,6 +31,11 @@ public sealed class GetInventorySummaryQueryHandler(EstoqueDbContext dbContext) 
             .OrderByDescending(point => point.Total)
             .ToList();
 
-        return Result.Success(new InventorySummary(products.Count, lowStockCount, totalStockValue));
+        return Result.Success(new InventorySummary(
+            products.Count,
+            lowStockCount,
+            outOfStockCount,
+            totalUnitsInStock,
+            totalStockValue));
     }
 }

@@ -33,7 +33,7 @@ internal sealed class TenantLookupService(TenancyDbContext dbContext) : ITenantL
         return tenant is null ? null : Map(tenant);
     }
 
-    public async Task<TenantAvailabilityInfo?> GetAvailabilityInfoAsync(TenantId tenantId, CancellationToken cancellationToken = default)
+    public async Task<TenantAvailabilityInfo?> GetAvailabilityInfoAsync(TenantId tenantId, Guid? unitId = null, CancellationToken cancellationToken = default)
     {
         var tenant = await dbContext.Tenants.AsNoTracking()
             .SingleOrDefaultAsync(t => t.Id == tenantId, cancellationToken);
@@ -43,7 +43,18 @@ internal sealed class TenantLookupService(TenancyDbContext dbContext) : ITenantL
             return null;
         }
 
-        var businessHours = tenant.BusinessHours
+        IReadOnlyCollection<BusinessHoursEntry> effectiveHours = tenant.BusinessHours;
+        if (unitId is not null)
+        {
+            var unit = await dbContext.Units.AsNoTracking()
+                .SingleOrDefaultAsync(u => u.Id == UnitId.From(unitId.Value) && u.IsActive, cancellationToken);
+            if (unit is not null && unit.BusinessHours.Count > 0)
+            {
+                effectiveHours = unit.BusinessHours;
+            }
+        }
+
+        var businessHours = effectiveHours
             .Select(h => new BusinessHoursLookup(h.DayOfWeek, h.StartTime, h.EndTime))
             .ToList();
         var closedDates = tenant.ClosedDates.Select(d => d.Date).ToList();

@@ -77,4 +77,36 @@ public class UnitTests
         unit.Activate();
         unit.IsActive.ShouldBeTrue();
     }
+
+    [Fact]
+    public void Create_Should_Keep_Unit_Contact_Data()
+    {
+        var unit = Unit.Create(Tenant, "Unidade Centro", null, null, null, null, "(11) 3333-4444", "(11) 99999-8888").Value;
+
+        unit.Phone.ShouldBe("(11) 3333-4444");
+        unit.WhatsApp.ShouldBe("(11) 99999-8888");
+    }
+
+    [Fact]
+    public void SetBusinessHours_Should_Replace_Unit_Schedule()
+    {
+        var unit = Unit.Create(Tenant, "Unidade Centro", null, null, null, null).Value;
+
+        var result = unit.SetBusinessHours([(DayOfWeek.Monday, new TimeOnly(9, 0), new TimeOnly(18, 0))]);
+
+        result.IsSuccess.ShouldBeTrue();
+        unit.BusinessHours.Count.ShouldBe(1);
+        unit.BusinessHours.Single().DayOfWeek.ShouldBe(DayOfWeek.Monday);
+    }
+
+    [Fact]
+    public void SetBusinessHours_Should_Reject_Invalid_Range()
+    {
+        var unit = Unit.Create(Tenant, "Unidade Centro", null, null, null, null).Value;
+
+        var result = unit.SetBusinessHours([(DayOfWeek.Monday, new TimeOnly(18, 0), new TimeOnly(9, 0))]);
+
+        result.IsFailure.ShouldBeTrue();
+        unit.BusinessHours.ShouldBeEmpty();
+    }
 }

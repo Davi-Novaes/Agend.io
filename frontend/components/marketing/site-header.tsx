@@ -30,7 +30,7 @@ export function SiteHeader() {
         scrolled ? "bg-background/80 border-border backdrop-blur" : "border-transparent bg-transparent"
       )}
     >
-      <div className="mx-auto flex h-16 max-w-6xl items-center justify-between px-4 sm:px-6">
+      <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4 sm:px-6">
         <Logo />
 
         <nav className="hidden items-center gap-6 sm:flex">
@@ -47,7 +47,7 @@ export function SiteHeader() {
             <Link href="/login">Entrar</Link>
           </Button>
           <Button asChild className="shadow-sm">
-            <Link href="/onboarding">Cadastre-se</Link>
+            <Link href="/onboarding">Começar agora</Link>
           </Button>
         </div>
 

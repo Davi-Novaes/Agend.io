@@ -9,7 +9,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { toast } from "sonner";
 import QRCode from "qrcode";
-import { Copy, History } from "lucide-react";
+import { CalendarClock, Copy, Globe2, History, MonitorSmartphone, Network } from "lucide-react";
 
 import {
   getMfaStatus,
@@ -60,12 +60,65 @@ type DisableFormValues = z.infer<typeof disableSchema>;
 type Step = "idle" | "setup" | "recovery-codes" | "disable";
 
 function formatOccurredAt(occurredAtUtc: string): string {
-  return new Date(occurredAtUtc).toLocaleString("pt-BR", { dateStyle: "short", timeStyle: "short" });
+  return new Date(occurredAtUtc).toLocaleString("pt-BR", { dateStyle: "medium", timeStyle: "short" });
 }
 
 function locationFrom(entry: { city: string | null; region: string | null; countryCode: string | null }): string | null {
-  const parts = [entry.city, entry.region, entry.countryCode].filter(Boolean);
+  let country = entry.countryCode;
+  if (country && typeof Intl.DisplayNames === "function") {
+    country = new Intl.DisplayNames(["pt-BR"], { type: "region" }).of(country.toUpperCase()) ?? country;
+  }
+
+  const parts = [entry.city, entry.region, country].filter(Boolean);
   return parts.length > 0 ? parts.join(", ") : null;
+}
+
+function normalizeIpAddress(ipAddress: string | null): string | null {
+  if (!ipAddress) return null;
+  return ipAddress.replace(/^::ffff:/i, "");
+}
+
+function deviceFrom(userAgent: string | null): string | null {
+  if (!userAgent) return null;
+
+  const browser = userAgent.includes("Edg/")
+    ? "Microsoft Edge"
+    : userAgent.includes("Firefox/")
+      ? "Firefox"
+      : userAgent.includes("Chrome/")
+        ? "Google Chrome"
+        : userAgent.includes("Safari/")
+          ? "Safari"
+          : "Navegador não identificado";
+
+  const system = /Android/i.test(userAgent)
+    ? "Android"
+    : /iPhone|iPad/i.test(userAgent)
+      ? "iPhone/iPad"
+      : /Windows/i.test(userAgent)
+        ? "Windows"
+        : /Mac OS X/i.test(userAgent)
+          ? "macOS"
+          : /Linux/i.test(userAgent)
+            ? "Linux"
+            : null;
+
+  return system ? `${browser} em ${system}` : browser;
+}
+
+const SECURITY_EVENT_LABELS: Record<string, string> = {
+  LoginSucceeded: "Login realizado",
+  LoginFailed: "Tentativa de login sem sucesso",
+  PasswordResetRequested: "Redefinição de senha solicitada",
+  PasswordResetCompleted: "Senha redefinida",
+  EmailConfirmed: "E-mail confirmado",
+  RegistrationConfirmed: "Cadastro confirmado",
+  MfaEnabled: "Verificação em duas etapas ativada",
+  MfaDisabled: "Verificação em duas etapas desativada",
+};
+
+function securityEventLabel(eventType: string): string {
+  return SECURITY_EVENT_LABELS[eventType] ?? "Atividade de segurança";
 }
 
 export default function SecuritySettingsPage() {
@@ -81,6 +134,7 @@ export default function SecuritySettingsPage() {
   const [isSubmitting, setIsSubmitting] = React.useState(false);
   const [isChangingPassword, setIsChangingPassword] = React.useState(false);
   const [isLoggingOutAll, setIsLoggingOutAll] = React.useState(false);
+  const [showAllActivity, setShowAllActivity] = React.useState(false);
 
   const accessToken = session?.accessToken ?? "";
 
@@ -194,9 +248,8 @@ export default function SecuritySettingsPage() {
   }
 
   return (
-    <div className="flex w-full max-w-2xl flex-1 flex-col gap-6">
+    <div className="flex w-full max-w-4xl flex-1 flex-col gap-6">
       <div>
-        <h1 className="text-lg font-semibold">Segurança</h1>
         <p className="text-muted-foreground text-sm">Proteção da sua conta — senha, verificação em duas etapas e sessões.</p>
       </div>
 
@@ -448,7 +501,9 @@ export default function SecuritySettingsPage() {
       <Card>
         <CardHeader>
           <CardTitle>Atividade recente</CardTitle>
-          <CardDescription>Últimos logins e eventos de segurança da sua conta.</CardDescription>
+          <CardDescription>
+            Confira quando e de onde sua conta foi acessada. A localização por IP é aproximada.
+          </CardDescription>
         </CardHeader>
         <CardContent>
           {activityQuery.isLoading ? (
@@ -460,27 +515,74 @@ export default function SecuritySettingsPage() {
           ) : !activityQuery.data || activityQuery.data.length === 0 ? (
             <EmptyState icon={History} title="Nenhuma atividade registrada ainda." />
           ) : (
-            <ul className="flex flex-col gap-2">
-              {activityQuery.data.map((entry) => {
-                const location = locationFrom(entry);
-                return (
-                  <li
-                    key={entry.id}
-                    className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1 rounded-md border p-3 text-sm"
-                  >
-                    <div className="flex flex-col">
-                      <span className="font-medium">{entry.eventType}</span>
-                      <span className="text-muted-foreground text-xs">
-                        {formatOccurredAt(entry.occurredAtUtc)}
-                        {entry.ipAddress ? ` · ${entry.ipAddress}` : ""}
-                        {location ? ` · ${location}` : ""}
-                      </span>
-                    </div>
-                    <Badge variant={entry.success ? "success" : "destructive"}>{entry.success ? "Sucesso" : "Falhou"}</Badge>
-                  </li>
-                );
-              })}
-            </ul>
+            <div className="flex flex-col gap-3">
+              <ul className="flex flex-col gap-2">
+                {(showAllActivity ? activityQuery.data : activityQuery.data.slice(0, 10)).map((entry) => {
+                  const location = locationFrom(entry);
+                  const ipAddress = normalizeIpAddress(entry.ipAddress);
+                  const device = deviceFrom(entry.userAgent);
+                  return (
+                    <li
+                      key={entry.id}
+                      className="rounded-xl border bg-card p-4 text-sm shadow-xs transition-colors hover:bg-muted/20"
+                    >
+                      <div className="flex flex-wrap items-start justify-between gap-3">
+                        <div>
+                          <p className="font-medium">{securityEventLabel(entry.eventType)}</p>
+                          <p className="mt-0.5 text-xs text-muted-foreground">
+                            Registro de segurança da sua conta
+                          </p>
+                        </div>
+                        <Badge variant={entry.success ? "success" : "destructive"}>
+                          {entry.success ? "Sucesso" : "Falhou"}
+                        </Badge>
+                      </div>
+
+                      <div className="mt-4 grid gap-3 border-t pt-4 sm:grid-cols-2">
+                        <div className="flex min-w-0 gap-2.5">
+                          <CalendarClock className="mt-0.5 size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
+                          <div className="min-w-0">
+                            <p className="text-xs font-medium text-muted-foreground">Data e hora</p>
+                            <p className="mt-0.5">{formatOccurredAt(entry.occurredAtUtc)}</p>
+                          </div>
+                        </div>
+                        <div className="flex min-w-0 gap-2.5">
+                          <Network className="mt-0.5 size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
+                          <div className="min-w-0">
+                            <p className="text-xs font-medium text-muted-foreground">Endereço IP</p>
+                            <p className="mt-0.5 break-all font-mono text-xs">{ipAddress ?? "Não informado"}</p>
+                          </div>
+                        </div>
+                        <div className="flex min-w-0 gap-2.5">
+                          <Globe2 className="mt-0.5 size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
+                          <div className="min-w-0">
+                            <p className="text-xs font-medium text-muted-foreground">Localização aproximada</p>
+                            <p className="mt-0.5">{location ?? "Não disponível para este acesso"}</p>
+                          </div>
+                        </div>
+                        <div className="flex min-w-0 gap-2.5">
+                          <MonitorSmartphone className="mt-0.5 size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
+                          <div className="min-w-0">
+                            <p className="text-xs font-medium text-muted-foreground">Dispositivo</p>
+                            <p className="mt-0.5">{device ?? "Não identificado"}</p>
+                          </div>
+                        </div>
+                      </div>
+                    </li>
+                  );
+                })}
+              </ul>
+              {activityQuery.data.length > 10 && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="self-start"
+                  onClick={() => setShowAllActivity((current) => !current)}
+                >
+                  {showAllActivity ? "Mostrar menos" : `Ver todos (${activityQuery.data.length})`}
+                </Button>
+              )}
+            </div>
           )}
         </CardContent>
       </Card>

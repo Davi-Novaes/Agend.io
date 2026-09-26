@@ -11,7 +11,9 @@ public sealed class ListUnitsQueryHandler(TenancyDbContext dbContext) : IQueryHa
     {
         var units = await dbContext.Units.AsNoTracking()
             .OrderBy(u => u.Name)
-            .Select(u => new UnitSummary(u.Id.Value, u.Name, u.Address, u.City, u.State, u.Country, u.IsActive))
+            .Select(u => new UnitSummary(
+                u.Id.Value, u.Name, u.Address, u.City, u.State, u.Country, u.Phone, u.WhatsApp, u.IsActive,
+                u.BusinessHours.Select(h => new UnitBusinessHoursSummary(h.DayOfWeek, h.StartTime, h.EndTime)).ToList()))
             .ToListAsync(cancellationToken);
 
         return Result.Success<IReadOnlyList<UnitSummary>>(units);
