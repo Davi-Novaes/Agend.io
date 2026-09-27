@@ -32,6 +32,7 @@ public sealed class ResourceConfiguration : IEntityTypeConfiguration<Resource>
         builder.Property(r => r.PhotoUrl).HasMaxLength(500);
 
         builder.Property(r => r.IsActive).IsRequired();
+        builder.Property(r => r.InheritsBusinessHours).IsRequired().HasDefaultValue(true);
 
         // Colecao de Value Objects sem identidade propria — tabela filha, FK
         // sombra gerada pelo EF, sem repositorio separado (faz parte do agregado

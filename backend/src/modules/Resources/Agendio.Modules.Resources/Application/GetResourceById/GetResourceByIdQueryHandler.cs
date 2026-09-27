@@ -28,7 +28,7 @@ public sealed class GetResourceByIdQueryHandler(ResourcesDbContext dbContext) : 
 
         var details = new ResourceDetails(
             resource.Id.Value, resource.Name, resource.Type, resource.Capacity, resource.Description, resource.IsActive, resource.UnitId,
-            resource.PhotoUrl, resource.Specialties.ToList(), resource.ServiceIds.ToList(), workingHours);
+            resource.PhotoUrl, resource.Specialties.ToList(), resource.ServiceIds.ToList(), resource.InheritsBusinessHours, workingHours);
 
         return Result.Success(details);
     }

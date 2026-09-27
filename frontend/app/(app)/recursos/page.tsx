@@ -130,13 +130,8 @@ function toApiTimeValue(time: string): string {
   return time.length === 5 ? `${time}:00` : time;
 }
 
-// Sem isso, um recurso novo nao tem NENHUM horario de trabalho e a pagina
-// publica de agendamento mostra "nenhum horario disponivel" pra sempre, ate o
-// dono descobrir a tela separada de "Horarios" — trava silenciosa real,
-// confirmada ao vivo pela Persona A da auditoria (BL-09, docs/BACKLOG.md).
-// Segunda a sabado, comercial, editavel a qualquer momento no mesmo dialog
-// que ja existe — nao inventa uma feature nova, so preenche o que ja tinha
-// que ser preenchido manualmente.
+// Fallback para empresas que ainda nao configuraram o proprio expediente.
+// Quando ele ja existe, o recurso fica sem jornada propria e herda a empresa.
 const DEFAULT_WORKING_HOURS: WorkingHourEntry[] = (
   ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"] as const
 ).map((dayOfWeek) => ({ dayOfWeek, startTime: "09:00:00", endTime: "18:00:00" }));
@@ -231,13 +226,14 @@ export default function ResourcesPage() {
         accessToken
       ),
     onSuccess: async (result) => {
-      // Falha ao pre-preencher o horario nao pode travar o cadastro em si —
-      // o recurso ja foi criado com sucesso; o dono sempre pode configurar
-      // manualmente depois em "Horarios" se isso aqui nao completar.
-      try {
-        await setResourceWorkingHours(result.id, DEFAULT_WORKING_HOURS, accessToken);
-      } catch {
-        toast.error("Recurso cadastrado, mas nao foi possivel pre-preencher o horario padrao. Configure em \"Horarios\".");
+      if (!profileQuery.data?.businessHours.length) {
+        // Sem expediente da empresa, mantemos o fallback historico para o
+        // primeiro cadastro continuar pronto para agendar.
+        try {
+          await setResourceWorkingHours(result.id, DEFAULT_WORKING_HOURS, accessToken);
+        } catch {
+          toast.error("Recurso cadastrado, mas nao foi possivel pre-preencher o horario padrao. Configure em \"Horarios\".");
+        }
       }
       toast.success("Recurso cadastrado.");
       invalidateList();
@@ -460,7 +456,7 @@ export default function ResourcesPage() {
       const details = await getResourceById(resource.id, accessToken);
       setHoursResource(resource);
       hoursForm.reset({
-        entries: details.workingHours.map((entry) => ({
+        entries: (details.inheritsBusinessHours ? [] : details.workingHours).map((entry) => ({
           dayOfWeek: entry.dayOfWeek,
           startTime: toTimeInputValue(entry.startTime),
           endTime: toTimeInputValue(entry.endTime),
@@ -948,7 +944,12 @@ export default function ResourcesPage() {
               className="flex flex-col gap-3"
             >
               {hoursFieldArray.fields.length === 0 && (
-                <p className="text-muted-foreground text-sm">Nenhum horario cadastrado ainda.</p>
+                <div className="border-primary/20 bg-primary/5 rounded-lg border p-3 text-sm">
+                  <p className="font-medium">Usando o horário da empresa</p>
+                  <p className="text-muted-foreground mt-1">
+                    O profissional acompanha automaticamente o expediente configurado em Marca. Adicione um horário abaixo somente se ele trabalhar em uma jornada diferente.
+                  </p>
+                </div>
               )}
               {hoursFieldArray.fields.map((field, index) => (
                 <div key={field.id} className="flex items-end gap-2">

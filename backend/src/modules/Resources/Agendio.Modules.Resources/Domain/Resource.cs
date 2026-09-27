@@ -35,6 +35,12 @@ public sealed class Resource : AggregateRoot<ResourceId>, ITenantOwned, IAuditab
 
     public bool IsActive { get; private set; }
 
+    /// <summary>
+    /// Quando verdadeiro, a agenda usa o horario da unidade/empresa. Uma lista
+    /// propria so existe quando o dono decide criar uma excecao para este recurso.
+    /// </summary>
+    public bool InheritsBusinessHours { get; private set; }
+
     public IReadOnlyCollection<WorkingHoursEntry> WorkingHours => _workingHours;
 
     /// <summary>Tags livres (ex.: "Corte", "Coloracao") — usadas para o cliente entender o que o profissional faz. So faz sentido para Type == Person, mas nao e validado.</summary>
@@ -75,6 +81,7 @@ public sealed class Resource : AggregateRoot<ResourceId>, ITenantOwned, IAuditab
         Description = description;
         UnitId = unitId;
         IsActive = true;
+        InheritsBusinessHours = true;
     }
 
     public static Result<Resource> Create(
@@ -175,6 +182,7 @@ public sealed class Resource : AggregateRoot<ResourceId>, ITenantOwned, IAuditab
 
         _workingHours.Clear();
         _workingHours.AddRange(parsedEntries);
+        InheritsBusinessHours = entries.Count == 0;
 
         return Result.Success();
     }
