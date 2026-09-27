@@ -85,4 +85,37 @@ public class ResourceTests
 
         resource.ServiceIds.ShouldBeEmpty();
     }
+
+    [Fact]
+    public void New_Resource_Should_Inherit_Business_Hours()
+    {
+        var resource = CreateResource();
+
+        resource.InheritsBusinessHours.ShouldBeTrue();
+        resource.WorkingHours.ShouldBeEmpty();
+    }
+
+    [Fact]
+    public void SetWorkingHours_Should_Create_A_Custom_Schedule()
+    {
+        var resource = CreateResource();
+
+        var result = resource.SetWorkingHours([(DayOfWeek.Monday, new TimeOnly(7, 0), new TimeOnly(16, 0))]);
+
+        result.IsSuccess.ShouldBeTrue();
+        resource.InheritsBusinessHours.ShouldBeFalse();
+    }
+
+    [Fact]
+    public void SetWorkingHours_With_Empty_List_Should_Restore_Business_Hours_Inheritance()
+    {
+        var resource = CreateResource();
+        resource.SetWorkingHours([(DayOfWeek.Monday, new TimeOnly(7, 0), new TimeOnly(16, 0))]);
+
+        var result = resource.SetWorkingHours([]);
+
+        result.IsSuccess.ShouldBeTrue();
+        resource.InheritsBusinessHours.ShouldBeTrue();
+        resource.WorkingHours.ShouldBeEmpty();
+    }
 }

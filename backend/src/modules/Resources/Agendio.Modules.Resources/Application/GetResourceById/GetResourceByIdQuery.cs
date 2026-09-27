@@ -18,4 +18,5 @@ public sealed record ResourceDetails(
     string? PhotoUrl,
     IReadOnlyList<string> Specialties,
     IReadOnlyList<Guid> ServiceIds,
+    bool InheritsBusinessHours,
     IReadOnlyList<WorkingHourEntryDetails> WorkingHours);

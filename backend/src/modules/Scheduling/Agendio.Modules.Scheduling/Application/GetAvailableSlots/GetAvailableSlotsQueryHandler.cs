@@ -78,7 +78,8 @@ public sealed class GetAvailableSlotsQueryHandler(
             return Result.Failure<IReadOnlyList<AvailableSlot>>(Error.Failure("Availability.InvalidTimeZone", "Fuso horario do estabelecimento invalido."));
         }
 
-        var effectiveWindows = ComputeEffectiveWindows(resource.WorkingHours, tenant.BusinessHours, request.Date.DayOfWeek);
+        var effectiveWindows = ComputeEffectiveWindows(
+            resource.WorkingHours, tenant.BusinessHours, request.Date.DayOfWeek, resource.InheritsBusinessHours);
         if (effectiveWindows.Count == 0)
         {
             return Result.Success(NoSlots);
@@ -139,17 +140,35 @@ public sealed class GetAvailableSlotsQueryHandler(
     }
 
     /// <summary>
-    /// Intersecta o horario do recurso com o horario de funcionamento do
-    /// estabelecimento para o dia pedido. Sem BusinessHours configurado
-    /// (lista vazia — nunca preenchida pelo dono), nao restringe nada, so o
-    /// horario do recurso vale (zero-config: Fase 1 tornou isso opcional).
-    /// Com BusinessHours configurado mas sem entrada para o dia pedido, o
-    /// estabelecimento esta fechado nesse dia, mesmo que o recurso tenha
-    /// horario configurado.
+    /// Recursos sem jornada personalizada herdam diretamente o expediente da
+    /// unidade/empresa. Quando existe uma jornada propria, intersecta as duas
+    /// janelas; assim uma excecao do profissional nunca abre o estabelecimento
+    /// fora do horario configurado.
     /// </summary>
     private static List<(TimeOnly Start, TimeOnly End)> ComputeEffectiveWindows(
-        IReadOnlyList<WorkingHourLookup> resourceWorkingHours, IReadOnlyList<BusinessHoursLookup> tenantBusinessHours, DayOfWeek dayOfWeek)
+        IReadOnlyList<WorkingHourLookup> resourceWorkingHours, IReadOnlyList<BusinessHoursLookup> tenantBusinessHours,
+        DayOfWeek dayOfWeek, bool inheritsBusinessHours)
     {
+        if (inheritsBusinessHours)
+        {
+            if (tenantBusinessHours.Count > 0)
+            {
+                return tenantBusinessHours
+                    .Where(b => b.DayOfWeek == dayOfWeek)
+                    .OrderBy(b => b.StartTime)
+                    .Select(b => (b.StartTime, b.EndTime))
+                    .ToList();
+            }
+
+            // Compatibilidade para cadastros antigos que receberam a escala
+            // automatica antes de a empresa configurar seu expediente.
+            return resourceWorkingHours
+                .Where(w => w.DayOfWeek == dayOfWeek)
+                .OrderBy(w => w.StartTime)
+                .Select(w => (w.StartTime, w.EndTime))
+                .ToList();
+        }
+
         var resourceWindows = resourceWorkingHours.Where(w => w.DayOfWeek == dayOfWeek).OrderBy(w => w.StartTime).ToList();
         if (resourceWindows.Count == 0)
         {

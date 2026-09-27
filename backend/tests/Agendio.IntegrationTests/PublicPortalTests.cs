@@ -247,6 +247,28 @@ public class PublicPortalTests(IntegrationTestFixture fixture)
     }
 
     [Fact]
+    public async Task Availability_Should_Inherit_Tenant_Business_Hours_When_Resource_Has_No_Custom_Schedule()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var client = fixture.CreateClient();
+        var (tenantId, accessToken) = await CreateTenantWithOwnerAndLoginAsync(client, cancellationToken);
+        var (resourceId, serviceId) = await SetUpBookableResourceAndServiceAsync(client, accessToken, cancellationToken);
+
+        var targetDate = DateOnly.FromDateTime(DateTime.UtcNow.AddDays(20));
+        var businessHoursResponse = await AuthorizedRequestHelpers.PutAuthorizedAsync(
+            client, accessToken, "/api/tenants/business-hours",
+            new { entries = new[] { new { dayOfWeek = targetDate.DayOfWeek.ToString(), startTime = "07:00:00", endTime = "10:00:00" } } },
+            cancellationToken);
+        businessHoursResponse.StatusCode.ShouldBe(HttpStatusCode.NoContent);
+
+        var slots = await GetAvailableSlotsAsync(client, tenantId, resourceId, serviceId, targetDate, cancellationToken);
+        var timeZone = TimeZoneInfo.FindSystemTimeZoneById("America/Sao_Paulo");
+
+        slots.ShouldNotBeEmpty();
+        TimeZoneInfo.ConvertTime(slots[0], timeZone).TimeOfDay.ShouldBe(new TimeSpan(7, 0, 0));
+    }
+
+    [Fact]
     public async Task Availability_Is_Empty_When_Tenant_Business_Hours_Configured_But_Missing_For_That_Day()
     {
         var cancellationToken = TestContext.Current.CancellationToken;

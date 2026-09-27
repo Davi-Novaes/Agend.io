@@ -963,6 +963,7 @@ export type ResourceSummary = {
 
 export type ResourceDetails = ResourceSummary & {
   serviceIds: string[];
+  inheritsBusinessHours: boolean;
   workingHours: WorkingHourEntry[];
 };
 
