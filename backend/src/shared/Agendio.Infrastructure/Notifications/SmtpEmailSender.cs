@@ -11,11 +11,13 @@ public sealed class SmtpEmailSender(IOptions<SmtpOptions> options) : IEmailSende
 
     public async Task SendAsync(string toAddress, string subject, string htmlBody, CancellationToken cancellationToken = default)
     {
+        var standardHtml = StandardEmailLayout.Render(subject, htmlBody);
+        var plainText = StandardEmailLayout.ToPlainText(subject, htmlBody);
         var message = new MimeMessage();
         message.From.Add(new MailboxAddress(_options.FromName, _options.FromAddress));
         message.To.Add(MailboxAddress.Parse(toAddress));
         message.Subject = subject;
-        message.Body = new BodyBuilder { HtmlBody = htmlBody }.ToMessageBody();
+        message.Body = new BodyBuilder { HtmlBody = standardHtml, TextBody = plainText }.ToMessageBody();
 
         using var client = new SmtpClient();
         await client.ConnectAsync(_options.Host, _options.Port, SecureSocketOptions.Auto, cancellationToken);
