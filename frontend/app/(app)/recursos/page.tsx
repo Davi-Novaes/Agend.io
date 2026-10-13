@@ -962,7 +962,7 @@ export default function ResourcesPage() {
                         <Select value={dayField.value} onValueChange={dayField.onChange}>
                           <FormControl>
                             <SelectTrigger className="w-full">
-                              <SelectValue />
+                              <SelectValue>{DAY_OPTIONS.find((day) => day.value === dayField.value)?.label}</SelectValue>
                             </SelectTrigger>
                           </FormControl>
                           <SelectContent>

@@ -11,6 +11,9 @@ public class StandardEmailLayoutTests
 
         html.ShouldContain("<!doctype html>");
         html.ShouldContain("agendio<span style=\"color:#6547f5;\">BR</span>");
+        html.ShouldContain($"src=\"{StandardEmailLayout.LogoUrl}\"");
+        html.ShouldContain("alt=\"Logo do AgendioBR\"");
+        html.ShouldNotContain(">A</td>");
         html.ShouldContain("class=\"email-card\"");
         html.ShouldContain("@media only screen and (max-width: 620px)");
         html.ShouldContain("<p>Olá!</p>");

@@ -1,5 +1,5 @@
 import type { LucideIcon } from "lucide-react";
-import { CalendarCheck, CheckCircle2, Clock, PlayCircle, Wallet } from "lucide-react";
+import { CalendarCheck, CheckCheck, CheckCircle2, Clock, PlayCircle, Wallet } from "lucide-react";
 
 import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -19,11 +19,12 @@ const TONES = {
   success: "bg-success/15 text-success shadow-[0_0_14px_-3px_color-mix(in_oklch,var(--success),transparent_55%)]",
   warning: "bg-warning/15 text-warning shadow-[0_0_14px_-3px_color-mix(in_oklch,var(--warning),transparent_55%)]",
   info: "bg-info/15 text-info shadow-[0_0_14px_-3px_color-mix(in_oklch,var(--info),transparent_55%)]",
+  completed: "bg-orange-500/15 text-orange-600 shadow-[0_0_14px_-3px_rgba(249,115,22,0.45)] dark:text-orange-400",
   destructive:
     "bg-destructive/15 text-destructive shadow-[0_0_14px_-3px_color-mix(in_oklch,var(--destructive),transparent_55%)]",
 } as const;
 
-/** Compacto de proposito: sao 5 lado a lado, precisam caber sem esmagar. */
+/** Compacto de proposito: sao 6 lado a lado, precisam caber sem esmagar. */
 function KpiCard({
   icon: Icon,
   title,
@@ -74,6 +75,7 @@ export function AgendaKpiRow({
   const confirmed = items.filter((a) => a.status === "Confirmed").length;
   const pending = items.filter((a) => a.status === "Scheduled").length;
   const inProgress = items.filter((a) => a.status === "InProgress").length;
+  const completed = items.filter((a) => a.status === "Completed").length;
   const estimatedRevenue = items
     .filter((a) => a.status !== "CancelledByCustomer" && a.status !== "CancelledByStaff" && a.status !== "NoShow")
     .reduce((sum, a) => sum + a.price, 0);
@@ -81,11 +83,12 @@ export function AgendaKpiRow({
   const share = (count: number) => (total > 0 ? `${Math.round((count / total) * 100)}%` : "—");
 
   return (
-    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
+    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
       <KpiCard icon={CalendarCheck} title="Agendamentos" value={String(total)} hint="Hoje" tone="primary" isLoading={isLoading} />
       <KpiCard icon={CheckCircle2} title="Confirmados" value={String(confirmed)} hint={share(confirmed)} tone="success" isLoading={isLoading} />
       <KpiCard icon={Clock} title="Pendentes" value={String(pending)} hint={share(pending)} tone="warning" isLoading={isLoading} />
       <KpiCard icon={PlayCircle} title="Em atendimento" value={String(inProgress)} hint={share(inProgress)} tone="info" isLoading={isLoading} />
+      <KpiCard icon={CheckCheck} title="Concluídos" value={String(completed)} hint={share(completed)} tone="completed" isLoading={isLoading} />
       <KpiCard
         icon={Wallet}
         title="Faturamento estimado"

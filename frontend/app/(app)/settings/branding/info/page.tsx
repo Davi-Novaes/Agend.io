@@ -20,6 +20,7 @@ import {
 } from "@/lib/api/client";
 import { useSession } from "@/lib/auth/session-context";
 import { useBrandingDraft } from "@/components/settings/branding/branding-draft-context";
+import { formatPhoneDisplay } from "@/lib/format/br-masks";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -139,8 +140,8 @@ function InfoForms({
     resolver: zodResolver(profileSchema),
     defaultValues: {
       description: profile.description ?? "",
-      phone: profile.phone ?? "",
-      whatsApp: profile.whatsApp ?? "",
+      phone: profile.phone ? formatPhoneDisplay(profile.phone) : "",
+      whatsApp: profile.whatsApp ? formatPhoneDisplay(profile.whatsApp) : "",
       email: profile.email ?? "",
       address: profile.address ?? "",
       instagramUrl: profile.instagramUrl ?? "",
@@ -256,7 +257,14 @@ function InfoForms({
                     <FormItem className="gap-1.5">
                       <FormLabel className={FIELD_LABEL_CLASS}>Telefone</FormLabel>
                       <FormControl>
-                        <Input placeholder="(11) 99999-8888" className={FIELD_VALUE_CLASS} {...field} />
+                        <Input
+                          placeholder="(11) 99999-8888"
+                          inputMode="tel"
+                          autoComplete="tel"
+                          className={FIELD_VALUE_CLASS}
+                          {...field}
+                          onChange={(event) => field.onChange(formatPhoneDisplay(event.target.value))}
+                        />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -269,7 +277,14 @@ function InfoForms({
                     <FormItem className="gap-1.5">
                       <FormLabel className={FIELD_LABEL_CLASS}>WhatsApp</FormLabel>
                       <FormControl>
-                        <Input placeholder="(11) 99999-8888" className={FIELD_VALUE_CLASS} {...field} />
+                        <Input
+                          placeholder="(11) 99999-8888"
+                          inputMode="tel"
+                          autoComplete="tel"
+                          className={FIELD_VALUE_CLASS}
+                          {...field}
+                          onChange={(event) => field.onChange(formatPhoneDisplay(event.target.value))}
+                        />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -358,7 +373,7 @@ function InfoForms({
                         <Select value={dayField.value} onValueChange={dayField.onChange}>
                           <FormControl>
                             <SelectTrigger className={`w-full ${FIELD_VALUE_CLASS}`}>
-                              <SelectValue />
+                              <SelectValue>{DAY_OPTIONS.find((day) => day.value === dayField.value)?.label}</SelectValue>
                             </SelectTrigger>
                           </FormControl>
                           <SelectContent>

@@ -10,6 +10,8 @@ namespace Agendio.Infrastructure.Notifications;
 /// </summary>
 public static partial class StandardEmailLayout
 {
+    public const string LogoUrl = "https://agendiobr.com.br/logo.png";
+
     public static string Render(string subject, string contentHtml)
     {
         var safeSubject = WebUtility.HtmlEncode(subject);
@@ -47,7 +49,9 @@ public static partial class StandardEmailLayout
                         <td style="padding:0 4px 20px;">
                           <table role="presentation" cellspacing="0" cellpadding="0" border="0">
                             <tr>
-                              <td width="42" height="42" align="center" valign="middle" style="width:42px; height:42px; border-radius:12px; background:#6547f5; color:#ffffff; font-size:22px; font-weight:800; line-height:42px;">A</td>
+                              <td width="50" height="50" align="center" valign="middle" style="width:50px; height:50px;">
+                                <img src="{{LogoUrl}}" width="50" height="50" alt="Logo do AgendioBR" style="display:block; width:50px; height:50px; border:0; object-fit:contain;">
+                              </td>
                               <td style="padding-left:12px;">
                                 <div style="font-size:20px; line-height:24px; font-weight:800; letter-spacing:-0.4px; color:#171721;">agendio<span style="color:#6547f5;">BR</span></div>
                                 <div style="font-size:11px; line-height:15px; color:#77778a;">Seu negócio organizado</div>
