@@ -90,6 +90,61 @@ public class TenantLogoTests(IntegrationTestFixture fixture)
         response.StatusCode.ShouldBe(HttpStatusCode.Unauthorized);
     }
 
+    [Fact]
+    public async Task Owner_Can_Remove_The_Logo_So_The_Public_Page_Falls_Back_To_The_Brand_Color()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var client = fixture.CreateClient();
+        var (_, slug, accessToken) = await CreateTenantWithOwnerAndLoginAsync(client, cancellationToken);
+        (await UploadLogoAsync(client, accessToken, TinyPng, "image/png", cancellationToken)).EnsureSuccessStatusCode();
+
+        var removeResponse = await RemoveLogoAsync(client, accessToken, cancellationToken);
+
+        removeResponse.StatusCode.ShouldBe(HttpStatusCode.NoContent);
+        (await GetPublicLogoUrlAsync(client, slug, cancellationToken)).ShouldBeNull();
+    }
+
+    [Fact]
+    public async Task Removing_A_Logo_Should_Not_Affect_Another_Tenant()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var client = fixture.CreateClient();
+        var (_, slugA, accessTokenA) = await CreateTenantWithOwnerAndLoginAsync(client, cancellationToken);
+        var (_, slugB, accessTokenB) = await CreateTenantWithOwnerAndLoginAsync(client, cancellationToken);
+        (await UploadLogoAsync(client, accessTokenA, TinyPng, "image/png", cancellationToken)).EnsureSuccessStatusCode();
+        (await UploadLogoAsync(client, accessTokenB, TinyPng, "image/png", cancellationToken)).EnsureSuccessStatusCode();
+
+        (await RemoveLogoAsync(client, accessTokenA, cancellationToken)).EnsureSuccessStatusCode();
+
+        (await GetPublicLogoUrlAsync(client, slugA, cancellationToken)).ShouldBeNull();
+        (await GetPublicLogoUrlAsync(client, slugB, cancellationToken)).ShouldNotBeNull();
+    }
+
+    [Fact]
+    public async Task Anonymous_Request_To_Remove_Logo_Should_Be_Unauthorized()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var client = fixture.CreateClient();
+
+        var response = await client.DeleteAsync("/api/tenants/logo", cancellationToken);
+
+        response.StatusCode.ShouldBe(HttpStatusCode.Unauthorized);
+    }
+
+    private static async Task<HttpResponseMessage> RemoveLogoAsync(
+        HttpClient client, string accessToken, CancellationToken cancellationToken)
+    {
+        var request = new HttpRequestMessage(HttpMethod.Delete, "/api/tenants/logo");
+        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", accessToken);
+        return await client.SendAsync(request, cancellationToken);
+    }
+
+    private static async Task<string?> GetPublicLogoUrlAsync(HttpClient client, string slug, CancellationToken cancellationToken)
+    {
+        var body = await client.GetFromJsonAsync<JsonElement>($"/api/tenants/by-slug/{slug}", cancellationToken);
+        return body.TryGetProperty("logoUrl", out var value) && value.ValueKind == JsonValueKind.String ? value.GetString() : null;
+    }
+
     private static async Task<HttpResponseMessage> UploadLogoAsync(
         HttpClient client, string accessToken, byte[] fileBytes, string contentType, CancellationToken cancellationToken)
     {

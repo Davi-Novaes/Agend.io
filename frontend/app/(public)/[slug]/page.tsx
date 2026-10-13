@@ -3,7 +3,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Inter, Lora, Merriweather, Montserrat, Playfair_Display, Poppins } from "next/font/google";
-import { ArrowRight, Building2, CalendarCheck, Camera, CheckCircle2, Clock3, ExternalLink, MapPin, MessageCircle, Phone, ShieldCheck, Sparkles, Star, User } from "lucide-react";
+import { ArrowRight, Building2, CalendarCheck, CheckCircle2, Clock3, ExternalLink, MapPin, MessageCircle, Phone, ShieldCheck, Sparkles, Star, User } from "lucide-react";
 
 import { getTenantBySlug, publicListServices, publicListResources, resolveAssetUrl, ApiError, type TenantPublicProfile, type PublicServiceSummary, type PublicResourceSummary, type PublicPageFont, type PublicPageButtonStyle, type WorkingHourEntry } from "@/lib/api/client";
 import { TenantThemeProvider } from "@/lib/tenant/tenant-theme-provider";
@@ -16,6 +16,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { formatPhoneDisplay } from "@/lib/format/br-masks";
 
 type PageProps = {
   params: Promise<{ slug: string }>;
@@ -149,6 +150,24 @@ function whatsAppLink(whatsApp: string): string {
   return `https://wa.me/${digits}?text=${encodeURIComponent("Olá! Vim pelo site e gostaria de agendar um horário.")}`;
 }
 
+function TenantMonogram({ name, className }: { name: string; className?: string }) {
+  return (
+    <span aria-hidden className={`flex shrink-0 items-center justify-center font-bold ${className ?? ""}`}>
+      {name.trim().charAt(0).toUpperCase() || "A"}
+    </span>
+  );
+}
+
+function InstagramMark({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className} aria-hidden="true">
+      <rect width="18" height="18" x="3" y="3" rx="5" />
+      <circle cx="12" cy="12" r="4" />
+      <circle cx="17.5" cy="6.5" r="1" fill="currentColor" stroke="none" />
+    </svg>
+  );
+}
+
 function SectionHeading({ eyebrow, title, description }: { eyebrow: string; title: string; description?: string }) {
   return (
     <div className="mx-auto max-w-2xl text-center">
@@ -204,7 +223,7 @@ export default async function TenantPortalPage({ params, searchParams }: PagePro
               {tenant.logoUrl ? (
                 <Image src={resolveAssetUrl(tenant.logoUrl)} alt="" width={36} height={36} className="size-9 rounded-xl bg-card object-contain p-0.5 ring-1 ring-border" unoptimized />
               ) : (
-                <span className="bg-primary text-primary-foreground flex size-9 items-center justify-center rounded-xl"><Sparkles className="size-4" /></span>
+                <TenantMonogram name={tenant.name} className="bg-primary text-primary-foreground size-9 rounded-xl text-base" />
               )}
               <span className="truncate font-semibold tracking-tight">{tenant.name}</span>
             </Link>
@@ -232,17 +251,12 @@ export default async function TenantPortalPage({ params, searchParams }: PagePro
             {tenant.bannerUrl && (
               <><Image src={resolveAssetUrl(tenant.bannerUrl)} alt="" fill sizes="100vw" className="object-cover" unoptimized priority /><div aria-hidden className="absolute inset-0 bg-gradient-to-r from-black/85 via-black/60 to-black/25" /></>
             )}
-            {!tenant.bannerUrl && (
-              <div aria-hidden className="absolute inset-0 overflow-hidden">
-                <div className="absolute -top-32 -right-20 size-96 rounded-full bg-white/10 blur-3xl" />
-                <div className="absolute -bottom-40 left-1/4 size-96 rounded-full bg-black/15 blur-3xl" />
-                <div className="absolute inset-0 opacity-15 [background-image:linear-gradient(115deg,transparent_0%,transparent_49%,white_50%,transparent_51%,transparent_100%)] [background-size:76px_76px]" />
-              </div>
-            )}
             <div className="relative mx-auto grid min-h-[540px] w-full max-w-6xl items-center px-4 py-20 sm:px-6 lg:grid-cols-[1fr_360px] lg:gap-16 lg:py-24">
               <div className="max-w-3xl text-white">
                 <div className="mb-6 flex items-center gap-3">
-                  {tenant.logoUrl && <Image src={resolveAssetUrl(tenant.logoUrl)} alt={`Logo de ${tenant.name}`} width={64} height={64} className="size-16 rounded-2xl bg-white object-contain p-1.5 shadow-xl" unoptimized />}
+                  {tenant.logoUrl
+                    ? <Image src={resolveAssetUrl(tenant.logoUrl)} alt={`Logo de ${tenant.name}`} width={64} height={64} className="size-16 rounded-2xl bg-white object-contain p-1.5 shadow-xl" unoptimized />
+                    : <TenantMonogram name={tenant.name} className="size-16 rounded-2xl bg-white text-2xl text-primary shadow-xl" />}
                   <div><p className="text-sm font-semibold text-white/90">{tenant.name}</p><p className="mt-0.5 flex items-center gap-1.5 text-xs text-white/70"><CheckCircle2 className="size-3.5" /> Agendamento online</p></div>
                 </div>
                 <h1 className="max-w-3xl text-4xl leading-[1.08] font-bold tracking-tight text-balance drop-shadow-sm sm:text-5xl lg:text-6xl">{tenant.homeHeroTitle || "Seu próximo horário começa aqui."}</h1>
@@ -320,7 +334,7 @@ export default async function TenantPortalPage({ params, searchParams }: PagePro
                           <div className="flex items-center gap-3 border-b bg-primary/5 p-5"><span className="flex size-10 items-center justify-center rounded-xl bg-primary text-primary-foreground"><Building2 className="size-5" /></span><div><h3 className="font-semibold">{unit.name}</h3><p className="text-xs text-muted-foreground">Local de atendimento</p></div></div>
                           <div className="flex flex-1 flex-col gap-3 p-5 text-sm">
                             {(unit.address || unit.city) ? <p className="flex items-start gap-2"><MapPin className="mt-0.5 size-4 shrink-0 text-primary" /><span>{[unit.address, unit.city, unit.state].filter(Boolean).join(" · ")}</span></p> : <p className="text-muted-foreground">Endereço disponível durante o agendamento.</p>}
-                            {unit.phone && <a href={`tel:${unit.phone}`} className="flex items-center gap-2 text-muted-foreground hover:text-foreground"><Phone className="size-4" />{unit.phone}</a>}
+                            {unit.phone && <a href={`tel:${unit.phone}`} className="flex items-center gap-2 text-muted-foreground hover:text-foreground"><Phone className="size-4" />{formatPhoneDisplay(unit.phone)}</a>}
                             {unit.whatsApp && <a href={whatsAppLink(unit.whatsApp)} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 text-muted-foreground hover:text-foreground"><MessageCircle className="size-4" />WhatsApp</a>}
                             {hours.length > 0 && <p className="mt-auto flex items-center gap-2 border-t pt-3 text-xs text-muted-foreground"><Clock3 className="size-3.5" />Horários próprios disponíveis</p>}
                           </div>
@@ -360,10 +374,10 @@ export default async function TenantPortalPage({ params, searchParams }: PagePro
 
         <footer className="border-t bg-card">
           <div className="mx-auto grid w-full max-w-6xl gap-8 px-4 py-12 sm:px-6 md:grid-cols-[1fr_auto] md:items-end">
-            <div><div className="flex items-center gap-3">{tenant.logoUrl ? <Image src={resolveAssetUrl(tenant.logoUrl)} alt="" width={42} height={42} className="size-10 rounded-xl object-contain ring-1 ring-border" unoptimized /> : <span className="bg-primary text-primary-foreground flex size-10 items-center justify-center rounded-xl"><Sparkles className="size-4" /></span>}<div><p className="font-semibold">{tenant.name}</p><p className="text-muted-foreground text-xs">Agendamento online fácil e seguro</p></div></div>
-              {customization.showContactSection && hasContactInfo && <div className="text-muted-foreground mt-6 flex flex-wrap gap-x-5 gap-y-3 text-sm">{tenant.address && <span className="flex items-center gap-1.5"><MapPin className="size-4" />{tenant.address}</span>}{tenant.phone && <a className="hover:text-foreground flex items-center gap-1.5" href={`tel:${tenant.phone}`}><Phone className="size-4" />{tenant.phone}</a>}{tenant.whatsApp && <a className="hover:text-foreground flex items-center gap-1.5" href={whatsAppLink(tenant.whatsApp)} target="_blank" rel="noopener noreferrer"><MessageCircle className="size-4" />WhatsApp</a>}</div>}
+            <div><div className="flex items-center gap-3">{tenant.logoUrl ? <Image src={resolveAssetUrl(tenant.logoUrl)} alt="" width={42} height={42} className="size-10 rounded-xl object-contain ring-1 ring-border" unoptimized /> : <TenantMonogram name={tenant.name} className="bg-primary text-primary-foreground size-10 rounded-xl text-base" />}<div><p className="font-semibold">{tenant.name}</p><p className="text-muted-foreground text-xs">Agendamento online fácil e seguro</p></div></div>
+              {customization.showContactSection && hasContactInfo && <div className="text-muted-foreground mt-6 flex flex-wrap gap-x-5 gap-y-3 text-sm">{tenant.address && <span className="flex items-center gap-1.5"><MapPin className="size-4" />{tenant.address}</span>}{tenant.phone && <a className="hover:text-foreground flex items-center gap-1.5" href={`tel:${tenant.phone}`}><Phone className="size-4" />{formatPhoneDisplay(tenant.phone)}</a>}{tenant.whatsApp && <a className="hover:text-foreground flex items-center gap-1.5" href={whatsAppLink(tenant.whatsApp)} target="_blank" rel="noopener noreferrer"><MessageCircle className="size-4" />WhatsApp</a>}</div>}
             </div>
-            {customization.showContactSection && (tenant.instagramUrl || tenant.facebookUrl) && <div className="flex gap-2">{tenant.instagramUrl && <Button variant="outline" size="icon" aria-label="Instagram" asChild><a href={tenant.instagramUrl} target="_blank" rel="noopener noreferrer"><Camera className="size-4" /></a></Button>}{tenant.facebookUrl && <Button variant="outline" size="sm" asChild><a href={tenant.facebookUrl} target="_blank" rel="noopener noreferrer">Facebook <ExternalLink className="size-3.5" /></a></Button>}</div>}
+            {customization.showContactSection && (tenant.instagramUrl || tenant.facebookUrl) && <div className="flex flex-wrap gap-2">{tenant.instagramUrl && <Button variant="outline" size="sm" asChild><a href={tenant.instagramUrl} target="_blank" rel="noopener noreferrer" aria-label="Abrir Instagram"><InstagramMark className="size-4" />Instagram <ExternalLink className="size-3.5" /></a></Button>}{tenant.facebookUrl && <Button variant="outline" size="sm" asChild><a href={tenant.facebookUrl} target="_blank" rel="noopener noreferrer">Facebook <ExternalLink className="size-3.5" /></a></Button>}</div>}
           </div>
           <div className="border-t px-4 py-4 text-center text-xs text-muted-foreground">Agendamento online por AgendioBR</div>
         </footer>

@@ -336,6 +336,10 @@ public sealed class Tenant : AggregateRoot<TenantId>, IAuditable, ISoftDeletable
         return Result.Success();
     }
 
+    public void RemoveLogo() => LogoUrl = null;
+
+    public void RemoveBanner() => BannerUrl = null;
+
     public Result UpdateProfile(
         string? description, string? phone, string? whatsApp, string? email, string? address, string? instagramUrl, string? facebookUrl)
     {

@@ -1,3 +1,4 @@
+using System.Security.Cryptography;
 using Agendio.Infrastructure.Storage;
 using Agendio.Modules.Tenancy.Infrastructure.Persistence;
 using Agendio.SharedKernel.Messaging;
@@ -19,13 +20,15 @@ public sealed class UpdateTenantBannerCommandHandler(
             return Result.Failure<string>(Error.NotFound("Tenant.NotFound", "Estabelecimento nao encontrado."));
         }
 
-        // Nome fixo por tenant (nao por upload): reenviar SUBSTITUI o banner
-        // anterior em vez de acumular arquivo orfao a cada troca.
+        // O arquivo continua fixo para nao acumular lixo, mas a URL recebe um
+        // hash do conteudo. Assim navegador, Next e CDN buscam a imagem nova.
         var extension = ImageContentTypes.ExtensionByContentType[request.ContentType];
         var relativePath = $"tenant-banners/{tenantContext.TenantId.Value}{extension}";
 
         using var contentStream = new MemoryStream(request.Content);
-        var bannerUrl = await fileStorage.SaveAsync(relativePath, contentStream, cancellationToken);
+        var storedUrl = await fileStorage.SaveAsync(relativePath, contentStream, cancellationToken);
+        var contentVersion = Convert.ToHexString(SHA256.HashData(request.Content))[..12].ToLowerInvariant();
+        var bannerUrl = $"{storedUrl}?v={contentVersion}";
 
         var setResult = tenant.SetBanner(bannerUrl);
         if (setResult.IsFailure)

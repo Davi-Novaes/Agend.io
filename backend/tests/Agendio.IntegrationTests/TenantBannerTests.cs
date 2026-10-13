@@ -25,6 +25,9 @@ public class TenantBannerTests(IntegrationTestFixture fixture)
         0x42, 0x60, 0x82,
     ];
 
+    private static readonly byte[] TinyPngVariant = Convert.FromBase64String(
+        "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9Y9ZQmcAAAAASUVORK5CYII=");
+
     [Fact]
     public async Task Owner_Can_Upload_A_Banner_And_Then_Fetch_It_Back_From_The_Public_Profile()
     {
@@ -63,6 +66,34 @@ public class TenantBannerTests(IntegrationTestFixture fixture)
     }
 
     [Fact]
+    public async Task Replacing_A_Banner_Should_Change_Its_Versioned_Url_And_Public_Profile()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var client = fixture.CreateClient();
+        var (_, slug, accessToken) = await CreateTenantWithOwnerAndLoginAsync(client, cancellationToken);
+
+        var firstResponse = await UploadBannerAsync(client, accessToken, TinyPng, "image/png", cancellationToken);
+        var firstUrl = (await firstResponse.Content.ReadFromJsonAsync<JsonElement>(cancellationToken))
+            .GetProperty("bannerUrl").GetString()!;
+
+        var secondResponse = await UploadBannerAsync(client, accessToken, TinyPngVariant, "image/png", cancellationToken);
+        var secondUrl = (await secondResponse.Content.ReadFromJsonAsync<JsonElement>(cancellationToken))
+            .GetProperty("bannerUrl").GetString()!;
+
+        secondUrl.ShouldNotBe(firstUrl);
+        secondUrl.Split('?')[0].ShouldBe(firstUrl.Split('?')[0]);
+        secondUrl.ShouldContain("?v=");
+
+        var tenantResponse = await client.GetAsync($"/api/tenants/by-slug/{slug}", cancellationToken);
+        var tenantBody = await tenantResponse.Content.ReadFromJsonAsync<JsonElement>(cancellationToken);
+        tenantBody.GetProperty("bannerUrl").GetString().ShouldBe(secondUrl);
+
+        var fileResponse = await client.GetAsync(secondUrl, cancellationToken);
+        fileResponse.StatusCode.ShouldBe(HttpStatusCode.OK);
+        (await fileResponse.Content.ReadAsByteArrayAsync(cancellationToken)).ShouldBe(TinyPngVariant);
+    }
+
+    [Fact]
     public async Task Uploading_A_Non_Image_Banner_Should_Be_Rejected()
     {
         var cancellationToken = TestContext.Current.CancellationToken;
@@ -88,6 +119,61 @@ public class TenantBannerTests(IntegrationTestFixture fixture)
         var response = await client.PostAsync("/api/tenants/banner", content, cancellationToken);
 
         response.StatusCode.ShouldBe(HttpStatusCode.Unauthorized);
+    }
+
+    [Fact]
+    public async Task Owner_Can_Remove_The_Banner_So_The_Public_Page_Falls_Back_To_The_Brand_Color()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var client = fixture.CreateClient();
+        var (_, slug, accessToken) = await CreateTenantWithOwnerAndLoginAsync(client, cancellationToken);
+        (await UploadBannerAsync(client, accessToken, TinyPng, "image/png", cancellationToken)).EnsureSuccessStatusCode();
+
+        var removeResponse = await RemoveBannerAsync(client, accessToken, cancellationToken);
+
+        removeResponse.StatusCode.ShouldBe(HttpStatusCode.NoContent);
+        (await GetPublicBannerUrlAsync(client, slug, cancellationToken)).ShouldBeNull();
+    }
+
+    [Fact]
+    public async Task Removing_A_Banner_Should_Not_Affect_Another_Tenant()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var client = fixture.CreateClient();
+        var (_, slugA, accessTokenA) = await CreateTenantWithOwnerAndLoginAsync(client, cancellationToken);
+        var (_, slugB, accessTokenB) = await CreateTenantWithOwnerAndLoginAsync(client, cancellationToken);
+        (await UploadBannerAsync(client, accessTokenA, TinyPng, "image/png", cancellationToken)).EnsureSuccessStatusCode();
+        (await UploadBannerAsync(client, accessTokenB, TinyPng, "image/png", cancellationToken)).EnsureSuccessStatusCode();
+
+        (await RemoveBannerAsync(client, accessTokenA, cancellationToken)).EnsureSuccessStatusCode();
+
+        (await GetPublicBannerUrlAsync(client, slugA, cancellationToken)).ShouldBeNull();
+        (await GetPublicBannerUrlAsync(client, slugB, cancellationToken)).ShouldNotBeNull();
+    }
+
+    [Fact]
+    public async Task Anonymous_Request_To_Remove_Banner_Should_Be_Unauthorized()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var client = fixture.CreateClient();
+
+        var response = await client.DeleteAsync("/api/tenants/banner", cancellationToken);
+
+        response.StatusCode.ShouldBe(HttpStatusCode.Unauthorized);
+    }
+
+    private static async Task<HttpResponseMessage> RemoveBannerAsync(
+        HttpClient client, string accessToken, CancellationToken cancellationToken)
+    {
+        var request = new HttpRequestMessage(HttpMethod.Delete, "/api/tenants/banner");
+        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", accessToken);
+        return await client.SendAsync(request, cancellationToken);
+    }
+
+    private static async Task<string?> GetPublicBannerUrlAsync(HttpClient client, string slug, CancellationToken cancellationToken)
+    {
+        var body = await client.GetFromJsonAsync<JsonElement>($"/api/tenants/by-slug/{slug}", cancellationToken);
+        return body.TryGetProperty("bannerUrl", out var value) && value.ValueKind == JsonValueKind.String ? value.GetString() : null;
     }
 
     private static async Task<HttpResponseMessage> UploadBannerAsync(

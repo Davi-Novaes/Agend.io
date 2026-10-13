@@ -126,7 +126,9 @@ export function resolveAssetUrl(path: string): string {
 }
 
 export function getTenantBySlug(slug: string): Promise<TenantPublicProfile> {
-  return request<TenantPublicProfile>(`/api/tenants/by-slug/${encodeURIComponent(slug)}`);
+  // A pagina publica precisa refletir alteracoes de marca imediatamente. Sem
+  // isto, o fetch feito no servidor do Next pode reutilizar um perfil antigo.
+  return request<TenantPublicProfile>(`/api/tenants/by-slug/${encodeURIComponent(slug)}`, { cache: "no-store" });
 }
 
 export type TerminologyPack = {
@@ -354,6 +356,14 @@ export async function uploadTenantLogo(file: File, accessToken: string): Promise
   }
 
   return response.json();
+}
+
+export function removeTenantLogo(accessToken: string): Promise<void> {
+  return request("/api/tenants/logo", { method: "DELETE" }, accessToken);
+}
+
+export function removeTenantBanner(accessToken: string): Promise<void> {
+  return request("/api/tenants/banner", { method: "DELETE" }, accessToken);
 }
 
 export async function uploadTenantBanner(file: File, accessToken: string): Promise<{ bannerUrl: string }> {

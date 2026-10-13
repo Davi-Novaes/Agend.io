@@ -3,13 +3,15 @@
 import * as React from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { ImageIcon, Palette, Type, Upload } from "lucide-react";
+import { ImageIcon, Palette, Trash2, Type, Upload } from "lucide-react";
 
 import {
   updateTenantBranding,
   updateTenantPageCustomization,
   uploadTenantLogo,
   uploadTenantBanner,
+  removeTenantLogo,
+  removeTenantBanner,
   resolveAssetUrl,
   TENANT_PROFILE_QUERY_KEY,
   ApiError,
@@ -61,19 +63,10 @@ export default function BrandingAppearancePage() {
 
   const [isSavingColor, setIsSavingColor] = React.useState(false);
   const [isSavingCustomization, setIsSavingCustomization] = React.useState(false);
-  const [selectedLogoFile, setSelectedLogoFile] = React.useState<File | null>(null);
   const [isUploadingLogo, setIsUploadingLogo] = React.useState(false);
   const logoInputRef = React.useRef<HTMLInputElement>(null);
-  const [selectedBannerFile, setSelectedBannerFile] = React.useState<File | null>(null);
   const [isUploadingBanner, setIsUploadingBanner] = React.useState(false);
   const bannerInputRef = React.useRef<HTMLInputElement>(null);
-
-  React.useEffect(() => {
-    return () => {
-      if (draft.logoPreviewUrl?.startsWith("blob:")) URL.revokeObjectURL(draft.logoPreviewUrl);
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- so limpa no unmount, nao a cada troca de preview.
-  }, []);
 
   const color = draft.primaryColorHex || "#3730A3";
   const ratio = contrastRatio(FOREGROUND_HEX, color);
@@ -119,7 +112,7 @@ export default function BrandingAppearancePage() {
         accessToken
       );
       toast.success("Aparência atualizada.");
-      queryClient.invalidateQueries({ queryKey: TENANT_PROFILE_QUERY_KEY });
+      await queryClient.invalidateQueries({ queryKey: TENANT_PROFILE_QUERY_KEY });
     } catch (error) {
       toast.error(error instanceof ApiError ? error.message : "Não foi possível salvar.");
     } finally {
@@ -127,63 +120,91 @@ export default function BrandingAppearancePage() {
     }
   }
 
-  function handleLogoFileChange(event: React.ChangeEvent<HTMLInputElement>) {
-    const file = event.target.files?.[0];
-    if (!file) return;
+  function validateImageFile(file: File, maxSizeBytes: number, maxSizeLabel: string): boolean {
     if (!ALLOWED_IMAGE_TYPES.includes(file.type)) {
       toast.error("Formato inválido. Envie um arquivo PNG, JPEG ou WEBP.");
-      return;
+      return false;
     }
-    if (file.size > MAX_LOGO_SIZE_BYTES) {
-      toast.error("O arquivo não pode ter mais que 2MB.");
-      return;
+    if (file.size > maxSizeBytes) {
+      toast.error(`O arquivo não pode ter mais que ${maxSizeLabel}.`);
+      return false;
     }
-    setSelectedLogoFile(file);
-    update({ logoPreviewUrl: URL.createObjectURL(file) });
+    return true;
   }
 
-  async function handleLogoUpload() {
-    if (!selectedLogoFile) return;
+  // Envia assim que o arquivo e escolhido: com um passo "Enviar" separado, o
+  // arquivo ficava so no estado desta aba enquanto a previa (contexto
+  // compartilhado) ja mostrava a imagem nova -- trocar de aba perdia o
+  // arquivo e a previa continuava mentindo que estava salvo.
+  async function handleLogoFileChange(event: React.ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+    if (!file || !validateImageFile(file, MAX_LOGO_SIZE_BYTES, "2MB")) return;
+
+    const previousPreviewUrl = draft.logoPreviewUrl;
+    const localPreviewUrl = URL.createObjectURL(file);
+    update({ logoPreviewUrl: localPreviewUrl });
     setIsUploadingLogo(true);
     try {
-      const result = await uploadTenantLogo(selectedLogoFile, accessToken);
+      const result = await uploadTenantLogo(file, accessToken);
       update({ logoPreviewUrl: resolveAssetUrl(result.logoUrl) });
-      setSelectedLogoFile(null);
-      queryClient.invalidateQueries({ queryKey: TENANT_PROFILE_QUERY_KEY });
+      await queryClient.invalidateQueries({ queryKey: TENANT_PROFILE_QUERY_KEY });
       toast.success("Logo atualizado.");
     } catch (error) {
+      update({ logoPreviewUrl: previousPreviewUrl });
       toast.error(error instanceof ApiError ? error.message : "Não foi possível enviar o logo.");
+    } finally {
+      URL.revokeObjectURL(localPreviewUrl);
+      setIsUploadingLogo(false);
+    }
+  }
+
+  async function handleRemoveLogo() {
+    setIsUploadingLogo(true);
+    try {
+      await removeTenantLogo(accessToken);
+      update({ logoPreviewUrl: null });
+      await queryClient.invalidateQueries({ queryKey: TENANT_PROFILE_QUERY_KEY });
+      toast.success("Logo removido. A página usa a cor principal no lugar.");
+    } catch (error) {
+      toast.error(error instanceof ApiError ? error.message : "Não foi possível remover o logo.");
     } finally {
       setIsUploadingLogo(false);
     }
   }
 
-  function handleBannerFileChange(event: React.ChangeEvent<HTMLInputElement>) {
+  async function handleBannerFileChange(event: React.ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0];
-    if (!file) return;
-    if (!ALLOWED_IMAGE_TYPES.includes(file.type)) {
-      toast.error("Formato inválido. Envie um arquivo PNG, JPEG ou WEBP.");
-      return;
-    }
-    if (file.size > MAX_BANNER_SIZE_BYTES) {
-      toast.error("O arquivo não pode ter mais que 4MB.");
-      return;
-    }
-    setSelectedBannerFile(file);
-    update({ bannerPreviewUrl: URL.createObjectURL(file) });
-  }
+    event.target.value = "";
+    if (!file || !validateImageFile(file, MAX_BANNER_SIZE_BYTES, "4MB")) return;
 
-  async function handleBannerUpload() {
-    if (!selectedBannerFile) return;
+    const previousPreviewUrl = draft.bannerPreviewUrl;
+    const localPreviewUrl = URL.createObjectURL(file);
+    update({ bannerPreviewUrl: localPreviewUrl });
     setIsUploadingBanner(true);
     try {
-      const result = await uploadTenantBanner(selectedBannerFile, accessToken);
+      const result = await uploadTenantBanner(file, accessToken);
       update({ bannerPreviewUrl: resolveAssetUrl(result.bannerUrl) });
-      setSelectedBannerFile(null);
-      queryClient.invalidateQueries({ queryKey: TENANT_PROFILE_QUERY_KEY });
+      await queryClient.invalidateQueries({ queryKey: TENANT_PROFILE_QUERY_KEY });
       toast.success("Banner atualizado.");
     } catch (error) {
+      update({ bannerPreviewUrl: previousPreviewUrl });
       toast.error(error instanceof ApiError ? error.message : "Não foi possível enviar o banner.");
+    } finally {
+      URL.revokeObjectURL(localPreviewUrl);
+      setIsUploadingBanner(false);
+    }
+  }
+
+  async function handleRemoveBanner() {
+    setIsUploadingBanner(true);
+    try {
+      await removeTenantBanner(accessToken);
+      update({ bannerPreviewUrl: null });
+      await queryClient.invalidateQueries({ queryKey: TENANT_PROFILE_QUERY_KEY });
+      toast.success("Banner removido. A capa usa a cor principal sólida.");
+    } catch (error) {
+      toast.error(error instanceof ApiError ? error.message : "Não foi possível remover o banner.");
     } finally {
       setIsUploadingBanner(false);
     }
@@ -198,9 +219,11 @@ export default function BrandingAppearancePage() {
         </CardHeader>
         <CardContent>
           <div className="flex items-center gap-4 rounded-xl border border-dashed bg-muted/15 p-4">
-            <div className="bg-background relative flex size-20 shrink-0 flex-col items-center justify-center overflow-hidden rounded-xl border shadow-sm">
-              <ImageIcon className="size-5 text-muted-foreground" />
-              <span className="mt-1 text-[10px] text-muted-foreground">Sem prévia</span>
+            <div
+              className="relative flex size-20 shrink-0 items-center justify-center overflow-hidden rounded-xl border text-3xl font-bold text-white shadow-sm"
+              style={{ backgroundColor: color }}
+            >
+              <span aria-hidden>{draft.name.trim().charAt(0).toUpperCase() || "A"}</span>
               {draft.logoPreviewUrl && (
                 // eslint-disable-next-line @next/next/no-img-element -- preview de upload local/URL dinamica da API.
                 <img key={draft.logoPreviewUrl} src={draft.logoPreviewUrl} alt="Logo do estabelecimento" className="absolute inset-0 size-full bg-background object-contain" onError={(event) => { event.currentTarget.style.display = "none"; }} />
@@ -208,18 +231,21 @@ export default function BrandingAppearancePage() {
             </div>
             <div className="flex flex-col gap-2">
               <input ref={logoInputRef} type="file" accept="image/png,image/jpeg,image/webp" onChange={handleLogoFileChange} className="hidden" />
-              <div className="flex gap-2">
-                <Button type="button" variant="outline" onClick={() => logoInputRef.current?.click()}>
+              <div className="flex flex-wrap gap-2">
+                <Button type="button" variant="outline" onClick={() => logoInputRef.current?.click()} disabled={isUploadingLogo}>
                   <Upload className="size-4" />
-                  Escolher arquivo
+                  {isUploadingLogo ? "Salvando..." : draft.logoPreviewUrl ? "Trocar imagem" : "Escolher arquivo"}
                 </Button>
-                {selectedLogoFile && (
-                  <Button type="button" onClick={handleLogoUpload} disabled={isUploadingLogo}>
-                    {isUploadingLogo ? "Enviando..." : "Enviar"}
+                {draft.logoPreviewUrl && (
+                  <Button type="button" variant="ghost" onClick={handleRemoveLogo} disabled={isUploadingLogo}>
+                    <Trash2 className="size-4" />
+                    Remover
                   </Button>
                 )}
               </div>
-              <p className="text-muted-foreground text-xs">PNG, JPEG ou WEBP, até 2MB.</p>
+              <p className="text-muted-foreground text-xs">
+                PNG, JPEG ou WEBP, até 2MB. Sem imagem, usamos a inicial do nome sobre a cor principal.
+              </p>
             </div>
           </div>
         </CardContent>
@@ -232,9 +258,11 @@ export default function BrandingAppearancePage() {
         </CardHeader>
         <CardContent>
           <div className="flex flex-col gap-4">
-            <div className="bg-muted/30 relative flex h-36 w-full flex-col items-center justify-center overflow-hidden rounded-xl border border-dashed sm:h-44">
-              <ImageIcon className="size-6 text-muted-foreground" />
-              <span className="mt-2 text-xs text-muted-foreground">Envie uma imagem horizontal para a capa</span>
+            <div
+              className="relative flex h-36 w-full flex-col items-center justify-center overflow-hidden rounded-xl border sm:h-44"
+              style={{ backgroundColor: color }}
+            >
+              <span className="text-xs font-medium text-white/85">Sem imagem: capa na cor principal</span>
               {draft.bannerPreviewUrl && (
                 // eslint-disable-next-line @next/next/no-img-element -- preview de upload local/URL dinamica da API.
                 <img key={draft.bannerPreviewUrl} src={draft.bannerPreviewUrl} alt="Banner do estabelecimento" className="absolute inset-0 size-full bg-muted object-cover" onError={(event) => { event.currentTarget.style.display = "none"; }} />
@@ -242,14 +270,15 @@ export default function BrandingAppearancePage() {
             </div>
             <div className="flex flex-col gap-2">
               <input ref={bannerInputRef} type="file" accept="image/png,image/jpeg,image/webp" onChange={handleBannerFileChange} className="hidden" />
-              <div className="flex gap-2">
-                <Button type="button" variant="outline" onClick={() => bannerInputRef.current?.click()}>
+              <div className="flex flex-wrap gap-2">
+                <Button type="button" variant="outline" onClick={() => bannerInputRef.current?.click()} disabled={isUploadingBanner}>
                   <Upload className="size-4" />
-                  Escolher arquivo
+                  {isUploadingBanner ? "Salvando..." : draft.bannerPreviewUrl ? "Trocar imagem" : "Escolher arquivo"}
                 </Button>
-                {selectedBannerFile && (
-                  <Button type="button" onClick={handleBannerUpload} disabled={isUploadingBanner}>
-                    {isUploadingBanner ? "Enviando..." : "Enviar"}
+                {draft.bannerPreviewUrl && (
+                  <Button type="button" variant="ghost" onClick={handleRemoveBanner} disabled={isUploadingBanner}>
+                    <Trash2 className="size-4" />
+                    Remover e usar cor sólida
                   </Button>
                 )}
               </div>

@@ -1,3 +1,4 @@
+using System.Security.Cryptography;
 using Agendio.Infrastructure.Storage;
 using Agendio.Modules.Tenancy.Infrastructure.Persistence;
 using Agendio.SharedKernel.Messaging;
@@ -19,14 +20,15 @@ public sealed class UpdateTenantLogoCommandHandler(
             return Result.Failure<string>(Error.NotFound("Tenant.NotFound", "Estabelecimento nao encontrado."));
         }
 
-        // Nome fixo por tenant (nao por upload): reenviar SUBSTITUI o logo
-        // anterior em vez de acumular arquivo orfao a cada troca. ContentType ja
-        // validado pelo pipeline (UpdateTenantLogoCommandValidator).
+        // O arquivo continua fixo para nao acumular lixo, mas a URL recebe um
+        // hash do conteudo. ContentType ja foi validado pelo pipeline.
         var extension = ImageContentTypes.ExtensionByContentType[request.ContentType];
         var relativePath = $"tenant-logos/{tenantContext.TenantId.Value}{extension}";
 
         using var contentStream = new MemoryStream(request.Content);
-        var logoUrl = await fileStorage.SaveAsync(relativePath, contentStream, cancellationToken);
+        var storedUrl = await fileStorage.SaveAsync(relativePath, contentStream, cancellationToken);
+        var contentVersion = Convert.ToHexString(SHA256.HashData(request.Content))[..12].ToLowerInvariant();
+        var logoUrl = $"{storedUrl}?v={contentVersion}";
 
         var setResult = tenant.SetLogo(logoUrl);
         if (setResult.IsFailure)

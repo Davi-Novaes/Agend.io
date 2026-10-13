@@ -6,6 +6,8 @@ using Agendio.Modules.Tenancy.Application.GetTenantCompanyInfo;
 using Agendio.Modules.Tenancy.Application.GetTenantProfile;
 using Agendio.Modules.Tenancy.Application.GetUnitById;
 using Agendio.Modules.Tenancy.Application.ListUnits;
+using Agendio.Modules.Tenancy.Application.RemoveTenantBanner;
+using Agendio.Modules.Tenancy.Application.RemoveTenantLogo;
 using Agendio.Modules.Tenancy.Application.SetTenantBusinessHours;
 using Agendio.Modules.Tenancy.Application.SetUnitActiveStatus;
 using Agendio.Modules.Tenancy.Application.SetUnitBusinessHours;
@@ -113,6 +115,24 @@ public sealed class TenancyEndpoints : IEndpointModule
         .RequireAuthorization(policy => policy.RequireRole("Owner"))
         .WithName("UpdateTenantBanner")
         .WithSummary("Faz upload do banner (capa) da pagina publica do estabelecimento (PNG/JPEG/WEBP, ate 4MB).");
+
+        group.MapDelete("/logo", async (IDispatcher dispatcher, CancellationToken cancellationToken) =>
+        {
+            var result = await dispatcher.Send(new RemoveTenantLogoCommand(), cancellationToken);
+            return result.IsSuccess ? Results.NoContent() : result.Error.ToProblemResult();
+        })
+        .RequireAuthorization(policy => policy.RequireRole("Owner"))
+        .WithName("RemoveTenantLogo")
+        .WithSummary("Remove o logo; a pagina publica volta a usar a cor de marca.");
+
+        group.MapDelete("/banner", async (IDispatcher dispatcher, CancellationToken cancellationToken) =>
+        {
+            var result = await dispatcher.Send(new RemoveTenantBannerCommand(), cancellationToken);
+            return result.IsSuccess ? Results.NoContent() : result.Error.ToProblemResult();
+        })
+        .RequireAuthorization(policy => policy.RequireRole("Owner"))
+        .WithName("RemoveTenantBanner")
+        .WithSummary("Remove o banner; a capa da pagina publica volta a ser a cor de marca solida.");
 
         group.MapGet("/profile", async (IDispatcher dispatcher, CancellationToken cancellationToken) =>
         {

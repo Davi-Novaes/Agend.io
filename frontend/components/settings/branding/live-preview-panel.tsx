@@ -1,6 +1,6 @@
 "use client";
 
-import { ExternalLink, Sparkles } from "lucide-react";
+import { ExternalLink } from "lucide-react";
 
 import type { PublicPageButtonStyle, PublicPageFont } from "@/lib/api/client";
 import { useBrandingDraft } from "@/components/settings/branding/branding-draft-context";
@@ -80,7 +80,7 @@ export function LivePreviewPanel({ compact = false }: { compact?: boolean }) {
           )}
           <div className="relative flex flex-col items-center gap-3">
             <div className="relative flex size-14 items-center justify-center overflow-hidden rounded-xl bg-white shadow">
-              <Sparkles className="size-6" style={{ color: primary }} />
+              <span aria-hidden className="text-2xl font-bold" style={{ color: primary }}>{draft.name.trim().charAt(0).toUpperCase() || "A"}</span>
               {draft.logoPreviewUrl && (
                 // eslint-disable-next-line @next/next/no-img-element -- previa local/blob, nao asset estatico do build.
                 <img key={draft.logoPreviewUrl} src={draft.logoPreviewUrl} alt="" className="absolute inset-0 size-full bg-white object-contain" onError={(event) => { event.currentTarget.style.display = "none"; }} />
