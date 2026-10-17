@@ -51,7 +51,7 @@ export default function RelatoriosPage() {
 
       <nav
         aria-label="Seções do relatório"
-        className="border-border/70 bg-background/90 sticky top-14 z-10 -mx-1 mb-8 flex max-w-full gap-1 overflow-x-auto border-y px-1 py-2 backdrop-blur"
+        className="border-border/70 -mx-1 mb-8 flex max-w-full gap-1 overflow-x-auto border-y px-1 py-2"
       >
         {REPORT_SECTIONS.map((section) => (
           <a
