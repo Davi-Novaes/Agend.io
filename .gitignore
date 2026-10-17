@@ -61,8 +61,10 @@ logs/
 
 # ---------- Arquivos de assistentes de codigo (ficam so na maquina local) ----------
 .claude/
+.agents/
 CLAUDE.md
 AGENTS.md
+skills-lock.json
 
 # ---------- Legado (projeto Python sem relacao, mantido para referencia) ----------
 _legacy/**/__pycache__/
