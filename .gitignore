@@ -59,8 +59,10 @@ $RECYCLE.BIN/
 *.log
 logs/
 
-# ---------- Estado efemero de sessao do Claude Code ----------
-.claude/*.lock
+# ---------- Arquivos de assistentes de codigo (ficam so na maquina local) ----------
+.claude/
+CLAUDE.md
+AGENTS.md
 
 # ---------- Legado (projeto Python sem relacao, mantido para referencia) ----------
 _legacy/**/__pycache__/
